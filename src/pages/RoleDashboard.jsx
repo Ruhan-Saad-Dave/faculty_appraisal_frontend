@@ -4,21 +4,35 @@ import HODDashboard from "./HODDashboard";
 import DeanDashboard from "./DeanDashboard";
 import DirectorDashboard from "./DirectorDashboard";
 import VCDashboard from "./VCDashboard";
+import { SCHOOL_CONFIG } from "../constants/formConfig";
 
 export default function RoleDashboard() {
   const role = (localStorage.getItem("role") || "").toLowerCase();
+  const school = localStorage.getItem("school") || "";
 
   switch (role) {
     case "faculty":
       return <Dashboard />;
-    case "hod":
+    
+    case "hod": {
+      const hasHod = SCHOOL_CONFIG[school]?.hasHod ?? true;
+      if (!hasHod) {
+        // If school has no HOD, redirect HOD user to Director (though normally HOD wouldn't exist)
+        // More importantly, this handles the routing if someone manually types the URL.
+        return <DirectorDashboard />;
+      }
       return <HODDashboard />;
-    case "dean":
-      return <DeanDashboard />;
+    }
+
     case "director":
       return <DirectorDashboard />;
+      
+    case "dean":
+      return <DeanDashboard />;
+      
     case "vc":
       return <VCDashboard />;
+      
     default:
       return <Navigate to="/login" />;
   }

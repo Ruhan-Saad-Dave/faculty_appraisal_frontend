@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { APP_INFO } from "../constants/formConfig";
 
 export default function FacultyProfile({ user, onProceed }) {
   const [confirmed, setConfirmed] = useState(false);
@@ -37,8 +38,8 @@ const roleColor = {
         <div style={S.logoWrap}>
           <div style={S.logoMark}>FA</div>
           <div>
-            <div style={S.logoName}>FacultyAppraise</div>
-            <div style={S.logoSub}>D Y Patil International University</div>
+            <div style={S.logoName}>{APP_INFO.PORTAL_NAME}</div>
+            <div style={S.logoSub}>{APP_INFO.UNIVERSITY_NAME}</div>
           </div>
         </div>
         <div style={S.ayPill}>Academic Year {user.ay}</div>

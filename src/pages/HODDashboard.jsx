@@ -1,177 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const HOD_USER = {
-  name: "Dr. Priya Sharma", employeeId: "DYPIU-HOD-0042",
-  designation: "Associate Professor & HOD",
-  department: "Computer Science & Engineering",
-  school: "School of Engineering", ay: "2025-2026", avatar: "PS",
-};
-
-const FACULTY_LIST = [
-  {
-    id: 1, name: "Prof. Arjun Mehta", employeeId: "DYPIU-FAC-0101",
-    designation: "Assistant Professor", submittedOn: "2025-04-18",
-    status: "Pending Review", avatar: "AM", avatarColor: "#6366f1",
-    // Mock faculty-filled data
-    info: { name: "Prof. Arjun Mehta", qual: "M.Tech (CSE)", desig: "Assistant Professor", ay: "2025-2026" },
-    lectures: [
-      { sem: "Sem I", code: "CS301 / Data Structures", planned: "48", conducted: "46", score: "18", hod: "", director: "" },
-      { sem: "Sem II", code: "CS401 / Operating Systems", planned: "48", conducted: "45", score: "17", hod: "", director: "" },
-    ],
-    courseFile: { course: "CS301", title: "Data Structures", details: "Yes", score: "16", hod: "", director: "" },
-    innovScore: "8", innovHod: "",
-    projects: [
-      { label: "Project guided (3/batch)", score: "5", hod: "", director: "" },
-      { label: "Industrial collaboration / Sponsorship", score: "3", hod: "", director: "" },
-      { label: "Award received", score: "2", hod: "", director: "" },
-      { label: "Project outcome: events/publications", score: "3", hod: "", director: "" },
-    ],
-    quals: [
-      { label: "Higher Qualification achieved (5 Marks)", score: "5", hod: "", director: "" },
-      { label: "Add-on Qualification / Certification", score: "4", hod: "", director: "" },
-    ],
-    feedback: [
-      { code: "CS301", fb1: "4.2", fb2: "4.4", score: "8.8", hod: "", director: "" },
-      { code: "CS401", fb1: "3.9", fb2: "4.1", score: "8.0", hod: "", director: "" },
-    ],
-    deptActs: [
-      { activity: "Department Seminar Coordination", nature: "Coordinator", score: "10", hod: "", director: "" },
-      { activity: "Lab Maintenance", nature: "In-charge", score: "8", hod: "", director: "" },
-    ],
-    uniActs: [
-      { activity: "Exam Duty", nature: "Flying Squad", score: "15", hod: "", director: "" },
-      { activity: "NAAC Documentation", nature: "Member", score: "10", hod: "", director: "" },
-    ],
-    society: [
-      { label: "Induction Program", details: "FE Student induction", score: "5", hod: "", director: "" },
-      { label: "NSS", details: "Organised cleanliness drive", score: "5", hod: "", director: "" },
-    ],
-    industry: [
-      { name: "TCS Pune", details: "Guest Lecture + MOU", score: "4", hod: "", director: "" },
-    ],
-    acr: [
-      { label: "Self-motivation and Proactiveness", hod: "", director: "" },
-      { label: "Punctuality", hod: "", director: "" },
-      { label: "Target based work", hod: "", director: "" },
-      { label: "Effectiveness", hod: "", director: "" },
-      { label: "Obedience", hod: "", director: "" },
-    ],
-    journals: [
-      { title: "Deep Learning for Image Segmentation", journal: "Elsevier CVIU", issn: "1077-3142", index: "Scopus", score: "30", hod: "", director: "" },
-    ],
-    books: [
-      { title: "Data Structures with C++", book: "Oxford Press, 2024", issn: "978-01-9", pub: "National", coauth: "1", first: "Yes", score: "20", hod: "", director: "" },
-    ],
-    ict: [
-      { title: "Data Structures MOOC", desc: "12-week online course", type: "E-Content", quad: "4", score: "15", hod: "", director: "" },
-    ],
-    research: [
-      { degree: "PhD", name: "Rohan Pawar", thesis: "Submitted 2024-11-10", score: "20", hod: "", director: "" },
-    ],
-    patents: [
-      { title: "Smart Irrigation System", type: "National", date: "2024-08-15", status: "Published", fileNo: "202421012345", score: "25", hod: "", director: "" },
-    ],
-    awards: [
-      { title: "Best Paper Award", date: "2024-03-20", agency: "IEEE", level: "International", score: "10", hod: "", director: "" },
-    ],
-    confs: [
-      { title: "ML in Healthcare", type: "Paper Presented", org: "IEEE ICCCNT 2024", level: "International", score: "15", hod: "", director: "" },
-    ],
-    proposals: [
-      { title: "AI-based Traffic Management", duration: "2 Years", agency: "DST", amount: "12.5 Lakhs", score: "10", hod: "", director: "" },
-    ],
-    fdps: [
-      { program: "FDP on Deep Learning", duration: "1 Week", org: "IIT Bombay", score: "5", hod: "", director: "" },
-    ],
-    training: [
-      { company: "Infosys BPM", duration: "2 Weeks", nature: "Industry Collaboration", score: "5", hod: "", director: "" },
-    ],
-    docs: {
-      "lec-0": [{ name: "timetable_sem1.pdf", url: "#", type: "application/pdf" }],
-      "lec-1": [{ name: "timetable_sem2.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "journal_paper_1.pdf", url: "#", type: "application/pdf" }, { name: "acceptance_letter.pdf", url: "#", type: "application/pdf" }],
-      "book-0": [{ name: "book_cover.pdf", url: "#", type: "application/pdf" }],
-      "pat-0": [{ name: "patent_certificate.pdf", url: "#", type: "application/pdf" }],
-      "conf-0": [{ name: "conference_paper.pdf", url: "#", type: "application/pdf" }],
-      "fdp-0": [{ name: "fdp_certificate.pdf", url: "#", type: "application/pdf" }],
-    },
-  },
-  {
-    id: 2, name: "Dr. Sneha Kulkarni", employeeId: "DYPIU-FAC-0088",
-    designation: "Assistant Professor", submittedOn: "2025-04-20",
-    status: "Pending Review", avatar: "SK", avatarColor: "#0ea5e9",
-    info: { name: "Dr. Sneha Kulkarni", qual: "Ph.D (IT)", desig: "Assistant Professor", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "IT201 / Database Systems", planned: "48", conducted: "48", score: "22", hod: "", director: "" }],
-    courseFile: { course: "IT201", title: "Database Systems", details: "Yes", score: "18", hod: "", director: "" },
-    innovScore: "9", innovHod: "",
-    projects: [
-      { label: "Project guided (3/batch)", score: "4", hod: "", director: "" },
-      { label: "Industrial collaboration / Sponsorship", score: "4", hod: "", director: "" },
-      { label: "Award received", score: "3", hod: "", director: "" },
-      { label: "Project outcome: events/publications", score: "4", hod: "", director: "" },
-    ],
-    quals: [
-      { label: "Higher Qualification achieved", score: "5", hod: "", director: "" },
-      { label: "Add-on Qualification / Certification", score: "5", hod: "", director: "" },
-    ],
-    feedback: [{ code: "IT201", fb1: "4.6", fb2: "4.8", score: "9.4", hod: "", director: "" }],
-    deptActs: [{ activity: "Departmental Seminar", nature: "Organizer", score: "15", hod: "", director: "" }],
-    uniActs: [{ activity: "Admission Committee", nature: "Member", score: "18", hod: "", director: "" }],
-    society: [{ label: "Blood Donation", details: "Organised camp", score: "5", hod: "", director: "" }],
-    industry: [{ name: "Wipro Pune", details: "Internship MOU", score: "5", hod: "", director: "" }],
-    acr: [
-      { label: "Self-motivation and Proactiveness", hod: "", director: "" },
-      { label: "Punctuality", hod: "", director: "" },
-      { label: "Target based work", hod: "", director: "" },
-      { label: "Effectiveness", hod: "", director: "" },
-      { label: "Obedience", hod: "", director: "" },
-    ],
-    journals: [{ title: "Blockchain in Healthcare", journal: "Springer", issn: "1234-5678", index: "SCI", score: "40", hod: "", director: "" }],
-    books: [], ict: [], research: [], patents: [], awards: [], confs: [], proposals: [], fdps: [], training: [],
-    docs: {
-      "lec-0": [{ name: "lecture_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "blockchain_paper.pdf", url: "#", type: "application/pdf" }],
-    },
-  },
-  {
-    id: 3, name: "Prof. Rahul Desai", employeeId: "DYPIU-FAC-0115",
-    designation: "Senior Assistant Professor", submittedOn: "2025-04-22",
-    status: "Reviewed", avatar: "RD", avatarColor: "#10b981",
-    info: { name: "Prof. Rahul Desai", qual: "M.E. (Electronics)", desig: "Senior Assistant Professor", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "EC201 / Digital Electronics", planned: "48", conducted: "44", score: "16", hod: "16", director: "" }],
-    courseFile: { course: "EC201", title: "Digital Electronics", details: "Yes", score: "14", hod: "14", director: "" },
-    innovScore: "7", innovHod: "7",
-    projects: [
-      { label: "Project guided", score: "5", hod: "5", director: "" },
-      { label: "Industrial collaboration", score: "2", hod: "2", director: "" },
-      { label: "Award received", score: "0", hod: "0", director: "" },
-      { label: "Project outcome", score: "2", hod: "2", director: "" },
-    ],
-    quals: [
-      { label: "Higher Qualification", score: "0", hod: "0", director: "" },
-      { label: "Certification", score: "3", hod: "3", director: "" },
-    ],
-    feedback: [{ code: "EC201", fb1: "3.8", fb2: "4.0", score: "7.8", hod: "7.8", director: "" }],
-    deptActs: [{ activity: "Lab Coordinator", nature: "In-charge", score: "12", hod: "12", director: "" }],
-    uniActs: [{ activity: "University Sports Committee", nature: "Member", score: "10", hod: "10", director: "" }],
-    society: [{ label: "Yoga Classes", details: "Organised yoga session", score: "5", hod: "5", director: "" }],
-    industry: [{ name: "Bosch Pune", details: "Site Visit", score: "3", hod: "3", director: "" }],
-    acr: [
-      { label: "Self-motivation and Proactiveness", hod: "18", director: "" },
-      { label: "Punctuality", hod: "20", director: "" },
-      { label: "Target based work", hod: "17", director: "" },
-      { label: "Effectiveness", hod: "16", director: "" },
-      { label: "Obedience", hod: "19", director: "" },
-    ],
-    journals: [], books: [], ict: [], research: [], patents: [], awards: [],
-    confs: [{ title: "IoT Security", type: "Paper", org: "National Conf", level: "National", score: "10", hod: "10", director: "" }],
-    proposals: [], fdps: [], training: [],
-    docs: { "lec-0": [{ name: "ec201_schedule.pdf", url: "#", type: "application/pdf" }] },
-    hodRemarks: "Good performance. Continue research activities.",
-  },
-];
+import { APP_INFO } from "../constants/formConfig";
+import { HOD_USER, FACULTY_LIST } from "../data/mockData";
+import { getFacultyForHOD } from "../services/api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -203,8 +34,11 @@ function ScoreBar({ score, max, color = "#6366f1" }) {
 }
 
 function StatusBadge({ status }) {
-  const map = { "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" }, "Reviewed": { bg: "#d1fae5", color: "#065f46", dot: "#10b981" } };
-  const s = map[status] || map["Pending Review"];
+    const map = {
+      "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
+      "HOD Reviewed":   { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
+    };
+    const s = map[status] || map["Pending Review"];
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: s.bg, color: s.color, fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20 }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, display: "inline-block" }} />
@@ -1042,12 +876,21 @@ export default function HODDashboard() {
   const [activeMainTab, setActiveMainTab] = useState("myAppraisal");
   const [hodAppraisalTab, setHodAppraisalTab] = useState("partA");
   const [reviewingFaculty, setReviewingFaculty] = useState(null);
-  const [facultyList, setFacultyList] = useState(FACULTY_LIST);
+  const [facultyList, setFacultyList] = useState([]);
+
+  const hodSchool = localStorage.getItem("school");
+  const hodDept = localStorage.getItem("department");
+
+  useEffect(() => {
+    setFacultyList(getFacultyForHOD(hodDept, hodSchool));
+  }, [hodDept, hodSchool]);
+
   const [filterStatus, setFilterStatus] = useState("All");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+
   // ── HOD's own appraisal form state ──
-  const [info, setInfo] = useState({ name: HOD_USER.name, qual: "", desig: HOD_USER.designation, ay: "2025-2026" });
+  const [info, setInfo] = useState({ name: HOD_USER.name, qual: "", desig: HOD_USER.designation, ay: HOD_USER.ay });
   const inf = (k) => (v) => setInfo((p) => ({ ...p, [k]: v }));
 
   const [lectures, setLectures] = useState([
@@ -1225,24 +1068,277 @@ export default function HODDashboard() {
     { id: "myAppraisal", icon: "👤", label: "My Appraisal", sub: "View your self-appraisal form" },
     { id: "approvals", icon: "📋", label: "Pending Approvals", sub: `${pendingCount} awaiting review`, badge: pendingCount },
   ];
+  const generateReport = () => {
+  const win = window.open('', '_blank');
+
+  const html = `
+  <html>
+  <head>
+    <title>Faculty Appraisal</title>
+
+    <style>
+      @page { size: A4; margin: 18mm; }
+
+      body {
+        font-family: "Times New Roman", serif;
+        font-size: 12px;
+        color: #000;
+      }
+
+      h1 { text-align: center; }
+      h2 { margin-top: 25px; border-bottom: 2px solid #000; }
+      h3 { margin-top: 15px; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 15px;
+        table-layout: fixed;
+      }
+
+      th, td {
+        border: 1px solid #000;
+        padding: 6px;
+        word-wrap: break-word;
+      }
+
+      th {
+        background: #f2f2f2;
+        text-align: center;
+      }
+
+      .center { text-align: center; }
+      .total { font-weight: bold; font-size: 13px; }
+      .page-break { page-break-before: always; }
+
+      .info td {
+        border: none;
+        padding: 4px;
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <h1>Faculty Appraisal Report</h1>
+
+    <!-- PERSONAL INFO -->
+    <table class="info">
+      <tr><td><b>Name:</b></td><td>${info.name || "&nbsp;"}</td></tr>
+      <tr><td><b>Qualification:</b></td><td>${info.qual || "&nbsp;"}</td></tr>
+      <tr><td><b>Designation:</b></td><td>${info.desig || "&nbsp;"}</td></tr>
+      <tr><td><b>Academic Year:</b></td><td>${info.ay || "&nbsp;"}</td></tr>
+    </table>
+
+    <!-- ================= PART A ================= -->
+    <h2>PART A — Teaching & Academic Activities</h2>
+
+    <!-- A1 -->
+    <h3>A1: Lectures / Tutorials / Practicals</h3>
+    <table>
+      <tr>
+        <th>Semester</th><th>Course</th>
+        <th>Planned</th><th>Conducted</th><th>Score</th>
+      </tr>
+      ${lectures.map(l => `
+        <tr>
+          <td>${l.sem || "&nbsp;"}</td>
+          <td>${l.code || "&nbsp;"}</td>
+          <td class="center">${l.planned || "&nbsp;"}</td>
+          <td class="center">${l.conducted || "&nbsp;"}</td>
+          <td class="center">${l.score || "&nbsp;"}</td>
+        </tr>
+      `).join('')}
+    </table>
+
+    <!-- A2 -->
+    <h3>A2: Course File</h3>
+    <table>
+      <tr><th>Course</th><th>Title</th><th>Details</th><th>Score</th></tr>
+      <tr>
+        <td>${courseFile.course || "&nbsp;"}</td>
+        <td>${courseFile.title || "&nbsp;"}</td>
+        <td>${courseFile.details || "&nbsp;"}</td>
+        <td class="center">${courseFile.score || "&nbsp;"}</td>
+      </tr>
+    </table>
+
+    <!-- A3 -->
+    <h3>A3: Innovative Teaching</h3>
+    <table>
+      <tr><th>Description</th><th>Score</th></tr>
+      <tr>
+        <td>Innovative Teaching Methods</td>
+        <td class="center">${innovScore || "&nbsp;"}</td>
+      </tr>
+    </table>
+
+    <!-- A4 -->
+    <h3>A4: Projects</h3>
+    <table>
+      <tr><th>Project Type</th><th>Score</th></tr>
+      ${projects.map(p => `<tr><td>${p.label || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- A5 -->
+    <h3>A5: Qualification Enhancement</h3>
+    <table>
+      <tr><th>Description</th><th>Score</th></tr>
+      ${quals.map(q => `<tr><td>${q.label || "&nbsp;"}</td><td class="center">${q.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- Feedback -->
+    <h3>B: Student Feedback</h3>
+    <table>
+      <tr><th>Course</th><th>FB1</th><th>FB2</th><th>Score</th></tr>
+      ${feedback.map(f => `
+        <tr>
+          <td>${f.code || "&nbsp;"}</td>
+          <td class="center">${f.fb1 || "&nbsp;"}</td>
+          <td class="center">${f.fb2 || "&nbsp;"}</td>
+          <td class="center">${f.score || "&nbsp;"}</td>
+        </tr>
+      `).join('')}
+    </table>
+
+    <!-- Department -->
+    <h3>C: Departmental Activities</h3>
+    <table>
+      <tr><th>Activity</th><th>Nature</th><th>Score</th></tr>
+      ${deptActs.map(d => `<tr><td>${d.activity || "&nbsp;"}</td><td>${d.nature || "&nbsp;"}</td><td class="center">${d.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- University -->
+    <h3>D: University Activities</h3>
+    <table>
+      <tr><th>Activity</th><th>Nature</th><th>Score</th></tr>
+      ${uniActs.map(u => `<tr><td>${u.activity || "&nbsp;"}</td><td>${u.nature || "&nbsp;"}</td><td class="center">${u.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- Society -->
+    <h3>E: Contribution to Society</h3>
+    <table>
+      <tr><th>Activity</th><th>Details</th><th>Score</th></tr>
+      ${society.map(s => `<tr><td>${s.label || "&nbsp;"}</td><td>${s.details || "&nbsp;"}</td><td class="center">${s.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- Industry -->
+    <h3>F: Industry Interaction</h3>
+    <table>
+      <tr><th>Company</th><th>Details</th><th>Score</th></tr>
+      ${industry.map(i => `<tr><td>${i.name || "&nbsp;"}</td><td>${i.details || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- ACR -->
+    <h3>G: ACR (Performance Indicators)</h3>
+    <table>
+      <tr><th>Criteria</th><th>Score</th></tr>
+      ${acr.map(a => `<tr><td>${a.label}</td><td class="center">${a.hod || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <p class="total">Part A Total: ${partATotal}</p>
+
+    <div class="page-break"></div>
+
+    <!-- ================= PART B ================= -->
+    <h2>PART B — Research & Development</h2>
+
+    <h3>Journals</h3>
+    <table>
+      <tr><th>Title</th><th>Journal</th><th>Index</th><th>Score</th></tr>
+      ${journals.map(j => `<tr><td>${j.title || "&nbsp;"}</td><td>${j.journal || "&nbsp;"}</td><td>${j.index || "&nbsp;"}</td><td class="center">${j.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Books</h3>
+    <table>
+      <tr><th>Title</th><th>Publisher</th><th>Score</th></tr>
+      ${books.map(b => `<tr><td>${b.title || "&nbsp;"}</td><td>${b.book || "&nbsp;"}</td><td class="center">${b.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>ICT</h3>
+    <table>
+      <tr><th>Title</th><th>Description</th><th>Score</th></tr>
+      ${ict.map(i => `<tr><td>${i.title || "&nbsp;"}</td><td>${i.desc || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Research Guidance</h3>
+    <table>
+      <tr><th>Degree</th><th>Name</th><th>Thesis</th><th>Score</th></tr>
+      ${research.map(r => `<tr><td>${r.degree || "&nbsp;"}</td><td>${r.name || "&nbsp;"}</td><td>${r.thesis || "&nbsp;"}</td><td class="center">${r.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Research Projects</h3>
+    <table>
+      <tr><th>Title</th><th>Agency</th><th>Amount</th><th>Score</th></tr>
+      ${projects2.map(p => `<tr><td>${p.title || "&nbsp;"}</td><td>${p.agency || "&nbsp;"}</td><td>${p.amount || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Patents</h3>
+    <table>
+      <tr><th>Title</th><th>Type</th><th>Date</th><th>Score</th></tr>
+      ${patents.map(p => `<tr><td>${p.title || "&nbsp;"}</td><td>${p.type || "&nbsp;"}</td><td>${p.date || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Awards</h3>
+    <table>
+      <tr><th>Title</th><th>Date</th><th>Agency</th><th>Score</th></tr>
+      ${awards.map(a => `<tr><td>${a.title || "&nbsp;"}</td><td>${a.date || "&nbsp;"}</td><td>${a.agency || "&nbsp;"}</td><td class="center">${a.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Conferences</h3>
+    <table>
+      <tr><th>Title</th><th>Type</th><th>Organizer</th><th>Score</th></tr>
+      ${confs.map(c => `<tr><td>${c.title || "&nbsp;"}</td><td>${c.type || "&nbsp;"}</td><td>${c.org || "&nbsp;"}</td><td class="center">${c.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Proposals</h3>
+    <table>
+      <tr><th>Title</th><th>Duration</th><th>Agency</th><th>Score</th></tr>
+      ${proposals.map(p => `<tr><td>${p.title || "&nbsp;"}</td><td>${p.duration || "&nbsp;"}</td><td>${p.agency || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>FDP / Training</h3>
+    <table>
+      <tr><th>Program</th><th>Duration</th><th>Organization</th><th>Score</th></tr>
+      ${fdps.map(f => `<tr><td>${f.program || "&nbsp;"}</td><td>${f.duration || "&nbsp;"}</td><td>${f.org || "&nbsp;"}</td><td class="center">${f.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Industrial Training</h3>
+    <table>
+      <tr><th>Company</th><th>Duration</th><th>Nature</th><th>Score</th></tr>
+      ${training.map(t => `<tr><td>${t.company || "&nbsp;"}</td><td>${t.duration || "&nbsp;"}</td><td>${t.nature || "&nbsp;"}</td><td class="center">${t.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <p class="total">Part B Total: ${partBTotal}</p>
+    <p class="total">Grand Total: ${grandTotal}</p>
+    <p class="total">Grade: ${g.label}</p>
+
+  </body>
+  </html>
+  `;
+
+  win.document.write(html);
+  win.document.close();
+  win.print();
+};
 
   const handleSubmitReview = (id, hodTotal, remarks) => {
-    setFacultyList(prev => prev.map(f => f.id === id ? { ...f, status: "Reviewed", hodTotal, hodRemarks: remarks } : f));
+    setFacultyList(prev => prev.map(f => f.id === id ? { ...f, status: "HOD Reviewed", hodTotal, hodRemarks: remarks } : f));
     setReviewingFaculty(null);
   };
 
   const filtered = filterStatus === "All" ? facultyList : facultyList.filter(f => f.status === filterStatus);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#f8fafc", color: "#1e293b" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: "Georgia, serif", background: "#f8fafc", color: "#1e293b" }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{ width: 252, minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderTopRightRadius: 18, borderBottomRightRadius: 18, marginRight: 8, boxShadow: "6px 0 20px rgba(15,23,42,0.18)" }}>
+      <aside style={{ width: 252, height: "100vh", overflowY: "auto", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, flexShrink: 0, boxShadow: "6px 0 20px rgba(15,23,42,0.18)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#6366f1,#0ea5e9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13 }}>FA</div>
           <div>
-            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 13 }}>FacultyAppraise</div>
-            <div style={{ color: "#475569", fontSize: 9, lineHeight: 1.3 }}>D Y Patil International University</div>
+            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 13 }}>{APP_INFO.PORTAL_NAME}</div>
+            <div style={{ color: "#475569", fontSize: 9, lineHeight: 1.3 }}>{APP_INFO.UNIVERSITY_NAME}</div>
           </div>
         </div>
 
@@ -2063,8 +2159,8 @@ export default function HODDashboard() {
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-                  <button style={{ padding: "10px 24px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
-                    Save Draft
+                  <button onClick={generateReport} style={{ padding: "10px 24px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
+                    Generate Report
                   </button>
                   <button style={{ padding: "10px 28px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
                     ✔ Submit Appraisal
@@ -2198,7 +2294,7 @@ export default function HODDashboard() {
             <div style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 800, fontSize: 17, color: "#0f172a", marginBottom: 6 }}>Confirm Logout</div>
               <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                You are about to log out of <strong>FacultyAppraise</strong>.<br />Any unsaved changes will be lost.
+                You are about to log out of <strong>{APP_INFO.PORTAL_NAME}</strong>.<br />Any unsaved changes will be lost.
               </div>
             </div>
             <div style={{ display: "flex", gap: 12, width: "100%" }}>

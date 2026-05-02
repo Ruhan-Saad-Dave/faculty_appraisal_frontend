@@ -1,340 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const VC_USER = {
-  name: "Prof. Rajendra Kulkarni", employeeId: "DYPIU-VC-0001",
-  designation: "Vice Chancellor",
-  school: "D Y Patil International University", ay: "2025-2026", avatar: "RK",
-};
-
-// Deans visible to VC (with Dean self-score)
-const DEAN_LIST = [
-  {
-    id: 401, name: "Prof. Anand Krishnamurthy", employeeId: "DYPIU-DEAN-0001",
-    designation: "Dean of Academics", department: "Office of the Dean",
-    submittedOn: "2025-04-30", status: "Pending VC Review",
-    avatar: "AK", avatarColor: "#7c3aed",
-    deanSelfScore: 430,
-    info: { name: "Prof. Anand Krishnamurthy", qual: "Ph.D., LLD (Law & Policy)", desig: "Dean of Academics", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "GS701 / Academic Leadership & Policy", planned: "30", conducted: "29", score: "18", dean: "18", vc: "" }],
-    courseFile: { course: "GS701", title: "Academic Leadership & Policy", details: "Yes", score: "18", dean: "18", vc: "" },
-    innovScore: "9", innovDean: "9", innovVC: "",
-    projects: [
-      { label: "Project guided (3/batch)", score: "5", dean: "5", vc: "" },
-      { label: "Industrial collaboration", score: "5", dean: "5", vc: "" },
-      { label: "Award received", score: "4", dean: "4", vc: "" },
-      { label: "Project outcome", score: "4", dean: "4", vc: "" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", dean: "5", vc: "" }, { label: "Certification", score: "5", dean: "5", vc: "" }],
-    feedback: [{ code: "GS701", fb1: "4.9", fb2: "4.9", score: "9.8", dean: "9.8", vc: "" }],
-    deptActs: [{ activity: "University Curriculum Committee", nature: "Chair", score: "20", dean: "20", vc: "" }],
-    uniActs: [{ activity: "Senate & Academic Council", nature: "Secretary", score: "30", dean: "30", vc: "" }],
-    society: [{ label: "Higher Ed Policy Forum", details: "National-level participation", score: "5", dean: "5", vc: "" }],
-    industry: [{ name: "McKinsey India", details: "Advisory Board Member", score: "5", dean: "5", vc: "" }],
-    acr: [
-      { label: "Strategic Leadership", dean: "25", vc: "" },
-      { label: "Academic Governance", dean: "24", vc: "" },
-      { label: "Research Promotion", dean: "23", vc: "" },
-      { label: "Institutional Relations", dean: "22", vc: "" },
-      { label: "Compliance & Reporting", dean: "24", vc: "" },
-    ],
-    journals: [{ title: "Governance Models in Indian HEIs", journal: "Higher Education", issn: "0018-1560", index: "SCI", score: "40", dean: "40", vc: "" }],
-    books: [{ title: "Academic Administration in the 21st Century", book: "Oxford Press, 2024", issn: "978-01-8", pub: "International", coauth: "0", first: "Yes", score: "30", dean: "30", vc: "" }],
-    ict: [{ title: "Leadership MOOC on Coursera", desc: "8-week program", type: "E-Content", quad: "4", score: "18", dean: "18", vc: "" }],
-    research: [{ degree: "PhD", name: "Sonal Joshi", thesis: "Awarded 2025-02-15", score: "25", dean: "25", vc: "" }],
-    patents: [],
-    awards: [{ title: "Best Academic Administrator", date: "2025-03-01", agency: "AIU", level: "National", score: "10", dean: "10", vc: "" }],
-    confs: [{ title: "Future of Higher Education in India", type: "Keynote", org: "FICCI HEIS 2024", level: "International", score: "20", dean: "20", vc: "" }],
-    proposals: [{ title: "NEP 2020 Implementation Research", duration: "2 Years", agency: "UGC", amount: "15 Lakhs", score: "18", dean: "18", vc: "" }],
-    fdps: [{ program: "Leadership & Strategy", duration: "1 Week", org: "IIM Ahmedabad", score: "5", dean: "5", vc: "" }],
-    training: [],
-    docs: {
-      "lec-0": [{ name: "gs701_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "governance_paper.pdf", url: "#", type: "application/pdf" }],
-    },
-    deanRemarks: "Self-appraisal submitted to Vice Chancellor for review.",
-  },
-  {
-    id: 402, name: "Prof. Lalitha Raghunathan", employeeId: "DYPIU-DEAN-0002",
-    designation: "Dean of Research & Innovation", department: "Office of Research",
-    submittedOn: "2025-04-28", status: "VC Reviewed",
-    avatar: "LR", avatarColor: "#0ea5e9",
-    deanSelfScore: 448, vcTotal: 440,
-    info: { name: "Prof. Lalitha Raghunathan", qual: "Ph.D. (Biotechnology), Post-Doc (MIT)", desig: "Dean of Research & Innovation", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "RS801 / Advanced Research Methodology", planned: "30", conducted: "30", score: "20", dean: "20", vc: "20" }],
-    courseFile: { course: "RS801", title: "Advanced Research Methodology", details: "Yes", score: "19", dean: "19", vc: "19" },
-    innovScore: "10", innovDean: "10", innovVC: "10",
-    projects: [
-      { label: "Project guided", score: "5", dean: "5", vc: "5" },
-      { label: "Industrial collaboration", score: "5", dean: "5", vc: "5" },
-      { label: "Award received", score: "5", dean: "5", vc: "5" },
-      { label: "Project outcome", score: "5", dean: "5", vc: "5" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", dean: "5", vc: "5" }, { label: "Certification", score: "5", dean: "5", vc: "5" }],
-    feedback: [{ code: "RS801", fb1: "4.9", fb2: "5.0", score: "9.9", dean: "9.9", vc: "9.9" }],
-    deptActs: [{ activity: "Research Council", nature: "Chair", score: "20", dean: "20", vc: "20" }],
-    uniActs: [{ activity: "NAAC Criterion 3", nature: "Co-ordinator", score: "30", dean: "30", vc: "30" }],
-    society: [{ label: "Rural Innovation Lab", details: "Initiated program in tribal areas", score: "5", dean: "5", vc: "5" }],
-    industry: [{ name: "TATA Consultancy", details: "Joint Research Lab MOU", score: "5", dean: "5", vc: "5" }],
-    acr: [
-      { label: "Strategic Leadership", dean: "25", vc: "25" },
-      { label: "Academic Governance", dean: "25", vc: "25" },
-      { label: "Research Promotion", dean: "25", vc: "25" },
-      { label: "Institutional Relations", dean: "24", vc: "24" },
-      { label: "Compliance & Reporting", dean: "24", vc: "24" },
-    ],
-    journals: [{ title: "CRISPR-based Gene Editing in Cancer", journal: "Nature Biotechnology", issn: "1087-0156", index: "SCI", score: "40", dean: "40", vc: "40" }],
-    books: [{ title: "Modern Research Methods", book: "Springer, 2024", issn: "978-3-030", pub: "International", coauth: "0", first: "Yes", score: "30", dean: "30", vc: "30" }],
-    ict: [{ title: "Research Ethics MOOC", desc: "NPTEL 12-week", type: "E-Content", quad: "4", score: "18", dean: "18", vc: "18" }],
-    research: [{ degree: "PhD", name: "Arun Prakash", thesis: "Awarded 2024-11-10", score: "25", dean: "25", vc: "25" }],
-    patents: [{ title: "Nano Drug Delivery System", type: "International", date: "2024-07-15", status: "Granted", fileNo: "PCT/IN2024/050789", score: "35", dean: "35", vc: "35" }],
-    awards: [{ title: "National Science Academy Fellow", date: "2025-01-20", agency: "INSA", level: "National", score: "10", dean: "10", vc: "10" }],
-    confs: [{ title: "Frontiers in Biotech Research", type: "Keynote", org: "IICB 2024", level: "International", score: "20", dean: "20", vc: "20" }],
-    proposals: [{ title: "Precision Medicine for India", duration: "5 Years", agency: "DBT", amount: "2.5 Crore", score: "18", dean: "18", vc: "18" }],
-    fdps: [{ program: "Research Leadership Program", duration: "2 Weeks", org: "IISc Bangalore", score: "5", dean: "5", vc: "5" }],
-    training: [],
-    docs: {
-      "lec-0": [{ name: "rs801_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "crispr_cancer.pdf", url: "#", type: "application/pdf" }],
-      "pat-0": [{ name: "nanodrug_patent.pdf", url: "#", type: "application/pdf" }],
-    },
-    deanRemarks: "Exceptional researcher and leader. Strongly recommended for highest recognition.",
-    vcRemarks: "VC-level endorsement. Distinguished contribution to research and innovation nationally.",
-  },
-];
-
-// Directors visible to VC (Dean-reviewed)
-const DIRECTOR_LIST_VC = [
-  {
-    id: 301, name: "Prof. Suresh Patil", employeeId: "DYPIU-DIR-0005",
-    designation: "Director / Dean", department: "School of Engineering & Management Research",
-    submittedOn: "2025-04-28", status: "Dean Reviewed",
-    avatar: "SP", avatarColor: "#6366f1",
-    directorScore: 420, deanTotal: 415, vcTotal: 0,
-    info: { name: "Prof. Suresh Patil", qual: "Ph.D., D.Sc. (Mechanical)", desig: "Director / Dean", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "ME601 / Advanced Manufacturing", planned: "40", conducted: "39", score: "20", director: "20", dean: "20", vc: "" }],
-    courseFile: { course: "ME601", title: "Advanced Manufacturing", details: "Yes", score: "18", director: "18", dean: "18", vc: "" },
-    innovScore: "9", innovDir: "9", innovDean: "9", innovVC: "",
-    projects: [
-      { label: "Project guided (3/batch)", score: "5", director: "5", dean: "5", vc: "" },
-      { label: "Industrial collaboration", score: "5", director: "5", dean: "5", vc: "" },
-      { label: "Award received", score: "4", director: "4", dean: "4", vc: "" },
-      { label: "Project outcome", score: "4", director: "4", dean: "4", vc: "" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", director: "5", dean: "5", vc: "" }, { label: "Certification", score: "5", director: "5", dean: "5", vc: "" }],
-    feedback: [{ code: "ME601", fb1: "4.7", fb2: "4.8", score: "9.5", director: "9.5", dean: "9.5", vc: "" }],
-    deptActs: [{ activity: "School Administration", nature: "Director", score: "20", director: "20", dean: "20", vc: "" }],
-    uniActs: [{ activity: "University Academic Council", nature: "Member", score: "30", director: "30", dean: "30", vc: "" }],
-    society: [{ label: "Industry Connect Summit", details: "Organised annual summit", score: "5", director: "5", dean: "5", vc: "" }],
-    industry: [{ name: "Tata Motors", details: "Joint Research MOU", score: "5", director: "5", dean: "5", vc: "" }],
-    acr: [
-      { label: "Leadership and Vision", director: "24", dean: "24", vc: "" },
-      { label: "Research Output", director: "23", dean: "23", vc: "" },
-      { label: "Institutional Development", director: "25", dean: "25", vc: "" },
-      { label: "Industry Interface", director: "22", dean: "22", vc: "" },
-      { label: "Compliance & Reporting", director: "20", dean: "20", vc: "" },
-    ],
-    journals: [{ title: "Smart Manufacturing using AI", journal: "CIRP Annals", issn: "0007-8506", index: "SCI", score: "40", director: "40", dean: "40", vc: "" }],
-    books: [{ title: "Manufacturing Systems Engineering", book: "Springer, 2024", issn: "978-3-031", pub: "International", coauth: "0", first: "Yes", score: "30", director: "30", dean: "30", vc: "" }],
-    ict: [{ title: "Advanced Manufacturing MOOC", desc: "NPTEL certified", type: "E-Content", quad: "4", score: "18", director: "18", dean: "18", vc: "" }],
-    research: [{ degree: "PhD", name: "Mihir Shah", thesis: "Awarded 2024-08-20", score: "25", director: "25", dean: "25", vc: "" }],
-    patents: [{ title: "Self-Healing Smart Composite", type: "International", date: "2024-06-10", status: "Granted", fileNo: "PCT/IN2024/050456", score: "35", director: "35", dean: "35", vc: "" }],
-    awards: [{ title: "Distinguished Educator Award", date: "2025-01-15", agency: "ISTE", level: "National", score: "10", director: "10", dean: "10", vc: "" }],
-    confs: [{ title: "Future of Manufacturing", type: "Keynote", org: "AIMTDR 2024", level: "International", score: "20", director: "20", dean: "20", vc: "" }],
-    proposals: [{ title: "Industry 4.0 Smart Factory", duration: "3 Years", agency: "DST-SERB", amount: "75 Lakhs", score: "18", director: "18", dean: "18", vc: "" }],
-    fdps: [{ program: "Leadership Development Program", duration: "1 Week", org: "IIM Pune", score: "5", director: "5", dean: "5", vc: "" }],
-    training: [],
-    docs: {
-      "lec-0": [{ name: "me601_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "smart_manufacturing.pdf", url: "#", type: "application/pdf" }],
-      "pat-0": [{ name: "patent_int.pdf", url: "#", type: "application/pdf" }],
-      "conf-0": [{ name: "keynote.pdf", url: "#", type: "application/pdf" }],
-    },
-    directorRemarks: "Self-assessment submitted for Dean review.",
-    deanRemarks: "Excellent Director-level performance. Strongly endorsed for VC approval.",
-  },
-  {
-    id: 302, name: "Dr. Meena Iyer", employeeId: "DYPIU-DIR-0003",
-    designation: "Director", department: "School of Health Sciences",
-    submittedOn: "2025-04-26", status: "VC Reviewed",
-    avatar: "MI", avatarColor: "#10b981",
-    directorScore: 395, deanTotal: 388, vcTotal: 385,
-    info: { name: "Dr. Meena Iyer", qual: "Ph.D. (Biomedical Sciences)", desig: "Director", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "HS501 / Clinical Research Methods", planned: "40", conducted: "40", score: "22", director: "22", dean: "22", vc: "22" }],
-    courseFile: { course: "HS501", title: "Clinical Research Methods", details: "Yes", score: "19", director: "19", dean: "19", vc: "19" },
-    innovScore: "10", innovDir: "10", innovDean: "10", innovVC: "10",
-    projects: [
-      { label: "Project guided", score: "5", director: "5", dean: "5", vc: "5" },
-      { label: "Industrial collaboration", score: "5", director: "5", dean: "5", vc: "5" },
-      { label: "Award received", score: "4", director: "4", dean: "4", vc: "4" },
-      { label: "Project outcome", score: "4", director: "4", dean: "4", vc: "4" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", director: "5", dean: "5", vc: "5" }, { label: "Certification", score: "5", director: "5", dean: "5", vc: "5" }],
-    feedback: [{ code: "HS501", fb1: "4.9", fb2: "4.8", score: "9.7", director: "9.7", dean: "9.7", vc: "9.7" }],
-    deptActs: [{ activity: "Research Ethics Committee", nature: "Chair", score: "20", director: "20", dean: "20", vc: "20" }],
-    uniActs: [{ activity: "NAAC Steering Committee", nature: "Co-Convener", score: "28", director: "28", dean: "28", vc: "28" }],
-    society: [{ label: "Community Health Camp", details: "Free checkups in rural Pune", score: "5", director: "5", dean: "5", vc: "5" }],
-    industry: [{ name: "Cipla Ltd.", details: "Joint Research MOU", score: "5", director: "5", dean: "5", vc: "5" }],
-    acr: [
-      { label: "Leadership and Vision", director: "25", dean: "25", vc: "25" },
-      { label: "Research Output", director: "24", dean: "24", vc: "24" },
-      { label: "Institutional Development", director: "23", dean: "23", vc: "23" },
-      { label: "Industry Interface", director: "22", dean: "22", vc: "22" },
-      { label: "Compliance & Reporting", director: "24", dean: "24", vc: "24" },
-    ],
-    journals: [{ title: "AI-Assisted Drug Discovery", journal: "Nature Medicine", issn: "1078-8956", index: "SCI", score: "40", director: "40", dean: "40", vc: "40" }],
-    books: [], ict: [], research: [{ degree: "PhD", name: "Pooja Varma", thesis: "Awarded 2024-12-10", score: "25", director: "25", dean: "25", vc: "25" }],
-    patents: [], awards: [{ title: "Excellence in Research", date: "2024-10-20", agency: "ICMR", level: "National", score: "10", director: "10", dean: "10", vc: "10" }],
-    confs: [{ title: "Biomarkers in Early Cancer Detection", type: "Invited Talk", org: "AACR 2024", level: "International", score: "20", director: "20", dean: "20", vc: "20" }],
-    proposals: [{ title: "Rural Health Diagnostics AI", duration: "2 Years", agency: "ICMR", amount: "30 Lakhs", score: "18", director: "18", dean: "18", vc: "18" }],
-    fdps: [], training: [],
-    docs: {
-      "lec-0": [{ name: "hs501_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "ai_drug_discovery.pdf", url: "#", type: "application/pdf" }],
-    },
-    directorRemarks: "Outstanding researcher and institutional leader. Fully recommended.",
-    deanRemarks: "Endorsed with commendation. Exceptional contribution to health sciences research.",
-    vcRemarks: "VC approval granted. Exemplary national-level contribution.",
-  },
-];
-
-// HODs visible to VC (Dean-reviewed)
-const HOD_LIST_VC = [
-  {
-    id: 103, name: "Dr. Anjali Nair", employeeId: "DYPIU-HOD-0051",
-    designation: "Associate Professor & HOD", department: "Chemical Engineering",
-    submittedOn: "2025-04-20", status: "Dean Reviewed",
-    avatar: "AN", avatarColor: "#10b981",
-    hodScore: 330, directorTotal: 330, deanTotal: 328, vcTotal: 0,
-    info: { name: "Dr. Anjali Nair", qual: "Ph.D (Chemical)", desig: "Associate Professor & HOD", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "CH301 / Process Engineering", planned: "48", conducted: "48", score: "22", hod: "22", director: "22", dean: "22", vc: "" }],
-    courseFile: { course: "CH301", title: "Process Engineering", details: "Yes", score: "19", hod: "19", director: "19", dean: "19", vc: "" },
-    innovScore: "10", innovHod: "10", innovDir: "10", innovDean: "10", innovVC: "",
-    projects: [
-      { label: "Project guided", score: "5", hod: "5", director: "5", dean: "5", vc: "" },
-      { label: "Industrial collaboration", score: "5", hod: "5", director: "5", dean: "5", vc: "" },
-      { label: "Award received", score: "4", hod: "4", director: "4", dean: "4", vc: "" },
-      { label: "Project outcome", score: "4", hod: "4", director: "4", dean: "4", vc: "" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", hod: "5", director: "5", dean: "5", vc: "" }, { label: "Certification", score: "5", hod: "5", director: "5", dean: "5", vc: "" }],
-    feedback: [{ code: "CH301", fb1: "4.8", fb2: "4.9", score: "9.7", hod: "9.7", director: "9.7", dean: "9.7", vc: "" }],
-    deptActs: [{ activity: "Lab Upgrade Project", nature: "PI", score: "20", hod: "20", director: "20", dean: "20", vc: "" }],
-    uniActs: [{ activity: "NAAC Criterion 3 Lead", nature: "Convener", score: "28", hod: "28", director: "28", dean: "28", vc: "" }],
-    society: [{ label: "Rural Sanitation Project", details: "NGO Collaboration", score: "5", hod: "5", director: "5", dean: "5", vc: "" }],
-    industry: [{ name: "BASF India", details: "Research Collaboration", score: "5", hod: "5", director: "5", dean: "5", vc: "" }],
-    acr: [
-      { label: "Leadership and Team Management", hod: "25", director: "25", dean: "25", vc: "" },
-      { label: "Research Output", hod: "25", director: "25", dean: "25", vc: "" },
-      { label: "Departmental Performance", hod: "24", director: "24", dean: "24", vc: "" },
-      { label: "Punctuality & Commitment", hod: "23", director: "23", dean: "23", vc: "" },
-      { label: "Industry / Institute Interface", hod: "22", director: "22", dean: "22", vc: "" },
-    ],
-    journals: [{ title: "Green Chemistry in Polymers", journal: "Green Chemistry", issn: "1463-9262", index: "SCI", score: "40", hod: "40", director: "40", dean: "40", vc: "" }],
-    books: [{ title: "Chemical Process Design", book: "Wiley, 2024", issn: "978-11-19", pub: "International", coauth: "0", first: "Yes", score: "30", hod: "30", director: "30", dean: "30", vc: "" }],
-    ict: [], research: [{ degree: "PhD", name: "Kavya Iyer", thesis: "Awarded 2024-09-10", score: "25", hod: "25", director: "25", dean: "25", vc: "" }],
-    patents: [], awards: [{ title: "Young Scientist Award", date: "2024-11-05", agency: "DST", level: "National", score: "10", hod: "10", director: "10", dean: "10", vc: "" }],
-    confs: [{ title: "Sustainable Process Engineering", type: "Invited Talk", org: "IChemE 2024", level: "International", score: "20", hod: "20", director: "20", dean: "20", vc: "" }],
-    proposals: [{ title: "Bio-refinery Optimisation", duration: "2 Years", agency: "CSIR", amount: "22 Lakhs", score: "18", hod: "18", director: "18", dean: "18", vc: "" }],
-    fdps: [], training: [],
-    docs: {
-      "lec-0": [{ name: "ch301_timetable.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "green_chemistry.pdf", url: "#", type: "application/pdf" }],
-    },
-    hodRemarks: "Outstanding researcher and administrator. Recommended for senior designation.",
-    directorRemarks: "Fully endorsed. Exceptional contribution to research and institution building.",
-    deanRemarks: "Strongly approved at Dean level. Exemplary academic and research leadership.",
-  },
-  {
-    id: 104, name: "Dr. Priya Sharma", employeeId: "DYPIU-HOD-0042",
-    designation: "Associate Professor & HOD", department: "Computer Science & Engineering",
-    submittedOn: "2025-04-25", status: "VC Reviewed",
-    avatar: "PS", avatarColor: "#6366f1",
-    hodScore: 312, directorTotal: 308, deanTotal: 305, vcTotal: 302,
-    info: { name: "Dr. Priya Sharma", qual: "Ph.D (Computer Science)", desig: "Associate Professor & HOD", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "CS501 / AI & ML", planned: "48", conducted: "47", score: "20", hod: "20", director: "20", dean: "20", vc: "20" }],
-    courseFile: { course: "CS501", title: "AI & ML", details: "Yes", score: "18", hod: "18", director: "18", dean: "18", vc: "18" },
-    innovScore: "9", innovHod: "9", innovDir: "9", innovDean: "9", innovVC: "9",
-    projects: [
-      { label: "Project guided (3/batch)", score: "5", hod: "5", director: "5", dean: "5", vc: "5" },
-      { label: "Industrial collaboration", score: "4", hod: "4", director: "4", dean: "4", vc: "4" },
-      { label: "Award received", score: "3", hod: "3", director: "3", dean: "3", vc: "3" },
-      { label: "Project outcome", score: "4", hod: "4", director: "4", dean: "4", vc: "4" },
-    ],
-    quals: [{ label: "Higher Qualification achieved", score: "5", hod: "5", director: "5", dean: "5", vc: "5" }, { label: "Add-on Certification", score: "4", hod: "4", director: "4", dean: "4", vc: "4" }],
-    feedback: [{ code: "CS501", fb1: "4.5", fb2: "4.7", score: "9.2", hod: "9.2", director: "9.2", dean: "9.2", vc: "9.2" }],
-    deptActs: [{ activity: "Department Seminar Series", nature: "Coordinator", score: "18", hod: "18", director: "18", dean: "18", vc: "18" }],
-    uniActs: [{ activity: "NBA Accreditation Committee", nature: "Convener", score: "25", hod: "25", director: "25", dean: "25", vc: "25" }],
-    society: [{ label: "Community Coding Bootcamp", details: "Organised for school students", score: "5", hod: "5", director: "5", dean: "5", vc: "5" }],
-    industry: [{ name: "Microsoft India", details: "MOU + Certification Program", score: "5", hod: "5", director: "5", dean: "5", vc: "5" }],
-    acr: [
-      { label: "Leadership and Team Management", hod: "22", director: "22", dean: "22", vc: "22" },
-      { label: "Research Output", hod: "24", director: "23", dean: "23", vc: "22" },
-      { label: "Departmental Performance", hod: "23", director: "23", dean: "23", vc: "23" },
-      { label: "Punctuality & Commitment", hod: "20", director: "20", dean: "20", vc: "20" },
-      { label: "Industry / Institute Interface", hod: "19", director: "19", dean: "19", vc: "19" },
-    ],
-    journals: [{ title: "Federated Learning for Healthcare IoT", journal: "IEEE IoT Journal", issn: "2327-4662", index: "SCI", score: "40", hod: "40", director: "40", dean: "40", vc: "40" }],
-    books: [{ title: "Machine Learning Fundamentals", book: "Pearson, 2024", issn: "978-93-54", pub: "National", coauth: "0", first: "Yes", score: "25", hod: "25", director: "25", dean: "25", vc: "25" }],
-    ict: [{ title: "AI MOOC on NPTEL", desc: "16-week course", type: "E-Content", quad: "4", score: "18", hod: "18", director: "18", dean: "18", vc: "18" }],
-    research: [{ degree: "PhD", name: "Aakash Tiwari", thesis: "Submitted 2025-01-15", score: "25", hod: "25", director: "25", dean: "25", vc: "25" }],
-    patents: [{ title: "Federated AI Privacy System", type: "International", date: "2024-10-05", status: "Published", fileNo: "PCT/IN2024/050123", score: "35", hod: "35", director: "35", dean: "35", vc: "35" }],
-    awards: [{ title: "Best Researcher Award", date: "2025-02-10", agency: "AICTE", level: "National", score: "10", hod: "10", director: "10", dean: "10", vc: "10" }],
-    confs: [{ title: "Privacy in AI Systems", type: "Keynote", org: "IEEE COMPSAC 2024", level: "International", score: "20", hod: "20", director: "20", dean: "20", vc: "20" }],
-    proposals: [{ title: "Federated ML for Smart Cities", duration: "3 Years", agency: "SERB", amount: "48 Lakhs", score: "18", hod: "18", director: "18", dean: "18", vc: "18" }],
-    fdps: [{ program: "FDP on Generative AI", duration: "2 Weeks", org: "IIT Delhi", score: "8", hod: "8", director: "8", dean: "8", vc: "8" }],
-    training: [{ company: "Google India", duration: "1 Week", nature: "Industry Immersion", score: "5", hod: "5", director: "5", dean: "5", vc: "5" }],
-    docs: {
-      "lec-0": [{ name: "ai_ml_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "federated_learning.pdf", url: "#", type: "application/pdf" }],
-      "pat-0": [{ name: "patent_int.pdf", url: "#", type: "application/pdf" }],
-    },
-    hodRemarks: "Excellent performance across all parameters. Strongly recommended for promotion.",
-    directorRemarks: "Endorsed. Excellent researcher and departmental leader.",
-    deanRemarks: "Approved. Commendable research and academic leadership.",
-    vcRemarks: "VC approval confirmed. Fast-track promotion recommended.",
-  },
-];
-
-// Faculty visible to VC (Dean-reviewed)
-const FACULTY_LIST_VC = [
-  {
-    id: 202, name: "Dr. Sneha Kulkarni", employeeId: "DYPIU-FAC-0088",
-    designation: "Assistant Professor", department: "Computer Science & Engineering",
-    submittedOn: "2025-04-20", status: "Dean Reviewed",
-    avatar: "SK", avatarColor: "#0ea5e9",
-    hodTotal: 345, directorTotal: 340, deanTotal: 338, vcTotal: 0,
-    hodRemarks: "Excellent researcher.",
-    directorRemarks: "Strongly approved.",
-    deanRemarks: "Exemplary. Dean-level endorsement for fast-track promotion.",
-    info: { name: "Dr. Sneha Kulkarni", qual: "Ph.D (IT)", desig: "Assistant Professor", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "IT201 / Database Systems", planned: "48", conducted: "48", score: "22", hod: "22", director: "22", dean: "22", vc: "" }],
-    courseFile: { course: "IT201", title: "Database Systems", details: "Yes", score: "18", hod: "18", director: "18", dean: "18", vc: "" },
-    innovScore: "9", innovHod: "9", innovDir: "9", innovDean: "9", innovVC: "",
-    projects: [
-      { label: "Project guided", score: "4", hod: "4", director: "4", dean: "4", vc: "" },
-      { label: "Industrial collaboration", score: "4", hod: "4", director: "4", dean: "4", vc: "" },
-      { label: "Award received", score: "3", hod: "3", director: "3", dean: "3", vc: "" },
-      { label: "Project outcome", score: "4", hod: "4", director: "4", dean: "4", vc: "" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", hod: "5", director: "5", dean: "5", vc: "" }, { label: "Certification", score: "5", hod: "5", director: "5", dean: "5", vc: "" }],
-    feedback: [{ code: "IT201", fb1: "4.6", fb2: "4.8", score: "9.4", hod: "9.4", director: "9.4", dean: "9.4", vc: "" }],
-    deptActs: [{ activity: "Departmental Seminar", nature: "Organizer", score: "15", hod: "15", director: "15", dean: "15", vc: "" }],
-    uniActs: [{ activity: "Admission Committee", nature: "Member", score: "18", hod: "18", director: "18", dean: "18", vc: "" }],
-    society: [{ label: "Blood Donation", details: "Organised camp", score: "5", hod: "5", director: "5", dean: "5", vc: "" }],
-    industry: [{ name: "Wipro Pune", details: "Internship MOU", score: "5", hod: "5", director: "5", dean: "5", vc: "" }],
-    acr: [
-      { label: "Self-motivation and Proactiveness", hod: "22", director: "22", dean: "22", vc: "" },
-      { label: "Punctuality", hod: "23", director: "23", dean: "23", vc: "" },
-      { label: "Target based work", hod: "21", director: "21", dean: "21", vc: "" },
-      { label: "Effectiveness", hod: "22", director: "22", dean: "22", vc: "" },
-      { label: "Obedience", hod: "23", director: "23", dean: "23", vc: "" },
-    ],
-    journals: [{ title: "Blockchain in Healthcare", journal: "Springer", issn: "1234-5678", index: "SCI", score: "40", hod: "40", director: "40", dean: "40", vc: "" }],
-    books: [], ict: [], research: [], patents: [], awards: [], confs: [], proposals: [], fdps: [], training: [],
-    docs: { "jour-0": [{ name: "blockchain_paper.pdf", url: "#", type: "application/pdf" }] },
-  },
-];
+import { getStaffForVC } from "../services/api";
+import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
+import { VC_USER, DEAN_LIST, DIRECTOR_LIST_VC, HOD_LIST_VC, FACULTY_LIST_VC } from "../data/mockData";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -378,7 +46,7 @@ function StatusBadge({ status }) {
   );
 }
 function RO({ val, center }) {
-  return <span style={{ fontSize: 11, fontFamily: "'Crimson Text', Georgia, serif", color: "#1e293b", display: "block", textAlign: center ? "center" : "left" }}>{val || <span style={{ color: "#cbd5e1" }}>—</span>}</span>;
+  return <span style={{ fontSize: 11, fontFamily: "Georgia, serif", color: "#1e293b", display: "block", textAlign: center ? "center" : "left" }}>{val || <span style={{ color: "#cbd5e1" }}>—</span>}</span>;
 }
 function VCInput({ val, onChange }) {
   return (
@@ -813,7 +481,7 @@ function AnalyticsPanel({ deans, directors, hods, faculty }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>University Analytics</h1>
-      <p style={{ margin: "0 0 8px", color: "#64748b", fontSize: 11 }}>DYPIU · AY {VC_USER.ay} — VC-level overview</p>
+      <p style={{ margin: "0 0 8px", color: "#64748b", fontSize: 11 }}>{APP_INFO.SHORT_NAME} · AY {VC_USER.ay} — VC-level overview</p>
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
@@ -821,7 +489,7 @@ function AnalyticsPanel({ deans, directors, hods, faculty }) {
           { label: "Total Records", val: all.length, icon: "📋", color: "#0f172a" },
           { label: "VC Reviewed", val: reviewed.length, icon: "✅", color: "#059669" },
           { label: "Pending VC", val: pending.length, icon: "⏳", color: "#d97706" },
-          { label: "Avg VC Score", val: avgScore, sub: "/575", icon: "📊", color: "#b45309" },
+          { label: "Avg VC Score", val: avgScore, sub: `/${MAX_SCORES.GRAND_TOTAL}`, icon: "📊", color: "#b45309" },
         ].map(({ label, val, icon, color, sub }) => (
           <div key={label} style={{ background: "#fff", borderRadius: 10, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", borderTop: `3px solid ${color}` }}>
             <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
@@ -834,237 +502,61 @@ function AnalyticsPanel({ deans, directors, hods, faculty }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        {/* Role Breakdown */}
-        <div style={{ background: "#fff", borderRadius: 10, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 14, fontSize: 13 }}>Approval by Role</div>
-          {roleStats.map(({ role, count, approved }) => (
-            <div key={role} style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>{role}</span>
-                <span style={{ fontSize: 11, color: "#64748b" }}>{approved}/{count} approved</span>
+        {/* Role Distribution */}
+        <div style={{ background: "#fff", borderRadius: 10, padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Approval Status by Role</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {roleStats.map(s => (
+              <div key={s.role}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700 }}>{s.role}</span>
+                  <span style={{ color: "#64748b" }}>{s.approved} / {s.count} approved</span>
+                </div>
+                <div style={{ height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ width: `${pct(s.approved, s.count)}%`, height: "100%", background: "#b45309" }} />
+                </div>
               </div>
-              <div style={{ background: "#f1f5f9", borderRadius: 4, height: 8, overflow: "hidden" }}>
-                <div style={{ width: `${count ? (approved / count) * 100 : 0}%`, height: "100%", background: "#b45309", borderRadius: 4, transition: "width .6s" }} />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* Top Performers */}
-        <div style={{ background: "#fff", borderRadius: 10, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 14, fontSize: 13 }}>Top Performers (All Roles)</div>
-          {topPerformers.map((p, i) => {
-            const score = p.vcTotal || p.deanTotal || p.directorTotal || 0;
-            const g = grade(score, 575);
-            return (
-              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#d97706" : "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 10, color: "#fff", flexShrink: 0 }}>{i + 1}</div>
-                <Avatar initials={p.avatar} color={p.avatarColor || "#b45309"} size={28} />
+        <div style={{ background: "#fff", borderRadius: 10, padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Top Performers (Consolidated)</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {topPerformers.map((p, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < 4 ? "1px solid #f1f5f9" : "none" }}>
+                <Avatar initials={p.avatar} size={30} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a" }}>{p.name}</div>
-                  <div style={{ fontSize: 10, color: "#94a3b8" }}>{p.role} · {p.department || "Office"}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{p.name}</div>
+                  <div style={{ fontSize: 9, color: "#94a3b8" }}>{p.role} · {p.department}</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: g.color }}>{score}</div>
-                  <div style={{ fontSize: 9, color: "#94a3b8" }}>{g.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: grade(p.vcTotal || p.deanTotal || 0, MAX_SCORES.GRAND_TOTAL).color }}>
+                  {p.vcTotal || p.deanTotal || "—"}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Grade distribution */}
-      <div style={{ background: "#fff", borderRadius: 10, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-        <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 14, fontSize: 13 }}>Grade Distribution (All Reviewed)</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-          {[
-            { label: "Outstanding", min: 85, color: "#059669", bg: "#d1fae5" },
-            { label: "Very Good",   min: 70, color: "#0284c7", bg: "#dbeafe" },
-            { label: "Good",        min: 55, color: "#7c3aed", bg: "#ede9fe" },
-            { label: "Satisfactory",min: 40, color: "#d97706", bg: "#fef3c7" },
-            { label: "Needs Imp.",  min: 0,  color: "#dc2626", bg: "#fee2e2" },
-          ].map(({ label, min, color, bg }) => {
-            const count = all.filter(p => {
-              const s = p.vcTotal || p.deanTotal || p.directorTotal || 0;
-              const pct2 = (s / 575) * 100;
-              return pct2 >= min && (min === 0 ? pct2 < 40 : true) && (min === 85 || pct2 < (min === 70 ? 85 : min === 55 ? 70 : min === 40 ? 55 : 85));
-            }).length;
-            return (
-              <div key={label} style={{ background: bg, borderRadius: 8, padding: "14px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color }}>{count}</div>
-                <div style={{ fontSize: 10, color, fontWeight: 700, marginTop: 4 }}>{label}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Review Panel ─────────────────────────────────────────────────────────────
-function VCReviewPanel({ person, personMode, onBack, onSubmit }) {
-  const [vcData, setVcData] = useState({});
-  const [remarks, setRemarks] = useState(person.vcRemarks || "");
-  const [tab, setTab] = useState("form");
-
-  const { partA, partB, total } = calcVCScore(person, vcData);
-  const g = grade(total, 575);
-
-  const dirTotal  = person.directorTotal || person.directorScore || 0;
-  const hodTotal  = person.hodTotal || person.hodScore || 0;
-  const deanTotal = person.deanTotal || person.deanSelfScore || 0;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <div style={{ background: "#0f172a", padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, marginBottom: 16, borderRadius: 10 }}>
-        <button onClick={onBack} style={{ background: "#1e293b", border: "none", color: "#94a3b8", cursor: "pointer", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontFamily: "Georgia, serif" }}>← Back</button>
-        <Avatar initials={person.avatar} color={person.avatarColor || "#b45309"} size={40} />
-        <div style={{ flex: 1 }}>
-          <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{person.name}</div>
-          <div style={{ color: "#64748b", fontSize: 11 }}>{person.designation} · {person.employeeId}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {personMode === "faculty" && hodTotal > 0 && (
-            <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase" }}>HOD</div>
-              <div style={{ color: "#818cf8", fontWeight: 800, fontSize: 14 }}>{hodTotal}</div>
-            </div>
-          )}
-          {(personMode === "faculty" || personMode === "hod") && dirTotal > 0 && (
-            <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase" }}>Dir</div>
-              <div style={{ color: "#38bdf8", fontWeight: 800, fontSize: 14 }}>{dirTotal}</div>
-            </div>
-          )}
-          {personMode === "director" && dirTotal > 0 && (
-            <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase" }}>Dir Self</div>
-              <div style={{ color: "#38bdf8", fontWeight: 800, fontSize: 14 }}>{dirTotal}</div>
-            </div>
-          )}
-          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase" }}>Dean</div>
-            <div style={{ color: "#c4b5fd", fontWeight: 800, fontSize: 14 }}>{deanTotal}</div>
-          </div>
-          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase" }}>VC A</div>
-            <div style={{ color: "#fde68a", fontWeight: 800, fontSize: 14 }}>{partA.toFixed(1)}</div>
-          </div>
-          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase" }}>VC B</div>
-            <div style={{ color: "#fbbf24", fontWeight: 800, fontSize: 14 }}>{partB.toFixed(1)}</div>
-          </div>
-          <div style={{ background: g.bg, border: `2px solid ${g.color}40`, borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: g.color, fontSize: 9, textTransform: "uppercase", fontWeight: 700 }}>VC Total</div>
-            <div style={{ color: g.color, fontWeight: 800, fontSize: 14 }}>{total.toFixed(1)}<span style={{ fontSize: 10, color: "#94a3b8" }}>/575</span></div>
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-        {[["form", "📋 Review Form"], ["remarks", "✏️ Remarks & Submit"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#78350f" : "#e2e8f0", color: tab === id ? "#fde68a" : "#475569" }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "form" && (
-        <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} />
-      )}
-
-      {tab === "remarks" && (
-        <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
-          <h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>VC Remarks & Final Submission</h3>
-
-          {/* Remarks chain */}
-          {person.hodRemarks && (
-            <div style={{ background: "#f0f4ff", border: "1px solid #c7d2fe", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#4338ca", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>HOD Remarks</div>
-              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6 }}>{person.hodRemarks}</div>
-            </div>
-          )}
-          {person.directorRemarks && (
-            <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Director Remarks</div>
-              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6 }}>{person.directorRemarks}</div>
-            </div>
-          )}
-          {person.deanRemarks && (
-            <div style={{ background: "#faf5ff", border: "1px solid #ddd6fe", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#6d28d9", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Dean Remarks</div>
-              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6 }}>{person.deanRemarks}</div>
-            </div>
-          )}
-
-          {/* Score summary */}
-          <table style={{ ...T, marginBottom: 18 }}>
-            <thead><tr>
-              <th style={TH}>Section</th><th style={TH}>Max</th>
-              {(personMode === "hod" || personMode === "faculty") && <th style={TH_HOD}>HOD Score</th>}
-              {(personMode !== "dean") && <th style={TH_DIR}>Director Score</th>}
-              <th style={TH_DEAN}>Dean Score</th>
-              <th style={TH_VC}>VC Score</th>
-            </tr></thead>
-            <tbody>
-              {[["Part A — Teaching & Activities", 200, partA], ["Part B — Research & Contributions", 375, partB]].map(([l, m, v]) => (
-                <tr key={l}>
-                  <td style={TD}>{l}</td><td style={TDC}>{m}</td>
-                  {(personMode === "hod" || personMode === "faculty") && <td style={TDS_HOD}>{hodTotal ? (hodTotal / 2).toFixed(0) : "—"}</td>}
-                  {personMode !== "dean" && <td style={TDS_DIR}>{dirTotal ? (dirTotal / 2).toFixed(0) : "—"}</td>}
-                  <td style={TDS_DEAN}>{deanTotal ? (deanTotal / 2).toFixed(0) : "—"}</td>
-                  <td style={{ ...TDS_VC, fontWeight: 700, color: "#78350f" }}>{v.toFixed(1)}</td>
-                </tr>
-              ))}
-              <tr style={{ background: "#fef3c7", fontWeight: 700 }}>
-                <td style={TD}>Grand Total</td><td style={TDC}>575</td>
-                {(personMode === "hod" || personMode === "faculty") && <td style={TDS_HOD}>{hodTotal}</td>}
-                {personMode !== "dean" && <td style={TDS_DIR}>{dirTotal}</td>}
-                <td style={TDS_DEAN}>{deanTotal}</td>
-                <td style={{ ...TDS_VC, color: "#78350f", fontSize: 14 }}>{total.toFixed(1)}</td>
-              </tr>
-              <tr style={{ background: g.bg }}>
-                <td style={TD} colSpan={6}><strong>Grade</strong></td>
-                <td style={{ ...TDC, color: g.color, fontWeight: 800 }}>{g.label}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>VC Remarks</label>
-          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={4}
-            placeholder="Enter your Vice Chancellor-level remarks, final endorsement, and recommendations..."
-            style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 7, padding: "10px 12px", fontSize: 12, fontFamily: "Georgia, serif", resize: "vertical", boxSizing: "border-box", marginBottom: 16 }} />
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "Georgia, serif" }}>Cancel</button>
-            <button onClick={() => onSubmit(person.id, total, remarks, personMode)}
-              style={{ padding: "10px 28px", background: "#78350f", color: "#fef3c7", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
-              ✔ Submit VC Final Approval
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 // ─── Person Card ──────────────────────────────────────────────────────────────
 function PersonCard({ person, personMode, onReview }) {
-  const g = grade(person.vcTotal || person.deanTotal || person.directorTotal || 300, 575);
+  const g = grade(person.vcTotal || person.deanTotal || 300, MAX_SCORES.GRAND_TOTAL);
   const docCount = Object.values(person.docs || {}).reduce((a, arr) => a + arr.length, 0);
-  const isVCReviewed = person.status === "VC Reviewed";
 
   const scoreRows = [];
-  if (personMode === "faculty") scoreRows.push({ label: "HOD Score",  val: person.hodTotal || 0,       color: "#6366f1" });
-  if (personMode !== "dean")    scoreRows.push({ label: "Dir Score",  val: person.directorTotal || person.directorScore || 0, color: "#0ea5e9" });
+  if (personMode === "faculty" || personMode === "hod") {
+    scoreRows.push({ label: personMode === "hod" ? "Own Score" : "HOD Score", val: person.hodTotal || person.hodScore || 0, color: "#6366f1" });
+  }
+  if (personMode !== "dean") {
+    scoreRows.push({ label: "Dir Score", val: person.directorTotal || person.directorScore || 0, color: "#0ea5e9" });
+  }
   scoreRows.push({ label: "Dean Score", val: person.deanTotal || person.deanSelfScore || 0, color: "#7c3aed" });
-  scoreRows.push({ label: "VC Score",   val: person.vcTotal || 0,       color: "#b45309" });
-  scoreRows.push({ label: "Docs",       val: docCount,                  color: "#10b981", noBar: true });
+  scoreRows.push({ label: "VC Score", val: person.vcTotal || 0, color: "#b45309" });
 
   return (
     <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 6px rgba(0,0,0,.07)", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1080,40 +572,146 @@ function PersonCard({ person, personMode, onReview }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${scoreRows.length},1fr)`, gap: 10, background: "#f8fafc", borderRadius: 8, padding: "12px 14px" }}>
-        {scoreRows.map(({ label, val, color, noBar }) => (
+        {scoreRows.map(({ label, val, color }) => (
           <div key={label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.6 }}>{label}</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1 }}>
-              {typeof val === "number" ? val.toFixed(0) : val}
-              {!noBar && <span style={{ fontSize: 9, color: "#94a3b8" }}>/575</span>}
-            </div>
-            {!noBar && <ScoreBar score={val} max={575} color={color} />}
-            {noBar && <div style={{ fontSize: 9, color: "#94a3b8" }}>files</div>}
+            <div style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1 }}>{val}<span style={{ fontSize: 9, color: "#94a3b8" }}>/{MAX_SCORES.GRAND_TOTAL}</span></div>
+            <ScoreBar score={val} max={MAX_SCORES.GRAND_TOTAL} color={color} />
           </div>
         ))}
       </div>
 
-      {/* Remarks chain preview */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        {person.directorRemarks && (
-          <div style={{ background: "#f0f9ff", borderRadius: 6, padding: "7px 10px", fontSize: 11, color: "#0369a1", lineHeight: 1.5, borderLeft: "3px solid #38bdf8" }}>
-            <span style={{ fontWeight: 700 }}>Director: </span>{person.directorRemarks.slice(0, 55)}{person.directorRemarks.length > 55 ? "…" : ""}
-          </div>
-        )}
-        {person.deanRemarks && (
-          <div style={{ background: "#faf5ff", borderRadius: 6, padding: "7px 10px", fontSize: 11, color: "#6d28d9", lineHeight: 1.5, borderLeft: "3px solid #a78bfa" }}>
-            <span style={{ fontWeight: 700 }}>Dean: </span>{person.deanRemarks.slice(0, 55)}{person.deanRemarks.length > 55 ? "…" : ""}
-          </div>
-        )}
-      </div>
-
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
-        <div style={{ fontSize: 10, color: "#94a3b8" }}>Submitted: {person.submittedOn}</div>
+        <div style={{ fontSize: 10, color: "#94a3b8" }}>Docs: {docCount} files · {person.submittedOn}</div>
         <button onClick={() => onReview(person, personMode)}
-          style={{ fontSize: 11, padding: "7px 18px", background: isVCReviewed ? "#1e293b" : "#78350f", color: isVCReviewed ? "#e2e8f0" : "#fde68a", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
-          {isVCReviewed ? "✎ Edit VC Review" : "👁️ VC Review & Approve →"}
+          style={{ fontSize: 11, padding: "7px 18px", background: person.status === "VC Reviewed" ? "#1e293b" : "#b45309", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
+          {person.status === "VC Reviewed" ? "✎ Edit VC Approval" : "🔍 Review & Approve →"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── VC Review Panel (Main Review Container) ──────────────────────────────────
+function VCReviewPanel({ person, personMode, onBack, onSubmit }) {
+  const [vcData, setVcData] = useState({});
+  const [remarks, setRemarks] = useState(person.vcRemarks || "");
+  const [tab, setTab] = useState("form");
+
+  const { partA, partB, total } = calcVCScore(person, vcData);
+  const g = grade(total, MAX_SCORES.GRAND_TOTAL);
+
+  const deanTotal = person.deanTotal || person.deanSelfScore || 0;
+  const dirTotal  = person.directorTotal || person.directorScore || 0;
+  const hodTotal   = person.hodTotal || person.hodScore || 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {/* VC Header */}
+      <div style={{ background: "#451a03", padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, marginBottom: 16, borderRadius: 10, borderBottom: "4px solid #b45309" }}>
+        <button onClick={onBack} style={{ background: "#78350f", border: "none", color: "#fde68a", cursor: "pointer", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontFamily: "Georgia, serif" }}>← Back</button>
+        <Avatar initials={person.avatar} color={person.avatarColor || "#b45309"} size={44} />
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>{person.name}</div>
+          <div style={{ color: "#fde68a", fontSize: 11 }}>{person.designation} · {person.employeeId}</div>
+        </div>
+        
+        {/* Prior Score Display */}
+        <div style={{ display: "flex", gap: 8 }}>
+          {[["Dean Total", deanTotal, "#ddd6fe"], ["VC Part A", partA.toFixed(1), "#fde68a"], ["VC Part B", partB.toFixed(1), "#fcd34d"]].map(([l, v, c]) => (
+            <div key={l} style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: "8px 12px", textAlign: "center", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>{l}</div>
+              <div style={{ color: c, fontWeight: 800, fontSize: 14 }}>{v}</div>
+            </div>
+          ))}
+          <div style={{ background: g.bg, borderRadius: 8, padding: "8px 12px", textAlign: "center", border: `2px solid ${g.color}` }}>
+            <div style={{ color: g.color, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 800 }}>VC Total</div>
+            <div style={{ color: g.color, fontWeight: 900, fontSize: 14 }}>{total.toFixed(1)}<span style={{ fontSize: 10, opacity: 0.7 }}>/{MAX_SCORES.GRAND_TOTAL}</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[["form", "📋 Review Form"], ["remarks", "✏️ Final Approval"]].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ padding: "8px 22px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#78350f" : "#fff", color: tab === id ? "#fff" : "#92400e", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "form" && <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} />}
+
+      {tab === "remarks" && (
+        <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 2px 10px rgba(0,0,0,0.08)" }}>
+          <h3 style={{ margin: "0 0 18px", color: "#451a03", fontSize: 16 }}>VC Final Remarks & Sanction</h3>
+
+          {/* Remarks Chain */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+            {person.directorRemarks && (
+              <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "12px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", marginBottom: 4 }}>Director Remarks</div>
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.5 }}>{person.directorRemarks}</div>
+              </div>
+            )}
+            {person.deanRemarks && (
+              <div style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 8, padding: "12px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#5b21b6", textTransform: "uppercase", marginBottom: 4 }}>Dean Remarks</div>
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.5 }}>{person.deanRemarks}</div>
+              </div>
+            )}
+          </div>
+
+          <SC title="Score Reconciliation" accent="#b45309">
+            <table style={{ ...T, fontSize: 12 }}>
+              <thead><tr>
+                <th style={TH}>Section</th>
+                {personMode === "faculty" && <th style={TH_HOD}>HOD</th>}
+                {personMode !== "dean" && <th style={TH_DIR}>Dir</th>}
+                <th style={TH_DEAN}>Dean</th>
+                <th style={TH_VC}>VC Final</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td style={TD}>Part A — Teaching</td>
+                  {personMode === "faculty" && <td style={TDS_HOD}>—</td>}
+                  {personMode !== "dean" && <td style={TDS_DIR}>—</td>}
+                  <td style={TDS_DEAN}>—</td>
+                  <td style={{ ...TDS_VC, fontWeight: 700 }}>{partA.toFixed(1)}</td>
+                </tr>
+                <tr>
+                  <td style={TD}>Part B — Research</td>
+                  {personMode === "faculty" && <td style={TDS_HOD}>—</td>}
+                  {personMode !== "dean" && <td style={TDS_DIR}>—</td>}
+                  <td style={TDS_DEAN}>—</td>
+                  <td style={{ ...TDS_VC, fontWeight: 700 }}>{partB.toFixed(1)}</td>
+                </tr>
+                <tr style={{ background: "#fffbeb", fontWeight: 800 }}>
+                  <td style={TD}>GRAND TOTAL</td>
+                  {personMode === "faculty" && <td style={TDS_HOD}>{hodTotal}</td>}
+                  {personMode !== "dean" && <td style={TDS_DIR}>{dirTotal}</td>}
+                  <td style={TDS_DEAN}>{deanTotal}</td>
+                  <td style={{ ...TDS_VC, fontSize: 15, color: "#92400e" }}>{total.toFixed(1)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </SC>
+
+          <label style={{ fontWeight: 800, fontSize: 13, color: "#451a03", display: "block", marginBottom: 8 }}>VC Final Observations & Decisions</label>
+          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={5}
+            placeholder="Final executive decision, appraisal score confirmation, and future recommendations..."
+            style={{ width: "100%", border: "2px solid #fde68a", borderRadius: 8, padding: "12px", fontSize: 13, fontFamily: "Georgia, serif", resize: "vertical", boxSizing: "border-box", marginBottom: 18, background: "#fffdf5" }} />
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+            <button onClick={onBack} style={{ padding: "10px 24px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>Cancel</button>
+            <button onClick={() => onSubmit(person.id, total, remarks, personMode)}
+              style={{ padding: "11px 32px", background: "#92400e", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif", boxShadow: "0 4px 10px rgba(146, 64, 14, 0.2)" }}>
+              ✔ CONFIRM & SIGN APPRAISAL
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1121,116 +719,89 @@ function PersonCard({ person, personMode, onReview }) {
 // ─── Main VC Dashboard ────────────────────────────────────────────────────────
 export default function VCDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab]   = useState("analytics");
-  const [reviewing, setReviewing]   = useState(null);
-  const [deanList,  setDeanList]    = useState(DEAN_LIST);
-  const [dirList,   setDirList]     = useState(DIRECTOR_LIST_VC);
-  const [hodList,   setHodList]     = useState(HOD_LIST_VC);
-  const [facList,   setFacList]     = useState(FACULTY_LIST_VC);
+  const [activeTab, setActiveTab] = useState("analytics");
+  const [reviewing, setReviewing] = useState(null); // { person, personMode }
+  const [deanList, setDeanList] = useState([]);
+  const [dirList, setDirList] = useState([]);
+  const [hodList, setHodList] = useState([]);
+  const [facList, setFacList] = useState([]);
+
+  useEffect(() => {
+    const { faculty, hods, directors, deans } = getStaffForVC();
+    setFacList(faculty);
+    setHodList(hods);
+    setDirList(directors);
+    setDeanList(deans);
+  }, []);
+
   const [filterStatus, setFilterStatus] = useState("All");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const pendingDeans = deanList.filter(d => d.status !== "VC Reviewed").length;
-  const pendingDirs  = dirList.filter(d => d.status !== "VC Reviewed").length;
-  const pendingHods  = hodList.filter(h => h.status !== "VC Reviewed").length;
-  const pendingFacs  = facList.filter(f => f.status !== "VC Reviewed").length;
-  const totalPending = pendingDeans + pendingDirs + pendingHods + pendingFacs;
-
   const handleSubmit = (id, total, remarks, personMode) => {
-    const update = (list, setter) => setter(prev => prev.map(p => p.id === id ? { ...p, status: "VC Reviewed", vcTotal: total, vcRemarks: remarks } : p));
-    if (personMode === "dean")     update(deanList, setDeanList);
-    else if (personMode === "director") update(dirList, setDirList);
-    else if (personMode === "hod") update(hodList, setHodList);
-    else if (personMode === "faculty") update(facList, setFacList);
+    const upd = (list) => list.map(p => p.id === id ? { ...p, status: "VC Reviewed", vcTotal: total, vcRemarks: remarks } : p);
+    if (personMode === "dean") setDeanList(upd);
+    else if (personMode === "director") setDirList(upd);
+    else if (personMode === "hod") setHodList(upd);
+    else if (personMode === "faculty") setFacList(upd);
     setReviewing(null);
   };
 
   const currentList = activeTab === "deans" ? deanList : activeTab === "directors" ? dirList : activeTab === "hods" ? hodList : facList;
-  const filterOptions = activeTab === "deans"
-    ? ["All", "Pending VC Review", "VC Reviewed"]
-    : ["All", "Dean Reviewed", "VC Reviewed"];
+  
+  const filtered = filterStatus === "All" ? currentList : (filterStatus === "Pending VC Review"
+    ? (activeTab === "deans" ? currentList.filter(p => p.status === "Pending Review") : currentList.filter(p => p.status === "Dean Reviewed"))
+    : currentList.filter(p => p.status === filterStatus));
 
-  const filtered = filterStatus === "All" ? currentList : currentList.filter(p => p.status === filterStatus);
-  const personModeFor = (tab) => tab === "deans" ? "dean" : tab === "directors" ? "director" : tab === "hods" ? "hod" : "faculty";
+  const filterOptions = ["All", "Pending VC Review", "VC Reviewed"];
+  const personModeFor = (tab) => tab.slice(0, -1); // "deans" -> "dean" etc
 
-  const NAV = [
-    { id: "analytics",  icon: "📊", label: "Analytics",          sub: "University-wide overview" },
-    { id: "deans",      icon: "🎓", label: "Dean Reviews",        sub: `${pendingDeans} awaiting VC`,  badge: pendingDeans },
-    { id: "directors",  icon: "🏛️", label: "Director Reviews",   sub: `${pendingDirs} awaiting VC`,   badge: pendingDirs },
-    { id: "hods",       icon: "👥", label: "HOD Reviews",         sub: `${pendingHods} awaiting VC`,   badge: pendingHods },
-    { id: "faculty",    icon: "📋", label: "Faculty Reviews",     sub: `${pendingFacs} awaiting VC`,   badge: pendingFacs },
-  ];
-
-  const tabLabel = activeTab === "deans" ? "Dean Reviews" : activeTab === "directors" ? "Director Reviews" : activeTab === "hods" ? "HOD Reviews" : "Faculty Reviews";
+  const tabLabel = activeTab === "analytics" ? "University Analytics" : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Approvals`;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#f5f0eb", color: "#1e293b" }}>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#fdfbf7", color: "#1e293b" }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{ width: 258, minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column", padding: "20px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#78350f,#b45309)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fef3c7", fontWeight: 800, fontSize: 13 }}>FA</div>
+      <aside style={{ width: 260, minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 18px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg,#b45309,#f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 900, fontSize: 16 }}>VC</div>
           <div>
-            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 13 }}>FacultyAppraise</div>
-            <div style={{ color: "#475569", fontSize: 9 }}>D Y Patil International University</div>
+            <div style={{ color: "#f1f5f9", fontWeight: 800, fontSize: 14, letterSpacing: -0.2 }}>{APP_INFO.PORTAL_NAME}</div>
+            <div style={{ color: "#94a3b8", fontSize: 9 }}>{APP_INFO.UNIVERSITY_NAME}</div>
           </div>
         </div>
 
-        {/* VC Role badge */}
-        <div style={{ background: "#451a03", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#fde68a", border: "1px solid #78350f" }}>
-          <div style={{ fontWeight: 700, marginBottom: 2 }}>Vice Chancellor</div>
-          <div style={{ color: "#a16207", fontSize: 10 }}>Final approval authority</div>
+        <div style={{ background: "#451a03", borderRadius: 10, padding: "10px 14px", borderLeft: "4px solid #f59e0b" }}>
+          <div style={{ fontWeight: 800, fontSize: 11, color: "#fde68a" }}>Vice Chancellor</div>
+          <div style={{ color: "rgba(253, 230, 138, 0.6)", fontSize: 10 }}>Executive Oversight</div>
         </div>
 
-        {/* Total pending alert */}
-        {totalPending > 0 && (
-          <div style={{ background: "#7f1d1d", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#fca5a5", border: "1px solid #991b1b" }}>
-            <div style={{ fontWeight: 700 }}>⏳ {totalPending} Pending VC</div>
-            <div style={{ fontSize: 10, color: "#f87171", marginTop: 2 }}>Awaiting your approval</div>
-          </div>
-        )}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "8px 0" }} />
 
-        <div style={{ height: 1, background: "#1e293b" }} />
-
-        {NAV.map(tab => (
+        {[
+          { id: "analytics", icon: "📊", label: "University Analytics" },
+          { id: "deans",     icon: "🎓", label: "Dean Approvals" },
+          { id: "directors", icon: "🏛️", label: "Director Approvals" },
+          { id: "hods",      icon: "👥", label: "HOD Approvals" },
+          { id: "faculty",   icon: "📋", label: "Faculty Approvals" },
+        ].map(tab => (
           <button key={tab.id} onClick={() => { setActiveTab(tab.id); setReviewing(null); setFilterStatus("All"); }}
-            style={{ background: activeTab === tab.id ? "#1e293b" : "none", border: "none", borderRadius: 9, padding: "10px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, width: "100%", fontFamily: "Georgia, serif" }}>
-            <span style={{ fontSize: 16 }}>{tab.icon}</span>
-            <div style={{ flex: 1, textAlign: "left" }}>
-              <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 12 }}>{tab.label}</div>
-              <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{tab.sub}</div>
-            </div>
-            {tab.badge > 0 && (
-              <div style={{ background: "#b45309", color: "#fef3c7", fontWeight: 800, fontSize: 10, minWidth: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</div>
-            )}
+            style={{ background: activeTab === tab.id ? "#1e293b" : "none", border: "none", borderRadius: 8, padding: "11px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 12, width: "100%", fontFamily: "Georgia, serif", transition: "all 0.2s" }}>
+            <span style={{ fontSize: 18 }}>{tab.icon}</span>
+            <span style={{ color: activeTab === tab.id ? "#fff" : "#94a3b8", fontWeight: activeTab === tab.id ? 700 : 500, fontSize: 13 }}>{tab.label}</span>
           </button>
         ))}
 
-        {/* Legend */}
-        <div style={{ marginTop: 4, background: "#1e293b", borderRadius: 8, padding: "10px 12px" }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Score Columns Legend</div>
-          {[
-            { color: "#818cf8", label: "HOD Score" },
-            { color: "#38bdf8", label: "Director Score" },
-            { color: "#a78bfa", label: "Dean Score" },
-            { color: "#fbbf24", label: "VC Score (you)" },
-          ].map(({ color, label }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-              <div style={{ fontSize: 10, color: "#94a3b8" }}>{label}</div>
-            </div>
-          ))}
-        </div>
-
         <div style={{ flex: 1 }} />
-        <div style={{ height: 1, background: "#1e293b" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Avatar initials={VC_USER.avatar} color="#b45309" size={34} />
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+        
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "4px" }}>
+          <Avatar initials={VC_USER.avatar} color="#b45309" size={38} />
           <div>
-            <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>{VC_USER.name.split(" ").slice(0, 2).join(" ")}</div>
-            <div style={{ color: "#475569", fontSize: 9 }}>Vice Chancellor · DYPIU</div>
+            <div style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>{VC_USER.name}</div>
+            <div style={{ color: "#64748b", fontSize: 10 }}>VC · {APP_INFO.SHORT_NAME}</div>
           </div>
         </div>
+        
         <button
           onClick={() => setShowLogoutModal(true)}
           style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, background: "none", border: "1px solid #374151", borderRadius: 8, padding: "9px 11px", cursor: "pointer", fontFamily: "Georgia, serif" }}
@@ -1256,7 +827,7 @@ export default function VCDashboard() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>{tabLabel}</h1>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>DYPIU · AY {VC_USER.ay} — VC Final Approval</p>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{APP_INFO.SHORT_NAME} · AY {VC_USER.ay} — VC Final Approval</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>
@@ -1322,7 +893,7 @@ export default function VCDashboard() {
             <div style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 800, fontSize: 17, color: "#0f172a", marginBottom: 6 }}>Confirm Logout</div>
               <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                You are about to log out of <strong>FacultyAppraise</strong>.<br />Any unsaved changes will be lost.
+                You are about to log out of <strong>{APP_INFO.PORTAL_NAME}</strong>.<br />Any unsaved changes will be lost.
               </div>
             </div>
             <div style={{ display: "flex", gap: 12, width: "100%" }}>

@@ -1,320 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const DEAN_USER = {
-  name: "Prof. Anand Krishnamurthy", employeeId: "DYPIU-DEAN-0001",
-  designation: "Dean of Academics",
-  department: "Office of the Dean",
-  school: "D Y Patil International University", ay: "2025-2026", avatar: "AK",
-};
-
-// Directors under this Dean (each director has reviewed HODs and faculty)
-const DIRECTOR_LIST = [
-  {
-    id: 301, name: "Prof. Suresh Patil", employeeId: "DYPIU-DIR-0005",
-    designation: "Director / Dean", department: "School of Engineering & Management Research",
-    submittedOn: "2025-04-28", status: "Pending Dean Review",
-    avatar: "SP", avatarColor: "#6366f1",
-    directorScore: 420,
-    info: { name: "Prof. Suresh Patil", qual: "Ph.D., D.Sc. (Mechanical)", desig: "Director / Dean", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "ME601 / Advanced Manufacturing", planned: "40", conducted: "39", score: "20", director: "20", dean: "" }],
-    courseFile: { course: "ME601", title: "Advanced Manufacturing", details: "Yes", score: "18", director: "18", dean: "" },
-    innovScore: "9", innovDir: "9", innovDean: "",
-    projects: [
-      { label: "Project guided (3/batch)", score: "5", director: "5", dean: "" },
-      { label: "Industrial collaboration", score: "5", director: "5", dean: "" },
-      { label: "Award received", score: "4", director: "4", dean: "" },
-      { label: "Project outcome", score: "4", director: "4", dean: "" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", director: "5", dean: "" }, { label: "Certification", score: "5", director: "5", dean: "" }],
-    feedback: [{ code: "ME601", fb1: "4.7", fb2: "4.8", score: "9.5", director: "9.5", dean: "" }],
-    deptActs: [{ activity: "School Administration", nature: "Director", score: "20", director: "20", dean: "" }],
-    uniActs: [{ activity: "University Academic Council", nature: "Member", score: "30", director: "30", dean: "" }],
-    society: [{ label: "Industry Connect Summit", details: "Organised annual summit", score: "5", director: "5", dean: "" }],
-    industry: [{ name: "Tata Motors", details: "Joint Research MOU", score: "5", director: "5", dean: "" }],
-    acr: [
-      { label: "Leadership and Vision", director: "24", dean: "" },
-      { label: "Research Output", director: "23", dean: "" },
-      { label: "Institutional Development", director: "25", dean: "" },
-      { label: "Industry Interface", director: "22", dean: "" },
-      { label: "Compliance & Reporting", director: "20", dean: "" },
-    ],
-    journals: [{ title: "Smart Manufacturing using AI", journal: "CIRP Annals", issn: "0007-8506", index: "SCI", score: "40", director: "40", dean: "" }],
-    books: [{ title: "Manufacturing Systems Engineering", book: "Springer, 2024", issn: "978-3-031", pub: "International", coauth: "0", first: "Yes", score: "30", director: "30", dean: "" }],
-    ict: [{ title: "Advanced Manufacturing MOOC", desc: "NPTEL certified", type: "E-Content", quad: "4", score: "18", director: "18", dean: "" }],
-    research: [{ degree: "PhD", name: "Mihir Shah", thesis: "Awarded 2024-08-20", score: "25", director: "25", dean: "" }],
-    patents: [{ title: "Self-Healing Smart Composite", type: "International", date: "2024-06-10", status: "Granted", fileNo: "PCT/IN2024/050456", score: "35", director: "35", dean: "" }],
-    awards: [{ title: "Distinguished Educator Award", date: "2025-01-15", agency: "ISTE", level: "National", score: "10", director: "10", dean: "" }],
-    confs: [{ title: "Future of Manufacturing", type: "Keynote", org: "AIMTDR 2024", level: "International", score: "20", director: "20", dean: "" }],
-    proposals: [{ title: "Industry 4.0 Smart Factory", duration: "3 Years", agency: "DST-SERB", amount: "75 Lakhs", score: "18", director: "18", dean: "" }],
-    fdps: [{ program: "Leadership Development Program", duration: "1 Week", org: "IIM Pune", score: "5", director: "5", dean: "" }],
-    training: [],
-    docs: {
-      "lec-0": [{ name: "me601_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "smart_manufacturing.pdf", url: "#", type: "application/pdf" }],
-      "pat-0": [{ name: "patent_int.pdf", url: "#", type: "application/pdf" }],
-      "conf-0": [{ name: "keynote.pdf", url: "#", type: "application/pdf" }],
-    },
-    directorRemarks: "Self-assessment submitted for Dean review.",
-  },
-  {
-    id: 302, name: "Dr. Meena Iyer", employeeId: "DYPIU-DIR-0003",
-    designation: "Director", department: "School of Health Sciences",
-    submittedOn: "2025-04-26", status: "Dean Reviewed",
-    avatar: "MI", avatarColor: "#10b981",
-    directorScore: 395, deanTotal: 388,
-    info: { name: "Dr. Meena Iyer", qual: "Ph.D. (Biomedical Sciences)", desig: "Director", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "HS501 / Clinical Research Methods", planned: "40", conducted: "40", score: "22", director: "22", dean: "22" }],
-    courseFile: { course: "HS501", title: "Clinical Research Methods", details: "Yes", score: "19", director: "19", dean: "19" },
-    innovScore: "10", innovDir: "10", innovDean: "10",
-    projects: [
-      { label: "Project guided", score: "5", director: "5", dean: "5" },
-      { label: "Industrial collaboration", score: "5", director: "5", dean: "5" },
-      { label: "Award received", score: "4", director: "4", dean: "4" },
-      { label: "Project outcome", score: "4", director: "4", dean: "4" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", director: "5", dean: "5" }, { label: "Certification", score: "5", director: "5", dean: "5" }],
-    feedback: [{ code: "HS501", fb1: "4.9", fb2: "4.8", score: "9.7", director: "9.7", dean: "9.7" }],
-    deptActs: [{ activity: "Research Ethics Committee", nature: "Chair", score: "20", director: "20", dean: "20" }],
-    uniActs: [{ activity: "NAAC Steering Committee", nature: "Co-Convener", score: "28", director: "28", dean: "28" }],
-    society: [{ label: "Community Health Camp", details: "Free checkups in rural Pune", score: "5", director: "5", dean: "5" }],
-    industry: [{ name: "Cipla Ltd.", details: "Joint Research MOU", score: "5", director: "5", dean: "5" }],
-    acr: [
-      { label: "Leadership and Vision", director: "25", dean: "25" },
-      { label: "Research Output", director: "24", dean: "24" },
-      { label: "Institutional Development", director: "23", dean: "23" },
-      { label: "Industry Interface", director: "22", dean: "22" },
-      { label: "Compliance & Reporting", director: "24", dean: "24" },
-    ],
-    journals: [{ title: "AI-Assisted Drug Discovery", journal: "Nature Medicine", issn: "1078-8956", index: "SCI", score: "40", director: "40", dean: "40" }],
-    books: [], ict: [], research: [{ degree: "PhD", name: "Pooja Varma", thesis: "Awarded 2024-12-10", score: "25", director: "25", dean: "25" }],
-    patents: [], awards: [{ title: "Excellence in Research", date: "2024-10-20", agency: "ICMR", level: "National", score: "10", director: "10", dean: "10" }],
-    confs: [{ title: "Biomarkers in Early Cancer Detection", type: "Invited Talk", org: "AACR 2024", level: "International", score: "20", director: "20", dean: "20" }],
-    proposals: [{ title: "Rural Health Diagnostics AI", duration: "2 Years", agency: "ICMR", amount: "30 Lakhs", score: "18", director: "18", dean: "18" }],
-    fdps: [], training: [],
-    docs: {
-      "lec-0": [{ name: "hs501_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "ai_drug_discovery.pdf", url: "#", type: "application/pdf" }],
-    },
-    directorRemarks: "Outstanding researcher and institutional leader. Fully recommended.",
-    deanRemarks: "Endorsed with commendation. Exceptional contribution to health sciences research.",
-  },
-];
-
-// HODs that the Dean can also view (with both HOD and Director scores visible)
-const HOD_LIST_DEAN = [
-  {
-    id: 101, name: "Dr. Priya Sharma", employeeId: "DYPIU-HOD-0042",
-    designation: "Associate Professor & HOD", department: "Computer Science & Engineering",
-    submittedOn: "2025-04-25", status: "Director Reviewed",
-    avatar: "PS", avatarColor: "#6366f1",
-    hodScore: 312, directorTotal: 308, deanTotal: 0,
-    info: { name: "Dr. Priya Sharma", qual: "Ph.D (Computer Science)", desig: "Associate Professor & HOD", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "CS501 / AI & ML", planned: "48", conducted: "47", score: "20", hod: "20", director: "20", dean: "" }],
-    courseFile: { course: "CS501", title: "AI & ML", details: "Yes", score: "18", hod: "18", director: "18", dean: "" },
-    innovScore: "9", innovHod: "9", innovDir: "9", innovDean: "",
-    projects: [
-      { label: "Project guided (3/batch)", score: "5", hod: "5", director: "5", dean: "" },
-      { label: "Industrial collaboration", score: "4", hod: "4", director: "4", dean: "" },
-      { label: "Award received", score: "3", hod: "3", director: "3", dean: "" },
-      { label: "Project outcome", score: "4", hod: "4", director: "4", dean: "" },
-    ],
-    quals: [{ label: "Higher Qualification achieved", score: "5", hod: "5", director: "5", dean: "" }, { label: "Add-on Certification", score: "4", hod: "4", director: "4", dean: "" }],
-    feedback: [{ code: "CS501", fb1: "4.5", fb2: "4.7", score: "9.2", hod: "9.2", director: "9.2", dean: "" }],
-    deptActs: [{ activity: "Department Seminar Series", nature: "Coordinator", score: "18", hod: "18", director: "18", dean: "" }],
-    uniActs: [{ activity: "NBA Accreditation Committee", nature: "Convener", score: "25", hod: "25", director: "25", dean: "" }],
-    society: [{ label: "Community Coding Bootcamp", details: "Organised for school students", score: "5", hod: "5", director: "5", dean: "" }],
-    industry: [{ name: "Microsoft India", details: "MOU + Certification Program", score: "5", hod: "5", director: "5", dean: "" }],
-    acr: [
-      { label: "Leadership and Team Management", hod: "22", director: "22", dean: "" },
-      { label: "Research Output", hod: "24", director: "23", dean: "" },
-      { label: "Departmental Performance", hod: "23", director: "23", dean: "" },
-      { label: "Punctuality & Commitment", hod: "20", director: "20", dean: "" },
-      { label: "Industry / Institute Interface", hod: "19", director: "19", dean: "" },
-    ],
-    journals: [{ title: "Federated Learning for Healthcare IoT", journal: "IEEE IoT Journal", issn: "2327-4662", index: "SCI", score: "40", hod: "40", director: "40", dean: "" }],
-    books: [{ title: "Machine Learning Fundamentals", book: "Pearson, 2024", issn: "978-93-54", pub: "National", coauth: "0", first: "Yes", score: "25", hod: "25", director: "25", dean: "" }],
-    ict: [{ title: "AI MOOC on NPTEL", desc: "16-week course", type: "E-Content", quad: "4", score: "18", hod: "18", director: "18", dean: "" }],
-    research: [{ degree: "PhD", name: "Aakash Tiwari", thesis: "Submitted 2025-01-15", score: "25", hod: "25", director: "25", dean: "" }],
-    patents: [{ title: "Federated AI Privacy System", type: "International", date: "2024-10-05", status: "Published", fileNo: "PCT/IN2024/050123", score: "35", hod: "35", director: "35", dean: "" }],
-    awards: [{ title: "Best Researcher Award", date: "2025-02-10", agency: "AICTE", level: "National", score: "10", hod: "10", director: "10", dean: "" }],
-    confs: [{ title: "Privacy in AI Systems", type: "Keynote", org: "IEEE COMPSAC 2024", level: "International", score: "20", hod: "20", director: "20", dean: "" }],
-    proposals: [{ title: "Federated ML for Smart Cities", duration: "3 Years", agency: "SERB", amount: "48 Lakhs", score: "18", hod: "18", director: "18", dean: "" }],
-    fdps: [{ program: "FDP on Generative AI", duration: "2 Weeks", org: "IIT Delhi", score: "8", hod: "8", director: "8", dean: "" }],
-    training: [{ company: "Google India", duration: "1 Week", nature: "Industry Immersion", score: "5", hod: "5", director: "5", dean: "" }],
-    docs: {
-      "lec-0": [{ name: "ai_ml_schedule.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "federated_learning.pdf", url: "#", type: "application/pdf" }],
-      "pat-0": [{ name: "patent_int.pdf", url: "#", type: "application/pdf" }],
-    },
-    hodRemarks: "Excellent performance across all parameters. Strongly recommended for promotion consideration.",
-    directorRemarks: "Endorsed. Excellent researcher and departmental leader.",
-  },
-  {
-    id: 103, name: "Dr. Anjali Nair", employeeId: "DYPIU-HOD-0051",
-    designation: "Associate Professor & HOD", department: "Chemical Engineering",
-    submittedOn: "2025-04-20", status: "Dean Reviewed",
-    avatar: "AN", avatarColor: "#10b981",
-    hodScore: 330, directorTotal: 330, deanTotal: 328,
-    info: { name: "Dr. Anjali Nair", qual: "Ph.D (Chemical)", desig: "Associate Professor & HOD", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "CH301 / Process Engineering", planned: "48", conducted: "48", score: "22", hod: "22", director: "22", dean: "22" }],
-    courseFile: { course: "CH301", title: "Process Engineering", details: "Yes", score: "19", hod: "19", director: "19", dean: "19" },
-    innovScore: "10", innovHod: "10", innovDir: "10", innovDean: "10",
-    projects: [
-      { label: "Project guided", score: "5", hod: "5", director: "5", dean: "5" },
-      { label: "Industrial collaboration", score: "5", hod: "5", director: "5", dean: "5" },
-      { label: "Award received", score: "4", hod: "4", director: "4", dean: "4" },
-      { label: "Project outcome", score: "4", hod: "4", director: "4", dean: "4" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", hod: "5", director: "5", dean: "5" }, { label: "Certification", score: "5", hod: "5", director: "5", dean: "5" }],
-    feedback: [{ code: "CH301", fb1: "4.8", fb2: "4.9", score: "9.7", hod: "9.7", director: "9.7", dean: "9.7" }],
-    deptActs: [{ activity: "Lab Upgrade Project", nature: "PI", score: "20", hod: "20", director: "20", dean: "20" }],
-    uniActs: [{ activity: "NAAC Criterion 3 Lead", nature: "Convener", score: "28", hod: "28", director: "28", dean: "28" }],
-    society: [{ label: "Rural Sanitation Project", details: "NGO Collaboration", score: "5", hod: "5", director: "5", dean: "5" }],
-    industry: [{ name: "BASF India", details: "Research Collaboration", score: "5", hod: "5", director: "5", dean: "5" }],
-    acr: [
-      { label: "Leadership and Team Management", hod: "25", director: "25", dean: "25" },
-      { label: "Research Output", hod: "25", director: "25", dean: "25" },
-      { label: "Departmental Performance", hod: "24", director: "24", dean: "24" },
-      { label: "Punctuality & Commitment", hod: "23", director: "23", dean: "23" },
-      { label: "Industry / Institute Interface", hod: "22", director: "22", dean: "22" },
-    ],
-    journals: [{ title: "Green Chemistry in Polymers", journal: "Green Chemistry", issn: "1463-9262", index: "SCI", score: "40", hod: "40", director: "40", dean: "40" }],
-    books: [{ title: "Chemical Process Design", book: "Wiley, 2024", issn: "978-11-19", pub: "International", coauth: "0", first: "Yes", score: "30", hod: "30", director: "30", dean: "30" }],
-    ict: [], research: [{ degree: "PhD", name: "Kavya Iyer", thesis: "Awarded 2024-09-10", score: "25", hod: "25", director: "25", dean: "25" }],
-    patents: [], awards: [{ title: "Young Scientist Award", date: "2024-11-05", agency: "DST", level: "National", score: "10", hod: "10", director: "10", dean: "10" }],
-    confs: [{ title: "Sustainable Process Engineering", type: "Invited Talk", org: "IChemE 2024", level: "International", score: "20", hod: "20", director: "20", dean: "20" }],
-    proposals: [{ title: "Bio-refinery Optimisation", duration: "2 Years", agency: "CSIR", amount: "22 Lakhs", score: "18", hod: "18", director: "18", dean: "18" }],
-    fdps: [], training: [],
-    docs: {
-      "lec-0": [{ name: "ch301_timetable.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "green_chemistry.pdf", url: "#", type: "application/pdf" }],
-    },
-    hodRemarks: "Outstanding researcher and administrator. Recommended for senior designation.",
-    directorRemarks: "Fully endorsed. Exceptional contribution to research and institution building.",
-    deanRemarks: "Strongly approved at Dean level. Exemplary academic and research leadership.",
-  },
-];
-
-// Faculty visible to Dean (director-approved)
-const FACULTY_LIST_DEAN = [
-  {
-    id: 201, name: "Prof. Arjun Mehta", employeeId: "DYPIU-FAC-0101",
-    designation: "Assistant Professor", department: "Computer Science & Engineering",
-    submittedOn: "2025-04-18", status: "Director Approved",
-    avatar: "AM", avatarColor: "#6366f1",
-    hodTotal: 310, directorTotal: 305, deanTotal: 0,
-    hodRemarks: "Good performance. Continue research.",
-    directorRemarks: "Satisfactory. Encouraged to publish more.",
-    info: { name: "Prof. Arjun Mehta", qual: "M.Tech (CSE)", desig: "Assistant Professor", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "CS301 / Data Structures", planned: "48", conducted: "46", score: "18", hod: "18", director: "18", dean: "" }],
-    courseFile: { course: "CS301", title: "Data Structures", details: "Yes", score: "16", hod: "16", director: "16", dean: "" },
-    innovScore: "8", innovHod: "8", innovDir: "8", innovDean: "",
-    projects: [
-      { label: "Project guided", score: "5", hod: "5", director: "5", dean: "" },
-      { label: "Industrial collaboration", score: "3", hod: "3", director: "3", dean: "" },
-      { label: "Award received", score: "2", hod: "2", director: "2", dean: "" },
-      { label: "Project outcome", score: "3", hod: "3", director: "3", dean: "" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", hod: "5", director: "5", dean: "" }, { label: "Certification", score: "4", hod: "4", director: "4", dean: "" }],
-    feedback: [{ code: "CS301", fb1: "4.2", fb2: "4.4", score: "8.8", hod: "8.8", director: "8.8", dean: "" }],
-    deptActs: [{ activity: "Department Seminar", nature: "Coordinator", score: "10", hod: "10", director: "10", dean: "" }],
-    uniActs: [{ activity: "Exam Duty", nature: "Flying Squad", score: "15", hod: "15", director: "15", dean: "" }],
-    society: [{ label: "Induction Program", details: "FE Student induction", score: "5", hod: "5", director: "5", dean: "" }],
-    industry: [{ name: "TCS Pune", details: "Guest Lecture + MOU", score: "4", hod: "4", director: "4", dean: "" }],
-    acr: [
-      { label: "Self-motivation and Proactiveness", hod: "18", director: "17", dean: "" },
-      { label: "Punctuality", hod: "20", director: "20", dean: "" },
-      { label: "Target based work", hod: "17", director: "17", dean: "" },
-      { label: "Effectiveness", hod: "16", director: "16", dean: "" },
-      { label: "Obedience", hod: "19", director: "19", dean: "" },
-    ],
-    journals: [{ title: "Deep Learning for Image Segmentation", journal: "Elsevier CVIU", issn: "1077-3142", index: "Scopus", score: "30", hod: "30", director: "30", dean: "" }],
-    books: [{ title: "Data Structures with C++", book: "Oxford Press, 2024", issn: "978-01-9", pub: "National", coauth: "1", first: "Yes", score: "20", hod: "20", director: "20", dean: "" }],
-    ict: [{ title: "Data Structures MOOC", desc: "12-week", type: "E-Content", quad: "4", score: "15", hod: "15", director: "15", dean: "" }],
-    research: [{ degree: "PhD", name: "Rohan Pawar", thesis: "Submitted 2024-11-10", score: "20", hod: "20", director: "20", dean: "" }],
-    patents: [{ title: "Smart Irrigation System", type: "National", date: "2024-08-15", status: "Published", fileNo: "202421012345", score: "25", hod: "25", director: "25", dean: "" }],
-    awards: [{ title: "Best Paper Award", date: "2024-03-20", agency: "IEEE", level: "International", score: "10", hod: "10", director: "10", dean: "" }],
-    confs: [{ title: "ML in Healthcare", type: "Paper", org: "IEEE ICCCNT 2024", level: "International", score: "15", hod: "15", director: "15", dean: "" }],
-    proposals: [{ title: "AI-based Traffic Management", duration: "2 Years", agency: "DST", amount: "12.5 Lakhs", score: "10", hod: "10", director: "10", dean: "" }],
-    fdps: [{ program: "FDP on Deep Learning", duration: "1 Week", org: "IIT Bombay", score: "5", hod: "5", director: "5", dean: "" }],
-    training: [{ company: "Infosys BPM", duration: "2 Weeks", nature: "Industry Collaboration", score: "5", hod: "5", director: "5", dean: "" }],
-    docs: {
-      "lec-0": [{ name: "timetable_sem1.pdf", url: "#", type: "application/pdf" }],
-      "jour-0": [{ name: "journal_paper_1.pdf", url: "#", type: "application/pdf" }],
-    },
-  },
-  {
-    id: 202, name: "Dr. Sneha Kulkarni", employeeId: "DYPIU-FAC-0088",
-    designation: "Assistant Professor", department: "Computer Science & Engineering",
-    submittedOn: "2025-04-20", status: "Dean Reviewed",
-    avatar: "SK", avatarColor: "#0ea5e9",
-    hodTotal: 345, directorTotal: 340, deanTotal: 338,
-    hodRemarks: "Excellent researcher.",
-    directorRemarks: "Strongly approved.",
-    deanRemarks: "Exemplary. Dean-level endorsement for fast-track promotion.",
-    info: { name: "Dr. Sneha Kulkarni", qual: "Ph.D (IT)", desig: "Assistant Professor", ay: "2025-2026" },
-    lectures: [{ sem: "Sem I", code: "IT201 / Database Systems", planned: "48", conducted: "48", score: "22", hod: "22", director: "22", dean: "22" }],
-    courseFile: { course: "IT201", title: "Database Systems", details: "Yes", score: "18", hod: "18", director: "18", dean: "18" },
-    innovScore: "9", innovHod: "9", innovDir: "9", innovDean: "9",
-    projects: [
-      { label: "Project guided", score: "4", hod: "4", director: "4", dean: "4" },
-      { label: "Industrial collaboration", score: "4", hod: "4", director: "4", dean: "4" },
-      { label: "Award received", score: "3", hod: "3", director: "3", dean: "3" },
-      { label: "Project outcome", score: "4", hod: "4", director: "4", dean: "4" },
-    ],
-    quals: [{ label: "Higher Qualification", score: "5", hod: "5", director: "5", dean: "5" }, { label: "Certification", score: "5", hod: "5", director: "5", dean: "5" }],
-    feedback: [{ code: "IT201", fb1: "4.6", fb2: "4.8", score: "9.4", hod: "9.4", director: "9.4", dean: "9.4" }],
-    deptActs: [{ activity: "Departmental Seminar", nature: "Organizer", score: "15", hod: "15", director: "15", dean: "15" }],
-    uniActs: [{ activity: "Admission Committee", nature: "Member", score: "18", hod: "18", director: "18", dean: "18" }],
-    society: [{ label: "Blood Donation", details: "Organised camp", score: "5", hod: "5", director: "5", dean: "5" }],
-    industry: [{ name: "Wipro Pune", details: "Internship MOU", score: "5", hod: "5", director: "5", dean: "5" }],
-    acr: [
-      { label: "Self-motivation and Proactiveness", hod: "22", director: "22", dean: "22" },
-      { label: "Punctuality", hod: "23", director: "23", dean: "23" },
-      { label: "Target based work", hod: "21", director: "21", dean: "21" },
-      { label: "Effectiveness", hod: "22", director: "22", dean: "22" },
-      { label: "Obedience", hod: "23", director: "23", dean: "23" },
-    ],
-    journals: [{ title: "Blockchain in Healthcare", journal: "Springer", issn: "1234-5678", index: "SCI", score: "40", hod: "40", director: "40", dean: "40" }],
-    books: [], ict: [], research: [], patents: [], awards: [], confs: [], proposals: [], fdps: [], training: [],
-    docs: { "jour-0": [{ name: "blockchain_paper.pdf", url: "#", type: "application/pdf" }] },
-  },
-];
-
-// Dean's own self-appraisal data
-const DEAN_SELF_DATA = {
-  info: { name: "Prof. Anand Krishnamurthy", qual: "Ph.D., LLD (Law & Policy)", desig: "Dean of Academics", ay: "2025-2026" },
-  lectures: [{ sem: "Sem I", code: "GS701 / Academic Leadership & Policy", planned: "30", conducted: "29", score: "18" }],
-  courseFile: { course: "GS701", title: "Academic Leadership & Policy", details: "Yes", score: "18" },
-  innovScore: "9",
-  projects: [
-    { label: "Project guided (3/batch)", score: "5" }, { label: "Industrial collaboration", score: "5" },
-    { label: "Award received", score: "4" }, { label: "Project outcome", score: "4" },
-  ],
-  quals: [{ label: "Higher Qualification", score: "5" }, { label: "Certification", score: "5" }],
-  feedback: [{ code: "GS701", fb1: "4.9", fb2: "4.9", score: "9.8" }],
-  deptActs: [{ activity: "University Curriculum Committee", nature: "Chair", score: "20" }],
-  uniActs: [{ activity: "Senate & Academic Council", nature: "Secretary", score: "30" }],
-  society: [{ label: "Higher Ed Policy Forum", details: "National-level participation", score: "5" }],
-  industry: [{ name: "McKinsey India", details: "Advisory Board Member", score: "5" }],
-  acr: [],
-  journals: [{ title: "Governance Models in Indian HEIs", journal: "Higher Education", issn: "0018-1560", index: "SCI", score: "40" }],
-  books: [{ title: "Academic Administration in the 21st Century", book: "Oxford Press, 2024", issn: "978-01-8", pub: "International", coauth: "0", first: "Yes", score: "30" }],
-  ict: [{ title: "Leadership MOOC on Coursera", desc: "8-week program", type: "E-Content", quad: "4", score: "18" }],
-  research: [{ degree: "PhD", name: "Sonal Joshi", thesis: "Awarded 2025-02-15", score: "25" }],
-  patents: [],
-  awards: [{ title: "Best Academic Administrator", date: "2025-03-01", agency: "AIU", level: "National", score: "10" }],
-  confs: [{ title: "Future of Higher Education in India", type: "Keynote", org: "FICCI HEIS 2024", level: "International", score: "20" }],
-  proposals: [{ title: "NEP 2020 Implementation Research", duration: "2 Years", agency: "UGC", amount: "15 Lakhs", score: "18" }],
-  fdps: [{ program: "Leadership & Strategy", duration: "1 Week", org: "IIM Ahmedabad", score: "5" }],
-  training: [],
-  docs: {
-    "lec-0": [{ name: "gs701_schedule.pdf", url: "#", type: "application/pdf" }],
-    "jour-0": [{ name: "governance_paper.pdf", url: "#", type: "application/pdf" }],
-  },
-};
+import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
+import { HodInput } from "../components/Inputs";
+import { DEAN_USER } from "../data/mockData";
+import { getStaffForDean } from "../services/api";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -379,6 +68,74 @@ function SelfInput({ val, onChange }) {
     />
   );
 }
+// ─── Input & Table Controls (Self-Appraisal Mode) ──────────────────────────────
+function TI({ val, onChange, center, placeholder }) {
+  return (
+    <input
+      value={val} onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder || ""}
+      style={center
+        ? { width: "100%", maxWidth: "100%", height: 30, boxSizing: "border-box", border: "1px solid #d1d5db", borderRadius: 4, padding: "5px 6px", fontSize: 11, lineHeight: 1.25, fontFamily: "Georgia, serif", outline: "none", textAlign: "center" }
+        : { width: "100%", maxWidth: "100%", height: 30, boxSizing: "border-box", border: "1px solid #d1d5db", borderRadius: 4, padding: "5px 6px", fontSize: 11, lineHeight: 1.25, fontFamily: "Georgia, serif", outline: "none" }}
+    />
+  );
+}
+
+function DocCell({ id, docs, setDocs }) {
+  const ref = useRef();
+  const handleFiles = (files) => {
+    const newFiles = Array.from(files).map((f) => ({
+      name: f.name,
+      url: URL.createObjectURL(f),
+      type: f.type,
+    }));
+    setDocs((p) => ({ ...p, [id]: [...(p[id] || []), ...newFiles] }));
+  };
+  const removeFile = (idx) => {
+    setDocs((p) => {
+      const updated = [...(p[id] || [])];
+      updated.splice(idx, 1);
+      return { ...p, [id]: updated };
+    });
+  };
+  const files = docs[id] || [];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {files.map((f, idx) => (
+        <div key={idx} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f0f9ff", border: "1px solid #0ea5e9", borderRadius: 4, padding: "2px 6px" }}>
+          <span style={{ fontSize: 10, color: "#1e293b", flex: 1, overflow: "hidden", textOverflow: "ellipsis" }} title={f.name}>{f.name}</span>
+          <button onClick={() => removeFile(idx)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: 10, cursor: "pointer" }}>✕</button>
+        </div>
+      ))}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", padding: "4px 6px", border: "1px dashed #cbd5e1", borderRadius: 4, background: "#f8fafc" }} onClick={() => ref.current.click()}>
+        <span style={{ fontSize: 10, color: "#64748b" }}>📎 Attach</span>
+        <input ref={ref} type="file" multiple style={{ display: "none" }} onChange={(e) => handleFiles(e.target.files)} />
+      </div>
+    </div>
+  );
+}
+
+function ViewCell({ id, docs }) {
+  const files = docs[id] || [];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {files.map((f, idx) => (
+        <a key={idx} href={f.url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#3b82f6", fontSize: 10, textDecoration: "none", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 4, padding: "2px 7px", whiteSpace: "nowrap" }} title={f.name}>
+          👁 {f.name.length > 12 ? f.name.slice(0, 12) + "…" : f.name}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function RowBtns({ onAdd, onDel, canDel = true }) {
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <button style={{ padding: "6px 12px", background: "#10b981", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={onAdd}>+ Add Row</button>
+      {canDel && <button style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={onDel}>− Delete Last</button>}
+    </div>
+  );
+}
 function ViewDocsCell({ docKey, docs }) {
   const files = docs?.[docKey] || [];
   if (!files.length) return <span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
@@ -394,6 +151,7 @@ function ViewDocsCell({ docKey, docs }) {
     </div>
   );
 }
+
 function SC({ title, subtitle, accent = "#7c3aed", children }) {
   return (
     <div style={{ background: "#fff", borderRadius: 9, boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 14, overflow: "hidden", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}` }}>
@@ -407,513 +165,691 @@ function SC({ title, subtitle, accent = "#7c3aed", children }) {
 }
 
 // ─── Table style constants ────────────────────────────────────────────────────
-const T = { width: "100%", borderCollapse: "collapse", fontSize: 11 };
-const TH      = { border: "1px solid #cbd5e1", padding: "5px 7px", background: "#0f172a",  color: "#94a3b8",  fontWeight: 700, textAlign: "center", fontSize: 10 };
-const TH_HOD  = { ...TH, background: "#312e81", color: "#c7d2fe" };
-const TH_DIR  = { ...TH, background: "#0c4a6e", color: "#bae6fd" };
-const TH_DEAN = { ...TH, background: "#4c1d95", color: "#ddd6fe" };
-const TD  = { border: "1px solid #e2e8f0", padding: "5px 7px", verticalAlign: "middle" };
+const T = { width: "100%", borderCollapse: "collapse", fontSize: 12 };
+const TH = { border: "1px solid #cbd5e1", padding: "7px 8px", background: "#0f172a", color: "#cbd5e1", fontWeight: 700, textAlign: "center", fontSize: 10 };
+const TH_HOD = { ...TH, background: "#312e81", color: "#c7d2fe" };
+const TD = { border: "1px solid #e2e8f0", padding: "4px 6px", verticalAlign: "middle" };
 const TDC = { ...TD, textAlign: "center" };
-const TDS = { ...TD, textAlign: "center", background: "#f8fafc", minWidth: 58 };
-const TDS_HOD  = { ...TDS, background: "#f0f4ff" };
-const TDS_DIR  = { ...TDS, background: "#f0fbff" };
-const TDS_DEAN = { ...TDS, background: "#faf5ff" };
+const TDS = { ...TD, textAlign: "center", background: "#f8fafc", minWidth: 52 };
+const TDS_HOD = { ...TDS, background: "#f0f4ff" };
 const TDV = { ...TD, background: "#fafbff", minWidth: 110 };
 
-// ─── Generic Review Form ──────────────────────────────────────────────────────
-// personMode: "director" (reviewing a Director), "hod" (reviewing HOD), "faculty" (reviewing faculty), "self"
-function ReviewForm({ person, deanData, setDeanData, personMode = "director", accentColor = "#7c3aed", role = "dean" }) {
-  const showHodCol  = personMode === "hod" || personMode === "faculty";
-  const showDirCol  = personMode === "director" || personMode === "hod" || personMode === "faculty";
-
+// ─── Faculty Form in HOD Review Mode ─────────────────────────────────────────
+function FacultyReviewForm({ faculty, hodData, setHodData }) {
   const set = (section, idx, field, val) => {
-    setDeanData(prev => {
+    setHodData(prev => {
       const updated = { ...prev };
-      if (!updated[section]) updated[section] = JSON.parse(JSON.stringify(person[section] || []));
-      if (idx === null) updated[section] = { ...updated[section], [field]: val };
-      else updated[section] = updated[section].map((r, i) => i === idx ? { ...r, [field]: val } : r);
+      if (!updated[section]) updated[section] = JSON.parse(JSON.stringify(faculty[section] || []));
+      if (idx === null) { updated[section] = { ...updated[section], [field]: val }; }
+      else { updated[section] = updated[section].map((r, i) => i === idx ? { ...r, [field]: val } : r); }
       return updated;
     });
   };
-  const setScalar = (key, val) => setDeanData(prev => ({ ...prev, [key]: val }));
+  const setScalar = (key, val) => setHodData(prev => ({ ...prev, [key]: val }));
+
   const get = (section, idx, field) => {
-    if (deanData[section]) {
-      const s = deanData[section];
-      return idx === null ? (s[field] ?? person[section]?.[field] ?? "") : (s[idx]?.[field] ?? person[section]?.[idx]?.[field] ?? "");
+    if (hodData[section]) {
+      const s = hodData[section];
+      return idx === null ? (s[field] ?? faculty[section]?.[field] ?? "") : (s[idx]?.[field] ?? faculty[section]?.[idx]?.[field] ?? "");
     }
-    return idx === null ? (person[section]?.[field] ?? "") : (person[section]?.[idx]?.[field] ?? "");
+    return idx === null ? (faculty[section]?.[field] ?? "") : (faculty[section]?.[idx]?.[field] ?? "");
   };
-  const getS = (key) => deanData[key] ?? person[key] ?? "";
-  const { docs } = person;
+  const getS = (key) => hodData[key] ?? faculty[key] ?? "";
+
+  const { info, lectures, courseFile, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, patents, awards, confs, proposals, fdps, training, docs } = faculty;
+
   const rows = (arr) => arr && arr.length > 0 ? arr : [{}];
 
-  const DI = ({ val, onChange }) =>
-    role === "self"
-      ? <SelfInput val={val} onChange={onChange} />
-      : <DeanInput val={val} onChange={onChange} />;
-
-  const TH_EDIT  = role === "self" ? { ...TH, background: "#064e3b", color: "#6ee7b7" } : TH_DEAN;
-  const TDS_EDIT = role === "self" ? { ...TDS, background: "#f0fff8" } : TDS_DEAN;
-  const editLabel = role === "self" ? "Your Score" : "Dean Score";
-
-  // Director score column label for HOD/Faculty mode
-  const dirColLabel = personMode === "director" ? "Self Score" : "Director Score";
-  const facColLabel = "Faculty Score";
-
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      {/* Mode banner */}
-      <div style={{ background: `linear-gradient(90deg,#3b0764,#6d28d9)`, color: "#ede9fe", borderRadius: 8, padding: "10px 16px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, fontSize: 12 }}>
-        <span style={{ fontSize: 18 }}>{role === "self" ? "✏️" : "👁️"}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      {/* HOD Review Banner */}
+      <div style={{ background: "linear-gradient(90deg,#312e81,#4338ca)", color: "#e0e7ff", borderRadius: 8, padding: "10px 16px", marginBottom: 14, display: "flex", alignItems: "center", gap: 10, fontSize: 12 }}>
+        <span style={{ fontSize: 18 }}>🔍</span>
         <div>
-          {role === "self"
-            ? <><strong>Self-Appraisal Mode</strong> — Fill your own scores in the <span style={{ color: "#86efac", fontWeight: 700 }}>Your Score</span> column.</>
-            : <><strong>Dean Review Mode</strong> — All prior scores are read-only. Only the <span style={{ color: "#c4b5fd", fontWeight: 700 }}>Dean Score</span> column is editable.
-                {showHodCol && " HOD scores shown for reference."} {showDirCol && " Director scores shown for reference."}</>
-          }
+          <strong>HOD Review Mode</strong> — Faculty data is read-only. Only <span style={{ color: "#c7d2fe", fontWeight: 700 }}>HOD Score</span> columns are editable. Click <span style={{ color: "#c7d2fe" }}>📄 View Doc</span> links to open uploaded files.
         </div>
       </div>
 
-      {/* Personal Info */}
-      <SC title="Personal Information" accent={accentColor}>
+      {/* Faculty Info */}
+      <SC title="Faculty Information" accent="#6366f1">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <tbody>
-            {Object.entries(person.info).map(([k, v]) => (
-              <tr key={k}>
-                <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%", textTransform: "capitalize" }}>{k}</td>
-                <td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{v}</td>
+            {[["Name", info.name], ["Qualification", info.qual], ["Designation", info.desig], ["Academic Year", info.ay]].map(([label, val]) => (
+              <tr key={label}>
+                <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%" }}>{label}</td>
+                <td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{val}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </SC>
 
-      <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#dbeafe", padding: "8px 14px", borderRadius: 6, marginBottom: 10 }}>PART A — Teaching & Academic Activities</div>
+      {/* ── PART A ── */}
+      <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#dbeafe", padding: "8px 14px", borderRadius: 6, marginBottom: 10, letterSpacing: 0.3 }}>PART A — Teaching & Academic Activities</div>
 
-      {/* A1 Lectures */}
-      <SC title="A1. Lectures / Tutorials / Practicals (Max 50)" accent={accentColor}>
+      {/* A1: Lectures */}
+      <SC title="A1. Lectures / Tutorials / Practicals (Max 50)" accent="#6366f1">
         <div style={{ overflowX: "auto" }}>
-          <table style={T}><thead><tr>
-            <th style={TH}>SN</th><th style={TH}>Semester</th><th style={TH}>Course</th>
-            <th style={TH}>Planned</th><th style={TH}>Conducted</th><th style={TH}>Docs</th>
-            {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-            {!showHodCol && <th style={TH}>{personMode === "director" ? "Self Score" : "Faculty Score"}</th>}
-            {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-            <th style={TH_EDIT}>{editLabel}</th>
-          </tr></thead>
-          <tbody>{rows(person.lectures).map((r, i) => (
-            <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-              <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.sem} /></td><td style={TD}><RO val={r.code} /></td>
-              <td style={TDC}><RO val={r.planned} center /></td><td style={TDC}><RO val={r.conducted} center /></td>
-              <td style={TDV}><ViewDocsCell docKey={`lec-${i}`} docs={docs} /></td>
-              {showHodCol && <><td style={TDS}><RO val={r.score} center /></td><td style={TDS_HOD}><RO val={r.hod} center /></td></>}
-              {!showHodCol && <td style={TDS}><RO val={r.score} center /></td>}
-              {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-              <td style={TDS_EDIT}><DI val={get("lectures", i, "dean")} onChange={v => set("lectures", i, "dean", v)} /></td>
-            </tr>
-          ))}</tbody></table>
+          <table style={T}>
+            <thead><tr>
+              <th style={TH}>SN</th><th style={TH}>Semester</th><th style={TH}>Course Code / Name</th>
+              <th style={TH}>Planned</th><th style={TH}>Conducted</th>
+              <th style={TH}>View Docs</th>
+              <th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+            </tr></thead>
+            <tbody>
+              {rows(lectures).map((r, i) => (
+                <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                  <td style={TDC}>{i + 1}</td>
+                  <td style={TD}><RO val={r.sem} /></td>
+                  <td style={TD}><RO val={r.code} /></td>
+                  <td style={TDC}><RO val={r.planned} center /></td>
+                  <td style={TDC}><RO val={r.conducted} center /></td>
+                  <td style={TDV}><ViewDocsCell docKey={`lec-${i}`} docs={docs} /></td>
+                  <td style={TDS}><RO val={r.score} center /></td>
+                  <td style={TDS_HOD}><HodInput val={get("lectures", i, "hod")} onChange={v => set("lectures", i, "hod", v)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </SC>
 
-      {/* A2 Course File */}
-      <SC title="A2. Course File (Max 20)" accent={accentColor}>
-        <table style={T}><thead><tr>
-          <th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th><th style={TH}>Docs</th>
-          {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-          {!showHodCol && <th style={TH}>Self Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          <th style={TH_EDIT}>{editLabel}</th>
-        </tr></thead>
-        <tbody><tr>
-          <td style={TD}><RO val={person.courseFile?.course} /></td>
-          <td style={TD}><RO val={person.courseFile?.title} /></td>
-          <td style={TDC}><RO val={person.courseFile?.details} center /></td>
-          <td style={TDV}><ViewDocsCell docKey="cf-0" docs={docs} /></td>
-          {showHodCol && <><td style={TDS}><RO val={person.courseFile?.score} center /></td><td style={TDS_HOD}><RO val={person.courseFile?.hod} center /></td></>}
-          {!showHodCol && <td style={TDS}><RO val={person.courseFile?.score} center /></td>}
-          {showDirCol && <td style={TDS_DIR}><RO val={person.courseFile?.director} center /></td>}
-          <td style={TDS_EDIT}><DI val={get("courseFile", null, "dean")} onChange={v => set("courseFile", null, "dean", v)} /></td>
-        </tr></tbody></table>
-      </SC>
-
-      {/* A3 Innovative */}
-      <SC title="A3. Innovative Teaching-Learning (Max 10)" accent={accentColor}>
-        <table style={T}><thead><tr>
-          <th style={TH}>Method</th>
-          {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-          {!showHodCol && <th style={TH}>Self Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          <th style={TH_EDIT}>{editLabel}</th>
-        </tr></thead>
-        <tbody><tr>
-          <td style={TD}>Innovative / participatory teaching methods used</td>
-          {showHodCol && <><td style={TDS}><RO val={person.innovScore} center /></td><td style={TDS_HOD}><RO val={person.innovHod} center /></td></>}
-          {!showHodCol && <td style={TDS}><RO val={person.innovScore} center /></td>}
-          {showDirCol && <td style={TDS_DIR}><RO val={person.innovDir} center /></td>}
-          <td style={TDS_EDIT}><DI val={getS("innovDean")} onChange={v => setScalar("innovDean", v)} /></td>
-        </tr></tbody></table>
-      </SC>
-
-      {/* A4 Projects */}
-      <SC title="A4. Projects (Max 10)" accent={accentColor}>
-        <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Project Type</th><th style={TH}>Docs</th>
-          {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-          {!showHodCol && <th style={TH}>Self Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          <th style={TH_EDIT}>{editLabel}</th>
-        </tr></thead>
-        <tbody>{rows(person.projects).map((r, i) => (
-          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-            <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.label} /></td>
-            <td style={TDV}><ViewDocsCell docKey={`proj-${i}`} docs={docs} /></td>
-            {showHodCol && <><td style={TDS}><RO val={r.score} center /></td><td style={TDS_HOD}><RO val={r.hod} center /></td></>}
-            {!showHodCol && <td style={TDS}><RO val={r.score} center /></td>}
-            {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-            <td style={TDS_EDIT}><DI val={get("projects", i, "dean")} onChange={v => set("projects", i, "dean", v)} /></td>
-          </tr>
-        ))}</tbody></table>
-      </SC>
-
-      {/* A5 Quals */}
-      <SC title="A5. Qualification Enhancement (Max 10)" accent={accentColor}>
-        <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Description</th><th style={TH}>Docs</th>
-          {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-          {!showHodCol && <th style={TH}>Self Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          <th style={TH_EDIT}>{editLabel}</th>
-        </tr></thead>
-        <tbody>{rows(person.quals).map((r, i) => (
-          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-            <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.label} /></td>
-            <td style={TDV}><ViewDocsCell docKey={`qual-${i}`} docs={docs} /></td>
-            {showHodCol && <><td style={TDS}><RO val={r.score} center /></td><td style={TDS_HOD}><RO val={r.hod} center /></td></>}
-            {!showHodCol && <td style={TDS}><RO val={r.score} center /></td>}
-            {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-            <td style={TDS_EDIT}><DI val={get("quals", i, "dean")} onChange={v => set("quals", i, "dean", v)} /></td>
-          </tr>
-        ))}</tbody></table>
-      </SC>
-
-      {/* B Feedback */}
-      <SC title="B. Student Feedback (Max 10)" accent={accentColor}>
-        <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>FB1</th><th style={TH}>FB2</th><th style={TH}>Avg</th>
-          {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-          {!showHodCol && <th style={TH}>Self Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          <th style={TH_EDIT}>{editLabel}</th>
-        </tr></thead>
-        <tbody>{rows(person.feedback).map((r, i) => (
-          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-            <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.code} /></td>
-            <td style={TDC}><RO val={r.fb1} center /></td><td style={TDC}><RO val={r.fb2} center /></td>
-            <td style={{ ...TDC, fontWeight: 700, color: "#0ea5e9" }}>{r.fb1 && r.fb2 ? ((n(r.fb1) + n(r.fb2)) / 2).toFixed(2) : "—"}</td>
-            {showHodCol && <><td style={TDS}><RO val={r.score} center /></td><td style={TDS_HOD}><RO val={r.hod} center /></td></>}
-            {!showHodCol && <td style={TDS}><RO val={r.score} center /></td>}
-            {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-            <td style={TDS_EDIT}><DI val={get("feedback", i, "dean")} onChange={v => set("feedback", i, "dean", v)} /></td>
-          </tr>
-        ))}</tbody></table>
-      </SC>
-
-      {/* C–F Activities */}
-      {[
-        ["C. Departmental Activities (Max 20)", "deptActs", "#f59e0b", ["Activity", "Nature"], ["activity", "nature"], "dept"],
-        ["D. University Activities (Max 30)", "uniActs", "#f59e0b", ["Activity", "Nature"], ["activity", "nature"], "uni"],
-        ["E. Contribution to Society (Max 10)", "society", "#10b981", ["Activity", "Details"], ["label", "details"], "soc"],
-        ["F. Industry Connect (Max 5)", "industry", "#10b981", ["Industry", "Details"], ["name", "details"], "ind"],
-      ].map(([title, key, accent2, cols, fields, docPfx]) => (
-        <SC key={key} title={title} accent={accent2}>
-          <table style={T}><thead><tr>
-            <th style={TH}>SN</th>
-            {cols.map(c => <th key={c} style={TH}>{c}</th>)}
-            <th style={TH}>Docs</th>
-            {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-            {!showHodCol && <th style={TH}>Self Score</th>}
-            {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-            <th style={TH_EDIT}>{editLabel}</th>
+      {/* A2: Course File */}
+      <SC title="A2. Course File (Max 20)" accent="#6366f1">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
           </tr></thead>
-          <tbody>{rows(person[key]).map((r, i) => (
-            <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-              <td style={TDC}>{i + 1}</td>
-              {fields.map(f => <td key={f} style={TD}><RO val={r[f]} /></td>)}
-              <td style={TDV}><ViewDocsCell docKey={`${docPfx}-${i}`} docs={docs} /></td>
-              {showHodCol && <><td style={TDS}><RO val={r.score} center /></td><td style={TDS_HOD}><RO val={r.hod} center /></td></>}
-              {!showHodCol && <td style={TDS}><RO val={r.score} center /></td>}
-              {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-              <td style={TDS_EDIT}><DI val={get(key, i, "dean")} onChange={v => set(key, i, "dean", v)} /></td>
+          <tbody>
+            <tr>
+              <td style={TD}><RO val={courseFile?.course} /></td>
+              <td style={TD}><RO val={courseFile?.title} /></td>
+              <td style={TDC}><RO val={courseFile?.details} center /></td>
+              <td style={TDV}><ViewDocsCell docKey="cf-0" docs={docs} /></td>
+              <td style={TDS}><RO val={courseFile?.score} center /></td>
+              <td style={TDS_HOD}><HodInput val={get("courseFile", null, "hod")} onChange={v => set("courseFile", null, "hod", v)} /></td>
             </tr>
-          ))}</tbody></table>
-        </SC>
-      ))}
-
-      {/* G ACR */}
-      <SC title="G. Annual Confidential Report (Max 25)" accent="#ef4444">
-        <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Parameter</th>
-          {showHodCol && <th style={TH_HOD}>HOD Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          {role !== "self" && <th style={TH_EDIT}>{editLabel}</th>}
-        </tr></thead>
-        <tbody>{rows(person.acr).map((r, i) => (
-          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-            <td style={TDC}>{i + 1}</td>
-            <td style={TD}><RO val={r.label} /></td>
-            {showHodCol && <td style={TDS_HOD}><RO val={r.hod} center /></td>}
-            {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-            {role !== "self" && <td style={TDS_EDIT}><DI val={get("acr", i, "dean")} onChange={v => set("acr", i, "dean", v)} /></td>}
-          </tr>
-        ))}</tbody></table>
+          </tbody>
+        </table>
       </SC>
 
-      <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#ede9fe", padding: "8px 14px", borderRadius: 6, marginBottom: 10 }}>PART B — Research & Academic Contributions</div>
-
-      {/* B1 Journals */}
-      <SC title="B1. Research Papers / Journal Publications (Max 120)" accent="#7c3aed">
-        <div style={{ overflowX: "auto" }}><table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Journal</th>
-          <th style={TH}>ISSN</th><th style={TH}>Index</th><th style={TH}>Docs</th>
-          {showHodCol && <><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th></>}
-          {!showHodCol && <th style={TH}>Self Score</th>}
-          {showDirCol && <th style={TH_DIR}>{dirColLabel}</th>}
-          <th style={TH_EDIT}>{editLabel}</th>
-        </tr></thead>
-        <tbody>{rows(person.journals).map((r, i) => (
-          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-            <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.title} /></td><td style={TD}><RO val={r.journal} /></td>
-            <td style={TDC}><RO val={r.issn} center /></td><td style={TDC}><RO val={r.index} center /></td>
-            <td style={TDV}><ViewDocsCell docKey={`jour-${i}`} docs={docs} /></td>
-            {showHodCol && <><td style={TDS}><RO val={r.score} center /></td><td style={TDS_HOD}><RO val={r.hod} center /></td></>}
-            {!showHodCol && <td style={TDS}><RO val={r.score} center /></td>}
-            {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-            <td style={TDS_EDIT}><DI val={get("journals", i, "dean")} onChange={v => set("journals", i, "dean", v)} /></td>
-          </tr>
-        ))}</tbody></table></div>
+      {/* A3: Innovative Teaching */}
+      <SC title="A3. Innovative Teaching-Learning (Max 10)" accent="#8b5cf6">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>Method</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td style={TD}>Innovative / participatory teaching methods used</td>
+              <td style={TDS}><RO val={faculty.innovScore} center /></td>
+              <td style={TDS_HOD}><HodInput val={getS("innovHod")} onChange={v => setScalar("innovHod", v)} /></td>
+            </tr>
+          </tbody>
+        </table>
       </SC>
 
-      {/* B2–B8 */}
-      {[
-        { title: "B2. Books / Book Chapters (Max 50)", key: "books", docPfx: "book",
-          cols: ["SN","Title","Book & Publisher","ISBN","1st Author?","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.title,r.book,r.issn,r.first] },
-        { title: "B3. ICT / E-Content (Max 20)", key: "ict", docPfx: "ict",
-          cols: ["SN","Title","Type","Quadrants","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.title,r.type,r.quad] },
-        { title: "B4. Research Guidance (Max 30)", key: "research", docPfx: "res",
-          cols: ["SN","Degree","Student","Status","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.degree,r.name,r.thesis] },
-        { title: "B5a. Patents / IPR (Max 40)", key: "patents", docPfx: "pat",
-          cols: ["SN","Title","Type","Filed","Status","File No.","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.title,r.type,r.date,r.status,r.fileNo] },
-        { title: "B5b. Awards / Fellowships (Max 10)", key: "awards", docPfx: "awd",
-          cols: ["SN","Award","Date","Agency","Level","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.title,r.date,r.agency,r.level] },
-        { title: "B6. Conferences (Max 30)", key: "confs", docPfx: "conf",
-          cols: ["SN","Title","Type","Organizer","Level","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.title,r.type,r.org,r.level] },
-        { title: "B7. Research Proposals (Max 20)", key: "proposals", docPfx: "prop",
-          cols: ["SN","Title","Duration","Agency","Amount","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.title,r.duration,r.agency,r.amount] },
-        { title: "B8. Self Development — FDP (Max 10)", key: "fdps", docPfx: "fdp",
-          cols: ["SN","Program","Duration","Organizer","Docs","Fac/Self Score","HOD","Dir","Dean"],
-          render: (r,i) => [i+1,r.program,r.duration,r.org] },
-      ].map(({ title, key, docPfx, render, cols }) => (
-        <SC key={key} title={title} accent="#7c3aed">
-          <div style={{ overflowX: "auto" }}><table style={T}><thead>
-            <tr>{cols.map((c, ci) => {
-              if (c === "HOD") return showHodCol ? <th key={ci} style={TH_HOD}>HOD Score</th> : null;
-              if (c === "Dir") return showDirCol ? <th key={ci} style={TH_DIR}>{dirColLabel}</th> : null;
-              if (c === "Dean") return <th key={ci} style={TH_EDIT}>{editLabel}</th>;
-              if (c === "Fac/Self Score") return <th key={ci} style={TH}>Faculty Score</th>;
-              if (c === "Docs") return <th key={ci} style={TH}>Docs</th>;
-              return <th key={ci} style={TH}>{c}</th>;
-            })}</tr>
-          </thead>
-          <tbody>{rows(person[key]).map((r, i) => {
-            const cells = render(r, i);
-            return (
+      {/* A4: Projects */}
+      <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Project Type</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(projects).map((r, i) => (
               <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
-                {cells.map((cell, ci) => <td key={ci} style={ci === 0 ? TDC : TD}><RO val={cell} /></td>)}
-                <td style={TDV}><ViewDocsCell docKey={`${docPfx}-${i}`} docs={docs} /></td>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.label} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`proj-${i}`} docs={docs} /></td>
                 <td style={TDS}><RO val={r.score} center /></td>
-                {showHodCol && <td style={TDS_HOD}><RO val={r.hod} center /></td>}
-                {showDirCol && <td style={TDS_DIR}><RO val={r.director} center /></td>}
-                <td style={TDS_EDIT}><DI val={get(key, i, "dean")} onChange={v => set(key, i, "dean", v)} /></td>
+                <td style={TDS_HOD}><HodInput val={get("projects", i, "hod")} onChange={v => set("projects", i, "hod", v)} /></td>
               </tr>
-            );
-          })}</tbody></table></div>
-        </SC>
-      ))}
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* A5: Qualification */}
+      <SC title="A5. Qualification Enhancement (Max 10)" accent="#8b5cf6">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Description</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(quals).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.label} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`qual-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("quals", i, "hod")} onChange={v => set("quals", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* B: Student Feedback */}
+      <SC title="B. Student Feedback (Max 10)" accent="#0ea5e9">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Feedback 1</th>
+            <th style={TH}>Feedback 2</th><th style={TH}>Average</th>
+            <th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(feedback).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.code} /></td>
+                <td style={TDC}><RO val={r.fb1} center /></td>
+                <td style={TDC}><RO val={r.fb2} center /></td>
+                <td style={{ ...TDC, fontWeight: 700, color: "#6366f1" }}>
+                  {r.fb1 && r.fb2 ? ((n(r.fb1) + n(r.fb2)) / 2).toFixed(2) : "—"}
+                </td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("feedback", i, "hod")} onChange={v => set("feedback", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* C: Dept Activities */}
+      <SC title="C. Departmental Activities (Max 20)" accent="#f59e0b">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Activity</th><th style={TH}>Nature</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(deptActs).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.activity} /></td>
+                <td style={TD}><RO val={r.nature} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`dept-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("deptActs", i, "hod")} onChange={v => set("deptActs", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* D: University Activities */}
+      <SC title="D. University Activities (Max 30)" accent="#f59e0b">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Activity</th><th style={TH}>Nature</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(uniActs).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.activity} /></td>
+                <td style={TD}><RO val={r.nature} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`uni-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("uniActs", i, "hod")} onChange={v => set("uniActs", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* E: Society */}
+      <SC title="E. Contribution to Society (Max 10)" accent="#10b981">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Activity</th><th style={TH}>Details</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(society).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.label} /></td>
+                <td style={TD}><RO val={r.details} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`soc-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("society", i, "hod")} onChange={v => set("society", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* F: Industry */}
+      <SC title="F. Industry Connect (Max 5)" accent="#10b981">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Industry Name</th><th style={TH}>Details</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(industry).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.name} /></td>
+                <td style={TD}><RO val={r.details} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`ind-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("industry", i, "hod")} onChange={v => set("industry", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* G: ACR */}
+      <SC title="G. Annual Confidential Report (Max 25)" accent="#ef4444">
+        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>⚠️ ACR is assessed by HOD only — faculty does not fill scores.</div>
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Parameter</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(acr).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.label} /></td>
+                <td style={TDS_HOD}><HodInput val={get("acr", i, "hod")} onChange={v => set("acr", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* ── PART B ── */}
+      <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#ede9fe", padding: "8px 14px", borderRadius: 6, marginBottom: 10, letterSpacing: 0.3 }}>PART B — Research & Academic Contributions</div>
+
+      {/* B1: Journals */}
+      <SC title="B1. Research Papers / Journal Publications (Max 120)" accent="#7c3aed">
+        <div style={{ overflowX: "auto" }}>
+          <table style={T}>
+            <thead><tr>
+              <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Journal</th>
+              <th style={TH}>ISSN</th><th style={TH}>Indexing</th>
+              <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+            </tr></thead>
+            <tbody>
+              {rows(journals).map((r, i) => (
+                <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                  <td style={TDC}>{i + 1}</td>
+                  <td style={TD}><RO val={r.title} /></td>
+                  <td style={TD}><RO val={r.journal} /></td>
+                  <td style={TDC}><RO val={r.issn} center /></td>
+                  <td style={TDC}><RO val={r.index} center /></td>
+                  <td style={TDV}><ViewDocsCell docKey={`jour-${i}`} docs={docs} /></td>
+                  <td style={TDS}><RO val={r.score} center /></td>
+                  <td style={TDS_HOD}><HodInput val={get("journals", i, "hod")} onChange={v => set("journals", i, "hod", v)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SC>
+
+      {/* B2: Books */}
+      <SC title="B2. Books / Book Chapters (Max 50)" accent="#7c3aed">
+        <div style={{ overflowX: "auto" }}>
+          <table style={T}>
+            <thead><tr>
+              <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Book & Publisher</th>
+              <th style={TH}>ISBN</th><th style={TH}>First Author?</th>
+              <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+            </tr></thead>
+            <tbody>
+              {rows(books).map((r, i) => (
+                <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                  <td style={TDC}>{i + 1}</td>
+                  <td style={TD}><RO val={r.title} /></td>
+                  <td style={TD}><RO val={r.book} /></td>
+                  <td style={TDC}><RO val={r.issn} center /></td>
+                  <td style={TDC}><RO val={r.first} center /></td>
+                  <td style={TDV}><ViewDocsCell docKey={`book-${i}`} docs={docs} /></td>
+                  <td style={TDS}><RO val={r.score} center /></td>
+                  <td style={TDS_HOD}><HodInput val={get("books", i, "hod")} onChange={v => set("books", i, "hod", v)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SC>
+
+      {/* B3: ICT */}
+      <SC title="B3. ICT / E-Content / Pedagogy (Max 20)" accent="#0ea5e9">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Type</th><th style={TH}>Quadrants</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(ict).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.title} /></td>
+                <td style={TD}><RO val={r.type} /></td>
+                <td style={TDC}><RO val={r.quad} center /></td>
+                <td style={TDV}><ViewDocsCell docKey={`ict-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("ict", i, "hod")} onChange={v => set("ict", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* B4: Research Guidance */}
+      <SC title="B4. Research Guidance — PhD / PG (Max 30)" accent="#059669">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Degree</th><th style={TH}>Student Name</th><th style={TH}>Status</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(research).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TDC}><RO val={r.degree} center /></td>
+                <td style={TD}><RO val={r.name} /></td>
+                <td style={TD}><RO val={r.thesis} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`res-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("research", i, "hod")} onChange={v => set("research", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* B5: Patents */}
+      <SC title="B5a. Patents / IPR (Max 40)" accent="#f97316">
+        <div style={{ overflowX: "auto" }}>
+          <table style={T}>
+            <thead><tr>
+              <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Type</th>
+              <th style={TH}>Filed</th><th style={TH}>Status</th><th style={TH}>File No.</th>
+              <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+            </tr></thead>
+            <tbody>
+              {rows(patents).map((r, i) => (
+                <tr key={i}>
+                  <td style={TDC}>{i + 1}</td>
+                  <td style={TD}><RO val={r.title} /></td>
+                  <td style={TDC}><RO val={r.type} center /></td>
+                  <td style={TDC}><RO val={r.date} center /></td>
+                  <td style={TDC}><RO val={r.status} center /></td>
+                  <td style={TDC}><RO val={r.fileNo} center /></td>
+                  <td style={TDV}><ViewDocsCell docKey={`pat-${i}`} docs={docs} /></td>
+                  <td style={TDS}><RO val={r.score} center /></td>
+                  <td style={TDS_HOD}><HodInput val={get("patents", i, "hod")} onChange={v => set("patents", i, "hod", v)} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SC>
+
+      {/* B5b: Awards */}
+      <SC title="B5b. Awards / Fellowships (Max 10)" accent="#f97316">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Award Title</th><th style={TH}>Date</th>
+            <th style={TH}>Agency</th><th style={TH}>Level</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(awards).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.title} /></td>
+                <td style={TDC}><RO val={r.date} center /></td>
+                <td style={TD}><RO val={r.agency} /></td>
+                <td style={TD}><RO val={r.level} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`awd-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("awards", i, "hod")} onChange={v => set("awards", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* B6: Conferences */}
+      <SC title="B6. Conferences / Papers Presented (Max 30)" accent="#6366f1">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Title / Session</th><th style={TH}>Type</th>
+            <th style={TH}>Organizer</th><th style={TH}>Level</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(confs).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.title} /></td>
+                <td style={TD}><RO val={r.type} /></td>
+                <td style={TD}><RO val={r.org} /></td>
+                <td style={TD}><RO val={r.level} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`conf-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("confs", i, "hod")} onChange={v => set("confs", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* B7: Proposals */}
+      <SC title="B7. Research Proposals / Products (Max 20)" accent="#0ea5e9">
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Duration</th>
+            <th style={TH}>Funding Agency</th><th style={TH}>Amount</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(proposals).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.title} /></td>
+                <td style={TDC}><RO val={r.duration} center /></td>
+                <td style={TD}><RO val={r.agency} /></td>
+                <td style={TDC}><RO val={r.amount} center /></td>
+                <td style={TDV}><ViewDocsCell docKey={`prop-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("proposals", i, "hod")} onChange={v => set("proposals", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
+
+      {/* B8: Self Dev */}
+      <SC title="B8. Self Development — FDP / Training (Max 10)" accent="#10b981">
+        <div style={{ fontWeight: 600, fontSize: 11, color: "#475569", marginBottom: 6 }}>FDP / Workshops</div>
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Program</th><th style={TH}>Duration</th><th style={TH}>Organizer</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(fdps).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.program} /></td>
+                <td style={TDC}><RO val={r.duration} center /></td>
+                <td style={TD}><RO val={r.org} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`fdp-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("fdps", i, "hod")} onChange={v => set("fdps", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ fontWeight: 600, fontSize: 11, color: "#475569", margin: "12px 0 6px" }}>Industrial Training</div>
+        <table style={T}>
+          <thead><tr>
+            <th style={TH}>SN</th><th style={TH}>Company</th><th style={TH}>Duration</th><th style={TH}>Nature</th>
+            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+          </tr></thead>
+          <tbody>
+            {rows(training).map((r, i) => (
+              <tr key={i}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.company} /></td>
+                <td style={TDC}><RO val={r.duration} center /></td>
+                <td style={TD}><RO val={r.nature} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`train-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={r.score} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("training", i, "hod")} onChange={v => set("training", i, "hod", v)} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </SC>
     </div>
   );
 }
 
-// ─── Score Calculator ─────────────────────────────────────────────────────────
-function calcDeanScore(person, deanData) {
-  const get = (section, idx, field) => {
-    if (deanData[section]) {
-      const s = deanData[section];
-      return idx === null ? n(s[field]) : n(s[idx]?.[field]);
-    }
-    return idx === null ? n(person[section]?.[field]) : n(person[section]?.[idx]?.[field]);
-  };
-  const getS = (key) => n(deanData[key] ?? person[key]);
-  const sum = (arr, s, f) => (arr || []).reduce((a, _, i) => a + get(s, i, f), 0);
-
-  const partA = sum(person.lectures, "lectures", "dean") + get("courseFile", null, "dean") +
-    getS("innovDean") + sum(person.projects, "projects", "dean") +
-    sum(person.quals, "quals", "dean") + sum(person.feedback, "feedback", "dean") +
-    sum(person.deptActs, "deptActs", "dean") + sum(person.uniActs, "uniActs", "dean") +
-    sum(person.society, "society", "dean") + sum(person.industry, "industry", "dean") +
-    sum(person.acr, "acr", "dean");
-
-  const partB = sum(person.journals, "journals", "dean") + sum(person.books, "books", "dean") +
-    sum(person.ict, "ict", "dean") + sum(person.research, "research", "dean") +
-    sum(person.patents, "patents", "dean") + sum(person.awards, "awards", "dean") +
-    sum(person.confs, "confs", "dean") + sum(person.proposals, "proposals", "dean") +
-    sum(person.fdps, "fdps", "dean") + sum(person.training || [], "training", "dean");
-
-  return { partA, partB, total: partA + partB };
-}
-
-// ─── Review Panel ─────────────────────────────────────────────────────────────
-function ReviewPanel({ person, personMode, onBack, onSubmit }) {
-  const [deanData, setDeanData] = useState({});
-  const [remarks, setRemarks] = useState(person.deanRemarks || "");
+// ─── Full Review Panel (opened when HOD clicks Review) ────────────────────────
+function ReviewPanel({ faculty, onBack, onSubmit }) {
+  const [hodData, setHodData] = useState({});
+  const [remarks, setRemarks] = useState(faculty.hodRemarks || "");
   const [tab, setTab] = useState("form");
 
-  const { partA, partB, total } = calcDeanScore(person, deanData);
+  // Compute HOD total from hodData
+  const calcHodScore = () => {
+    const get = (section, idx, field) => {
+      if (hodData[section]) {
+        const s = hodData[section];
+        return idx === null ? n(s[field]) : n(s[idx]?.[field]);
+      }
+      return idx === null ? n(faculty[section]?.[field]) : n(faculty[section]?.[idx]?.[field]);
+    };
+    const getS = (key) => n(hodData[key] ?? faculty[key]);
+
+    const lec = (faculty.lectures || []).reduce((a, _, i) => a + get("lectures", i, "hod"), 0);
+    const cf = get("courseFile", null, "hod");
+    const innov = getS("innovHod");
+    const proj = (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
+    const qual = (faculty.quals || []).reduce((a, _, i) => a + get("quals", i, "hod"), 0);
+    const fb = (faculty.feedback || []).reduce((a, _, i) => a + get("feedback", i, "hod"), 0);
+    const dept = (faculty.deptActs || []).reduce((a, _, i) => a + get("deptActs", i, "hod"), 0);
+    const uni = (faculty.uniActs || []).reduce((a, _, i) => a + get("uniActs", i, "hod"), 0);
+    const soc = (faculty.society || []).reduce((a, _, i) => a + get("society", i, "hod"), 0);
+    const ind = (faculty.industry || []).reduce((a, _, i) => a + get("industry", i, "hod"), 0);
+    const acrT = (faculty.acr || []).reduce((a, _, i) => a + get("acr", i, "hod"), 0);
+    const partA = lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT;
+
+    const jour = (faculty.journals || []).reduce((a, _, i) => a + get("journals", i, "hod"), 0);
+    const bk = (faculty.books || []).reduce((a, _, i) => a + get("books", i, "hod"), 0);
+    const ictT = (faculty.ict || []).reduce((a, _, i) => a + get("ict", i, "hod"), 0);
+    const res = (faculty.research || []).reduce((a, _, i) => a + get("research", i, "hod"), 0);
+    const pat = (faculty.patents || []).reduce((a, _, i) => a + get("patents", i, "hod"), 0);
+    const awd = (faculty.awards || []).reduce((a, _, i) => a + get("awards", i, "hod"), 0);
+    const conf = (faculty.confs || []).reduce((a, _, i) => a + get("confs", i, "hod"), 0);
+    const prop = (faculty.proposals || []).reduce((a, _, i) => a + get("proposals", i, "hod"), 0);
+    const fdp = (faculty.fdps || []).reduce((a, _, i) => a + get("fdps", i, "hod"), 0);
+    const train = (faculty.training || []).reduce((a, _, i) => a + get("training", i, "hod"), 0);
+    const partB = jour + bk + ictT + res + pat + awd + conf + prop + fdp + train;
+
+    return { partA, partB, total: partA + partB };
+  };
+
+  const { partA, partB, total } = calcHodScore();
   const g = grade(total, 575);
 
-  // Compute prior score totals for display
-  const dirTotal = person.directorTotal || person.directorScore || 0;
-  const hodTotal  = person.hodTotal || person.hodScore || 0;
-
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 0, minHeight: "100%" }}>
       {/* Header */}
       <div style={{ background: "#0f172a", padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, marginBottom: 16, borderRadius: 10 }}>
         <button onClick={onBack} style={{ background: "#1e293b", border: "none", color: "#94a3b8", cursor: "pointer", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontFamily: "Georgia, serif" }}>← Back</button>
-        <Avatar initials={person.avatar} color={person.avatarColor || "#7c3aed"} size={40} />
+        <Avatar initials={faculty.avatar} color={faculty.avatarColor} size={40} />
         <div style={{ flex: 1 }}>
-          <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{person.name}</div>
-          <div style={{ color: "#64748b", fontSize: 11 }}>{person.designation} · {person.employeeId}</div>
+          <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{faculty.name}</div>
+          <div style={{ color: "#64748b", fontSize: 11 }}>{faculty.designation} · {faculty.employeeId}</div>
         </div>
-        {/* Score pills */}
-        <div style={{ display: "flex", gap: 8 }}>
-          {personMode === "faculty" && (
-            <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>HOD Total</div>
-              <div style={{ color: "#818cf8", fontWeight: 800, fontSize: 14 }}>{hodTotal}</div>
-            </div>
-          )}
-          {(personMode === "faculty" || personMode === "hod") && (
-            <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>Dir Total</div>
-              <div style={{ color: "#38bdf8", fontWeight: 800, fontSize: 14 }}>{dirTotal}</div>
-            </div>
-          )}
-          {personMode === "director" && (
-            <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>Dir Self Score</div>
-              <div style={{ color: "#38bdf8", fontWeight: 800, fontSize: 14 }}>{dirTotal}</div>
-            </div>
-          )}
-          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>Dean Part A</div>
-            <div style={{ color: "#c4b5fd", fontWeight: 800, fontSize: 14 }}>{partA.toFixed(1)}</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 14px", textAlign: "center" }}>
+            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>HOD Part A</div>
+            <div style={{ color: "#818cf8", fontWeight: 800, fontSize: 16 }}>{partA.toFixed(1)}</div>
           </div>
-          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>Dean Part B</div>
-            <div style={{ color: "#a78bfa", fontWeight: 800, fontSize: 14 }}>{partB.toFixed(1)}</div>
+          <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 14px", textAlign: "center" }}>
+            <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>HOD Part B</div>
+            <div style={{ color: "#38bdf8", fontWeight: 800, fontSize: 16 }}>{partB.toFixed(1)}</div>
           </div>
-          <div style={{ background: g.bg, border: `2px solid ${g.color}40`, borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-            <div style={{ color: g.color, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>Dean Total</div>
-            <div style={{ color: g.color, fontWeight: 800, fontSize: 14 }}>{total.toFixed(1)}<span style={{ fontSize: 10, color: "#94a3b8" }}>/575</span></div>
+          <div style={{ background: g.bg, border: `2px solid ${g.color}40`, borderRadius: 8, padding: "8px 14px", textAlign: "center" }}>
+            <div style={{ color: g.color, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700 }}>HOD Total</div>
+            <div style={{ color: g.color, fontWeight: 800, fontSize: 16 }}>{total.toFixed(1)}<span style={{ fontSize: 10, color: "#94a3b8" }}>/575</span></div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tab switcher */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         {[["form", "📋 Review Form"], ["remarks", "✏️ Remarks & Submit"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
-            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#4c1d95" : "#e2e8f0", color: tab === id ? "#ddd6fe" : "#475569" }}>
+            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#312e81" : "#e2e8f0", color: tab === id ? "#e0e7ff" : "#475569" }}>
             {label}
           </button>
         ))}
       </div>
 
-      {tab === "form" && (
-        <ReviewForm
-          person={person} deanData={deanData} setDeanData={setDeanData}
-          personMode={personMode} accentColor="#7c3aed" role="dean"
-        />
-      )}
+      {tab === "form" && <FacultyReviewForm faculty={faculty} hodData={hodData} setHodData={setHodData} />}
 
       {tab === "remarks" && (
         <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
-          <h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>Dean Remarks & Final Submission</h3>
+          <h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>HOD Remarks & Final Submission</h3>
 
-          {/* Prior remarks chain */}
-          {person.hodRemarks && (
-            <div style={{ background: "#f0f4ff", border: "1px solid #c7d2fe", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#4338ca", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>HOD Remarks</div>
-              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6 }}>{person.hodRemarks}</div>
-            </div>
-          )}
-          {person.directorRemarks && (
-            <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>Director Remarks</div>
-              <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.6 }}>{person.directorRemarks}</div>
-            </div>
-          )}
-
-          {/* Score summary */}
+          {/* Score Summary */}
           <table style={{ ...T, marginBottom: 18 }}>
             <thead><tr>
               <th style={TH}>Section</th><th style={TH}>Max</th>
-              {(personMode === "hod" || personMode === "faculty") && <th style={TH}>Faculty Score</th>}
-              {(personMode === "hod" || personMode === "faculty") && <th style={TH_HOD}>HOD Score</th>}
-              {personMode !== "self" && <th style={TH_DIR}>Director Score</th>}
-              <th style={TH_DEAN}>Dean Score</th>
+              <th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
             </tr></thead>
             <tbody>
-              {[["Part A — Teaching & Activities", 200, partA], ["Part B — Research & Contributions", 375, partB]].map(([l, m, v]) => (
-                <tr key={l}>
-                  <td style={TD}>{l}</td><td style={TDC}>{m}</td>
-                  {(personMode === "hod" || personMode === "faculty") && <td style={TDS}>—</td>}
-                  {(personMode === "hod" || personMode === "faculty") && <td style={TDS_HOD}>{hodTotal ? (hodTotal / 2).toFixed(0) : "—"}</td>}
-                  {personMode !== "self" && <td style={TDS_DIR}>{dirTotal ? (dirTotal / 2).toFixed(0) : "—"}</td>}
-                  <td style={{ ...TDS_DEAN, fontWeight: 700, color: "#4c1d95" }}>{v.toFixed(1)}</td>
+              {[
+                ["Part A — Teaching & Activities", 200, faculty.lectures?.reduce((a, r) => a + n(r.score), 0) || 0, partA],
+                ["Part B — Research & Contributions", 375, faculty.journals?.reduce((a, r) => a + n(r.score), 0) || 0, partB],
+              ].map(([label, max, fac, hod]) => (
+                <tr key={label}>
+                  <td style={TD}>{label}</td>
+                  <td style={TDC}>{max}</td>
+                  <td style={TDS}>{fac.toFixed(1)}</td>
+                  <td style={{ ...TDS_HOD, fontWeight: 700, color: "#312e81" }}>{hod.toFixed(1)}</td>
                 </tr>
               ))}
               <tr style={{ background: "#d1fae5", fontWeight: 700 }}>
-                <td style={TD}>Grand Total</td><td style={TDC}>575</td>
-                {(personMode === "hod" || personMode === "faculty") && <td style={TDS}>—</td>}
-                {(personMode === "hod" || personMode === "faculty") && <td style={TDS_HOD}>{hodTotal}</td>}
-                {personMode !== "self" && <td style={TDS_DIR}>{dirTotal}</td>}
-                <td style={{ ...TDS_DEAN, color: "#065f46", fontSize: 14 }}>{total.toFixed(1)}</td>
+                <td style={TD}>Grand Total</td>
+                <td style={TDC}>575</td>
+                <td style={TDS}>—</td>
+                <td style={{ ...TDS_HOD, color: "#065f46", fontSize: 14 }}>{total.toFixed(1)}</td>
               </tr>
               <tr style={{ background: g.bg }}>
-                <td style={TD} colSpan={6}><strong>Grade</strong></td>
+                <td style={TD} colSpan={3}><strong>Grade</strong></td>
                 <td style={{ ...TDC, color: g.color, fontWeight: 800 }}>{g.label}</td>
               </tr>
             </tbody>
           </table>
 
-          <label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>Dean Remarks</label>
+          <label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>HOD Remarks</label>
           <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={4}
-            placeholder="Enter your Dean-level remarks, endorsement, and recommendations..."
+            placeholder="Enter your remarks, observations, and recommendations for this faculty member..."
             style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 7, padding: "10px 12px", fontSize: 12, fontFamily: "Georgia, serif", resize: "vertical", boxSizing: "border-box", marginBottom: 16 }} />
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "Georgia, serif" }}>Cancel</button>
-            <button onClick={() => onSubmit(person.id, total, remarks, personMode)}
-              style={{ padding: "10px 28px", background: "#4c1d95", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
-              ✔ Submit Dean Approval
+            <button onClick={() => onSubmit(faculty.id, total, remarks)}
+              style={{ padding: "10px 28px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
+              ✔ Submit HOD Review
             </button>
           </div>
         </div>
@@ -922,263 +858,604 @@ function ReviewPanel({ person, personMode, onBack, onSubmit }) {
   );
 }
 
-// ─── Person Card ──────────────────────────────────────────────────────────────
-function PersonCard({ person, personMode, onReview }) {
-  const g = grade(person.deanTotal || person.directorTotal || person.hodTotal || 300, 575);
-  const docCount = Object.values(person.docs || {}).reduce((a, arr) => a + arr.length, 0);
-
-  const scoreRows = [];
-  if (personMode === "faculty" || personMode === "hod") {
-    scoreRows.push({ label: personMode === "hod" ? "Own Score" : "HOD Score", val: person.hodTotal || person.hodScore || 0, color: "#6366f1" });
-  }
-  scoreRows.push({ label: "Dir Score", val: person.directorTotal || person.directorScore || 0, color: "#0ea5e9" });
-  scoreRows.push({ label: "Dean Score", val: person.deanTotal || 0, color: "#7c3aed" });
-  scoreRows.push({ label: "Docs", val: docCount, color: "#10b981", noBar: true });
-
-  const isDeanReviewed = person.status === "Dean Reviewed";
+function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit }) {
+  const [remarks, setRemarks] = useState(approval?.deanRemarks || approval?.directorRemarks || approval?.hodRemarks || "");
+  const titleMap = {
+    hodApprovals: "HOD Approval Review",
+    directorApprovals: "Director Approval Review",
+    facultyApprovals: "Faculty Approval Review",
+  };
+  const scoreKey = approvalType === "hodApprovals" ? "directorTotal" : approvalType === "directorApprovals" ? "deanTotal" : "hodTotal";
+  const scoreLabel = approvalType === "hodApprovals" ? "Director Total" : approvalType === "directorApprovals" ? "Dean Total" : "HOD Total";
 
   return (
-    <div style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 6px rgba(0,0,0,.07)", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <Avatar initials={person.avatar} color={person.avatarColor || "#7c3aed"} size={46} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>{person.name}</div>
-          <div style={{ fontSize: 11, color: "#475569", marginBottom: 2 }}>{person.designation}</div>
-          <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{person.employeeId}</div>
-          {person.department && <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{person.department}</div>}
+    <div style={{ background: "#fff", borderRadius: 14, padding: "24px", boxShadow: "0 18px 45px rgba(15,23,42,0.18)", minHeight: "100%" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+        <button onClick={onBack} style={{ border: "none", background: "#e2e8f0", color: "#0f172a", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>← Back</button>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{titleMap[approvalType]}</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{approval.name} · {approval.designation}</div>
         </div>
-        <StatusBadge status={person.status} />
       </div>
 
-      {/* Score grid */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${scoreRows.length},1fr)`, gap: 10, background: "#f8fafc", borderRadius: 8, padding: "12px 14px" }}>
-        {scoreRows.map(({ label, val, color, noBar }) => (
-          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.6 }}>{label}</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1 }}>
-              {typeof val === "number" ? val.toFixed(0) : val}
-              {!noBar && <span style={{ fontSize: 9, color: "#94a3b8" }}>/575</span>}
-            </div>
-            {!noBar && <ScoreBar score={val} max={575} color={color} />}
-            {noBar && <div style={{ fontSize: 9, color: "#94a3b8" }}>files</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "Employee ID", value: approval.employeeId },
+          { label: "Submitted", value: approval.submittedOn },
+          { label: scoreLabel, value: approval[scoreKey] ?? 0 },
+        ].map((item) => (
+          <div key={item.label} style={{ background: "#f8fafc", borderRadius: 12, padding: "18px 16px" }}>
+            <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.7 }}>{item.label}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{item.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Remarks chain preview */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {person.hodRemarks && (
-          <div style={{ background: "#f0f4ff", borderRadius: 6, padding: "7px 10px", fontSize: 11, color: "#4338ca", lineHeight: 1.5, borderLeft: "3px solid #818cf8" }}>
-            <span style={{ fontWeight: 700 }}>HOD: </span>{person.hodRemarks.slice(0, 60)}{person.hodRemarks.length > 60 ? "…" : ""}
-          </div>
-        )}
-        {person.directorRemarks && (
-          <div style={{ background: "#f0f9ff", borderRadius: 6, padding: "7px 10px", fontSize: 11, color: "#0369a1", lineHeight: 1.5, borderLeft: "3px solid #38bdf8" }}>
-            <span style={{ fontWeight: 700 }}>Director: </span>{person.directorRemarks.slice(0, 60)}{person.directorRemarks.length > 60 ? "…" : ""}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
-        <div style={{ fontSize: 10, color: "#94a3b8" }}>Submitted: {person.submittedOn}</div>
-        <button onClick={() => onReview(person, personMode)}
-          style={{ fontSize: 11, padding: "7px 18px", background: isDeanReviewed ? "#1e293b" : "#4c1d95", color: isDeanReviewed ? "#e2e8f0" : "#ede9fe", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
-          {isDeanReviewed ? "✎ Edit Dean Review" : "👁️ Review & Approve →"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Self-Appraisal Panel ─────────────────────────────────────────────────────
-function SelfAppraisalPanel() {
-  const [deanData, setDeanData] = useState({});
-  const [tab, setTab] = useState("form");
-  const [submitted, setSubmitted] = useState(false);
-  const [remarks, setRemarks] = useState("");
-
-  const { partA, partB, total } = calcDeanScore(DEAN_SELF_DATA, deanData);
-  const g = grade(total, 575);
-
-  if (submitted) return (
-    <div style={{ background: "#fff", borderRadius: 12, padding: "48px", textAlign: "center", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
-      <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-      <h2 style={{ margin: "0 0 8px", color: "#0f172a" }}>Self-Appraisal Submitted</h2>
-      <p style={{ color: "#64748b", fontSize: 13 }}>Your appraisal for AY {DEAN_USER.ay} has been forwarded to the Vice Chancellor.</p>
-      <div style={{ display: "inline-block", background: g.bg, color: g.color, borderRadius: 12, padding: "14px 28px", marginTop: 16, fontWeight: 800, fontSize: 18 }}>
-        {total.toFixed(1)} / 575 — {g.label}
-      </div>
-    </div>
-  );
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      {/* Score header */}
-      <div style={{ background: "#0f172a", borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-        <Avatar initials={DEAN_USER.avatar} color="#7c3aed" size={44} />
-        <div style={{ flex: 1 }}>
-          <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{DEAN_USER.name}</div>
-          <div style={{ color: "#64748b", fontSize: 11 }}>{DEAN_USER.designation} · Self-Appraisal AY {DEAN_USER.ay}</div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[["Part A", partA.toFixed(1), "#c4b5fd"], ["Part B", partB.toFixed(1), "#a78bfa"], ["Total", `${total.toFixed(1)}/575`, g.color]].map(([l, v, c]) => (
-            <div key={l} style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
-              <div style={{ color: "#94a3b8", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6 }}>{l}</div>
-              <div style={{ color: c, fontWeight: 800, fontSize: 14 }}>{v}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-        {[["form", "📋 Appraisal Form"], ["submit", "✏️ Submit"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#4c1d95" : "#e2e8f0", color: tab === id ? "#ddd6fe" : "#475569" }}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "form" && (
-        <ReviewForm
-          person={DEAN_SELF_DATA} deanData={deanData} setDeanData={setDeanData}
-          personMode="self" accentColor="#10b981" role="self"
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Dean Remarks</div>
+        <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={7}
+          style={{ width: "100%", borderRadius: 12, border: "1px solid #cbd5e1", padding: "14px", fontFamily: "Georgia, serif", fontSize: 13, color: "#1f2937", resize: "vertical" }}
         />
-      )}
+      </div>
 
-      {tab === "submit" && (
-        <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
-          <h3 style={{ margin: "0 0 14px", color: "#0f172a" }}>Submit Self-Appraisal</h3>
-          <table style={{ ...T, marginBottom: 18 }}>
-            <thead><tr><th style={TH}>Section</th><th style={TH}>Max</th><th style={{ ...TH, background: "#064e3b", color: "#6ee7b7" }}>Your Score</th></tr></thead>
-            <tbody>
-              {[["Part A — Teaching & Activities", 200, partA], ["Part B — Research & Contributions", 375, partB]].map(([l, m, v]) => (
-                <tr key={l}><td style={TD}>{l}</td><td style={TDC}>{m}</td><td style={{ ...TDS, background: "#f0fff8", fontWeight: 700, color: "#064e3b" }}>{v.toFixed(1)}</td></tr>
-              ))}
-              <tr style={{ background: g.bg }}>
-                <td style={TD} colSpan={2}><strong>Grand Total — {g.label}</strong></td>
-                <td style={{ ...TDS, background: g.bg, color: g.color, fontWeight: 800, fontSize: 14 }}>{total.toFixed(1)}/575</td>
-              </tr>
-            </tbody>
-          </table>
-          <label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>Self Remarks</label>
-          <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={4}
-            placeholder="Add your self-assessment remarks..."
-            style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 7, padding: "10px 12px", fontSize: 12, fontFamily: "Georgia, serif", resize: "vertical", boxSizing: "border-box", marginBottom: 16 }} />
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button onClick={() => setSubmitted(true)}
-              style={{ padding: "11px 30px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
-              ✔ Submit to VC
-            </button>
-          </div>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 12 }}>
+        <button onClick={onBack} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+        <button onClick={() => onSubmit(approval.id, remarks)} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: "#0f172a", color: "#f8fafc", fontWeight: 700, cursor: "pointer" }}>Submit Review</button>
+      </div>
     </div>
   );
 }
 
-// ─── Main Dean Dashboard ──────────────────────────────────────────────────────
+// ─── Main Dean Dashboard ───────────────────────────────────────────────────────
 export default function DeanDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("directors");
-  const [reviewing, setReviewing] = useState(null); // { person, personMode }
-  const [dirList, setDirList] = useState(DIRECTOR_LIST);
-  const [hodList, setHodList] = useState(HOD_LIST_DEAN);
-  const [facList, setFacList] = useState(FACULTY_LIST_DEAN);
+  const [activeMainTab, setActiveMainTab] = useState("myAppraisal");
+  const [hodAppraisalTab, setHodAppraisalTab] = useState("partA");
+  const [reviewingApproval, setReviewingApproval] = useState(null);
+  
+  const deanSchool = localStorage.getItem("school");
+  const [facultyList, setFacultyList] = useState([]);
+  const [hodList, setHodList] = useState([]);
+  const [directorList, setDirectorList] = useState([]);
+
+  useEffect(() => {
+    const { faculty, hods, directors } = getStaffForDean(deanSchool);
+    setFacultyList(faculty);
+    setHodList(hods);
+    setDirectorList(directors);
+  }, [deanSchool]);
+
   const [filterStatus, setFilterStatus] = useState("All");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const pendingDirs = dirList.filter(d => d.status === "Pending Dean Review").length;
-  const pendingHods = hodList.filter(h => h.status === "Director Reviewed").length;
-  const pendingFacs = facList.filter(f => f.status === "Director Approved").length;
 
-  const handleSubmit = (id, total, remarks, personMode) => {
-    if (personMode === "director") {
-      setDirList(prev => prev.map(d => d.id === id ? { ...d, status: "Dean Reviewed", deanTotal: total, deanRemarks: remarks } : d));
-    } else if (personMode === "hod") {
-      setHodList(prev => prev.map(h => h.id === id ? { ...h, status: "Dean Reviewed", deanTotal: total, deanRemarks: remarks } : h));
-    } else if (personMode === "faculty") {
-      setFacList(prev => prev.map(f => f.id === id ? { ...f, status: "Dean Reviewed", deanTotal: total, deanRemarks: remarks } : f));
+  // ── Dean's own appraisal form state ──
+  const [info, setInfo] = useState({ name: DEAN_USER.name, qual: "", desig: DEAN_USER.designation, ay: DEAN_USER.ay });
+  const inf = (k) => (v) => setInfo((p) => ({ ...p, [k]: v }));
+
+  const [lectures, setLectures] = useState([
+    { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
+    { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
+    { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
+  ]);
+  const setLec = (i, k, v) => setLectures((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [courseFile, setCourseFile] = useState({ course: "", title: "", details: "", score: "", hod: "", director: "" });
+  const [innovScore, setInnovScore] = useState("");
+  const [innovDetails, setInnovDetails] = useState("");
+  const [projects, setProjects] = useState([
+    { label: "Project guided (3/batch)", score: "", hod: "", director: "" },
+    { label: "Industrial collaboration / Sponsorship (Max 5)", score: "", hod: "", director: "" },
+    { label: "Award received (Max 5 marks)", score: "", hod: "", director: "" },
+    { label: "Project outcome: events/publications (Max 5)", score: "", hod: "", director: "" },
+  ]);
+  const setProj = (i, k, v) => setProjects((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [quals, setQuals] = useState([
+    { label: "Higher Qualification achieved (5 Marks)", score: "", hod: "", director: "" },
+    { label: "Add-on Qualification / Certification (Max 5)", score: "", hod: "", director: "" },
+  ]);
+  const setQual = (i, k, v) => setQuals((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [feedback, setFeedback] = useState([
+    { code: "", fb1: "", fb2: "", score: "", hod: "", director: "" },
+    { code: "", fb1: "", fb2: "", score: "", hod: "", director: "" },
+    { code: "", fb1: "", fb2: "", score: "", hod: "", director: "" },
+  ]);
+  const setFb = (i, k, v) => setFeedback((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [deptActs, setDeptActs] = useState([
+    { activity: "", nature: "", score: "", hod: "", director: "" },
+    { activity: "", nature: "", score: "", hod: "", director: "" },
+    { activity: "", nature: "", score: "", hod: "", director: "" },
+  ]);
+  const setDept = (i, k, v) => setDeptActs((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [uniActs, setUniActs] = useState([
+    { activity: "", nature: "", score: "", hod: "", director: "" },
+    { activity: "", nature: "", score: "", hod: "", director: "" },
+    { activity: "", nature: "", score: "", hod: "", director: "" },
+  ]);
+  const setUni = (i, k, v) => setUniActs((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const societyLabels = ["Induction Program", "Unnat Bharat Abhiyan", "Yoga Classes", "Blood Donation", "Techno Social activities", "NSS", "Social visits", "Project of Social Impact", "Any other activity"];
+  const [society, setSociety] = useState(societyLabels.map((l) => ({ label: l, details: "", score: "", hod: "", director: "" })));
+  const setSoc = (i, k, v) => setSociety((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [industry, setIndustry] = useState([
+    { name: "", details: "", score: "", hod: "", director: "" },
+    { name: "", details: "", score: "", hod: "", director: "" },
+  ]);
+  const setInd = (i, k, v) => setIndustry((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const acrLabels = ["Self-motivation and Proactiveness", "Punctuality", "Target based work", "Effectiveness", "Obedience"];
+  const [acr, setAcr] = useState(acrLabels.map((l) => ({ label: l, hod: "", director: "" })));
+  const setAcrRow = (i, k, v) => setAcr((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [journals, setJournals] = useState([
+    { title: "", journal: "", issn: "", index: "", score: "", hod: "", director: "" },
+    { title: "", journal: "", issn: "", index: "", score: "", hod: "", director: "" },
+    { title: "", journal: "", issn: "", index: "", score: "", hod: "", director: "" },
+  ]);
+  const setJour = (i, k, v) => setJournals((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [books, setBooks] = useState([
+    { title: "", book: "", issn: "", pub: "", coauth: "", first: "", score: "", hod: "", director: "" },
+    { title: "", book: "", issn: "", pub: "", coauth: "", first: "", score: "", hod: "", director: "" },
+  ]);
+  const setBook = (i, k, v) => setBooks((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [ict, setIct] = useState([
+    { title: "", desc: "", type: "", quad: "", score: "", hod: "", director: "" },
+    { title: "", desc: "", type: "", quad: "", score: "", hod: "", director: "" },
+  ]);
+  const setIctRow = (i, k, v) => setIct((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [research, setResearch] = useState([
+    { degree: "PhD", name: "", thesis: "", score: "", hod: "", director: "" },
+    { degree: "PhD", name: "", thesis: "", score: "", hod: "", director: "" },
+  ]);
+  const setRes = (i, k, v) => setResearch((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [projects2, setProjects2] = useState([
+    { title: "", agency: "", date: "", amount: "", role: "", status: "", score: "", hod: "" },
+    { title: "", agency: "", date: "", amount: "", role: "", status: "", score: "", hod: "" },
+  ]);
+  const setPrj2 = (i, k, v) => setProjects2((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [patents, setPatents] = useState([
+    { title: "", type: "", date: "", status: "", fileNo: "", score: "", hod: "", director: "" },
+    { title: "", type: "", date: "", status: "", fileNo: "", score: "", hod: "", director: "" },
+  ]);
+  const setPat = (i, k, v) => setPatents((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [awards, setAwards] = useState([
+    { title: "", date: "", agency: "", level: "", score: "", hod: "", director: "" },
+    { title: "", date: "", agency: "", level: "", score: "", hod: "", director: "" },
+  ]);
+  const setAwd = (i, k, v) => setAwards((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [confs, setConfs] = useState([
+    { title: "", type: "", org: "", level: "", score: "", hod: "", director: "" },
+    { title: "", type: "", org: "", level: "", score: "", hod: "", director: "" },
+    { title: "", type: "", org: "", level: "", score: "", hod: "", director: "" },
+  ]);
+  const setConf = (i, k, v) => setConfs((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [proposals, setProposals] = useState([
+    { title: "", duration: "", agency: "", amount: "", score: "", hod: "", director: "" },
+    { title: "", duration: "", agency: "", amount: "", score: "", hod: "", director: "" },
+  ]);
+  const setProp = (i, k, v) => setProposals((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [fdps, setFdps] = useState([
+    { program: "", duration: "", org: "", score: "", hod: "", director: "" },
+    { program: "", duration: "", org: "", score: "", hod: "", director: "" },
+  ]);
+  const setFdp = (i, k, v) => setFdps((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [training, setTraining] = useState([
+    { company: "", duration: "", nature: "", score: "", hod: "", director: "" },
+    { company: "", duration: "", nature: "", score: "", hod: "", director: "" },
+  ]);
+  const setTrain = (i, k, v) => setTraining((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
+
+  const [docs, setDocs] = useState({});
+
+  // ── Computed scores for HOD appraisal ──
+  const totalLecScore = lectures.reduce((a, r) => a + n(r.score), 0);
+  const courseFileScore = n(courseFile.score);
+  const innovTotal = n(innovScore);
+  const projectTotal = projects.reduce((a, r) => a + n(r.score), 0);
+  const qualTotal = quals.reduce((a, r) => a + n(r.score), 0);
+  const teachingRaw = totalLecScore + courseFileScore + innovTotal + projectTotal + qualTotal;
+  const stuFeedbackScore = feedback.reduce((a, r) => a + n(r.score), 0);
+  const deptScore = deptActs.reduce((a, r) => a + n(r.score), 0);
+  const uniScore = uniActs.reduce((a, r) => a + n(r.score), 0);
+  const societyScore = society.reduce((a, r) => a + n(r.score), 0);
+  const industryScore = industry.reduce((a, r) => a + n(r.score), 0);
+  const acrScore = acr.reduce((a, r) => a + n(r.hod), 0);
+  const partATotal = Math.min(200, teachingRaw + stuFeedbackScore + deptScore + uniScore + societyScore + industryScore + acrScore);
+
+  const journalScore = journals.reduce((a, r) => a + n(r.score), 0);
+  const bookScore = books.reduce((a, r) => a + n(r.score), 0);
+  const ictScore = ict.reduce((a, r) => a + n(r.score), 0);
+  const researchScore = research.reduce((a, r) => a + n(r.score), 0);
+  const projectBScore = projects2.reduce((a, r) => a + n(r.score), 0);
+  const patentScore = patents.reduce((a, r) => a + n(r.score), 0);
+  const awardScore = awards.reduce((a, r) => a + n(r.score), 0);
+  const confScore = confs.reduce((a, r) => a + n(r.score), 0);
+  const proposalScore = proposals.reduce((a, r) => a + n(r.score), 0);
+  const fdpScore = fdps.reduce((a, r) => a + n(r.score), 0);
+  const trainScore = training.reduce((a, r) => a + n(r.score), 0);
+  const partBTotal = journalScore + bookScore + ictScore + researchScore + projectBScore + patentScore + awardScore + confScore + proposalScore + fdpScore + trainScore;
+  const grandTotal = partATotal + partBTotal;
+
+  const gradeFunc = () => {
+    const p = pct(grandTotal, 575);
+    if (p >= 85) return { label: "Outstanding", color: "#10b981" };
+    if (p >= 70) return { label: "Very Good", color: "#3b82f6" };
+    if (p >= 55) return { label: "Good", color: "#f59e0b" };
+    if (p >= 40) return { label: "Satisfactory", color: "#f97316" };
+    return { label: "Needs Improvement", color: "#ef4444" };
+  };
+  const g = gradeFunc();
+
+  const facultyPendingCount = facultyList.filter(f => f.status === "Director Reviewed").length;
+  const facultyReviewedCount = facultyList.filter(f => f.status === "Dean Reviewed").length;
+  const hodPendingCount = hodList.filter(h => h.status === "Director Reviewed").length;
+  const hodReviewedCount = hodList.filter(h => h.status === "Dean Reviewed").length;
+  const directorPendingCount = directorList.filter(d => d.status === "Pending Review").length;
+  const directorReviewedCount = directorList.filter(d => d.status === "Dean Reviewed").length;
+
+  const activeApprovalList = activeMainTab === "hodApprovals"
+    ? hodList
+    : activeMainTab === "directorApprovals"
+      ? directorList
+      : activeMainTab === "facultyApprovals"
+        ? facultyList
+        : [];
+
+  const pendingCount = activeMainTab === "directorApprovals" 
+    ? directorList.filter(d => d.status === "Pending Review").length 
+    : activeApprovalList.filter(f => f.status === "Director Reviewed").length;
+
+  const reviewedCount = activeApprovalList.filter(f => f.status === "Dean Reviewed").length;
+
+  const filtered = filterStatus === "All"
+    ? activeApprovalList
+    : (filterStatus === "Pending Review"
+      ? (activeMainTab === "directorApprovals" ? directorList.filter(d => d.status === "Pending Review") : activeApprovalList.filter(f => f.status === "Director Reviewed"))
+      : activeApprovalList.filter(f => f.status === "Dean Reviewed"));
+
+  const navItems = [
+    { id: "myAppraisal", icon: "👤", label: "My Appraisal", sub: "View your self-appraisal form" },
+    { id: "hodApprovals", icon: "📝", label: "HOD Approval", sub: `${hodPendingCount} awaiting review`, badge: hodPendingCount },
+    { id: "directorApprovals", icon: "📌", label: "Director Approval", sub: `${directorPendingCount} awaiting review`, badge: directorPendingCount },
+    { id: "facultyApprovals", icon: "👩‍🏫", label: "Faculty Approval", sub: `${facultyPendingCount} awaiting review`, badge: facultyPendingCount },
+  ];
+  const generateReport = () => {
+  const win = window.open('', '_blank');
+
+  const html = `
+  <html>
+  <head>
+    <title>Faculty Appraisal</title>
+
+    <style>
+      @page { size: A4; margin: 18mm; }
+
+      body {
+        font-family: "Times New Roman", serif;
+        font-size: 12px;
+        color: #000;
+      }
+
+      h1 { text-align: center; }
+      h2 { margin-top: 25px; border-bottom: 2px solid #000; }
+      h3 { margin-top: 15px; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 15px;
+        table-layout: fixed;
+      }
+
+      th, td {
+        border: 1px solid #000;
+        padding: 6px;
+        word-wrap: break-word;
+      }
+
+      th {
+        background: #f2f2f2;
+        text-align: center;
+      }
+
+      .center { text-align: center; }
+      .total { font-weight: bold; font-size: 13px; }
+      .page-break { page-break-before: always; }
+
+      .info td {
+        border: none;
+        padding: 4px;
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <h1>Faculty Appraisal Report</h1>
+
+    <!-- PERSONAL INFO -->
+    <table class="info">
+      <tr><td><b>Name:</b></td><td>${info.name || "&nbsp;"}</td></tr>
+      <tr><td><b>Qualification:</b></td><td>${info.qual || "&nbsp;"}</td></tr>
+      <tr><td><b>Designation:</b></td><td>${info.desig || "&nbsp;"}</td></tr>
+      <tr><td><b>Academic Year:</b></td><td>${info.ay || "&nbsp;"}</td></tr>
+    </table>
+
+    <!-- ================= PART A ================= -->
+    <h2>PART A — Teaching & Academic Activities</h2>
+
+    <!-- A1 -->
+    <h3>A1: Lectures / Tutorials / Practicals</h3>
+    <table>
+      <tr>
+        <th>Semester</th><th>Course</th>
+        <th>Planned</th><th>Conducted</th><th>Score</th>
+      </tr>
+      ${lectures.map(l => `
+        <tr>
+          <td>${l.sem || "&nbsp;"}</td>
+          <td>${l.code || "&nbsp;"}</td>
+          <td class="center">${l.planned || "&nbsp;"}</td>
+          <td class="center">${l.conducted || "&nbsp;"}</td>
+          <td class="center">${l.score || "&nbsp;"}</td>
+        </tr>
+      `).join('')}
+    </table>
+
+    <!-- A2 -->
+    <h3>A2: Course File</h3>
+    <table>
+      <tr><th>Course</th><th>Title</th><th>Details</th><th>Score</th></tr>
+      <tr>
+        <td>${courseFile.course || "&nbsp;"}</td>
+        <td>${courseFile.title || "&nbsp;"}</td>
+        <td>${courseFile.details || "&nbsp;"}</td>
+        <td class="center">${courseFile.score || "&nbsp;"}</td>
+      </tr>
+    </table>
+
+    <!-- A3 -->
+    <h3>A3: Innovative Teaching</h3>
+    <table>
+      <tr><th>Description</th><th>Score</th></tr>
+      <tr>
+        <td>Innovative Teaching Methods</td>
+        <td class="center">${innovScore || "&nbsp;"}</td>
+      </tr>
+    </table>
+
+    <!-- A4 -->
+    <h3>A4: Projects</h3>
+    <table>
+      <tr><th>Project Type</th><th>Score</th></tr>
+      ${projects.map(p => `<tr><td>${p.label || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- A5 -->
+    <h3>A5: Qualification Enhancement</h3>
+    <table>
+      <tr><th>Description</th><th>Score</th></tr>
+      ${quals.map(q => `<tr><td>${q.label || "&nbsp;"}</td><td class="center">${q.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- Feedback -->
+    <h3>B: Student Feedback</h3>
+    <table>
+      <tr><th>Course</th><th>FB1</th><th>FB2</th><th>Score</th></tr>
+      ${feedback.map(f => `
+        <tr>
+          <td>${f.code || "&nbsp;"}</td>
+          <td class="center">${f.fb1 || "&nbsp;"}</td>
+          <td class="center">${f.fb2 || "&nbsp;"}</td>
+          <td class="center">${f.score || "&nbsp;"}</td>
+        </tr>
+      `).join('')}
+    </table>
+
+    <!-- Department -->
+    <h3>C: Departmental Activities</h3>
+    <table>
+      <tr><th>Activity</th><th>Nature</th><th>Score</th></tr>
+      ${deptActs.map(d => `<tr><td>${d.activity || "&nbsp;"}</td><td>${d.nature || "&nbsp;"}</td><td class="center">${d.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- University -->
+    <h3>D: University Activities</h3>
+    <table>
+      <tr><th>Activity</th><th>Nature</th><th>Score</th></tr>
+      ${uniActs.map(u => `<tr><td>${u.activity || "&nbsp;"}</td><td>${u.nature || "&nbsp;"}</td><td class="center">${u.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- Society -->
+    <h3>E: Contribution to Society</h3>
+    <table>
+      <tr><th>Activity</th><th>Details</th><th>Score</th></tr>
+      ${society.map(s => `<tr><td>${s.label || "&nbsp;"}</td><td>${s.details || "&nbsp;"}</td><td class="center">${s.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- Industry -->
+    <h3>F: Industry Interaction</h3>
+    <table>
+      <tr><th>Company</th><th>Details</th><th>Score</th></tr>
+      ${industry.map(i => `<tr><td>${i.name || "&nbsp;"}</td><td>${i.details || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <!-- ACR -->
+    <h3>G: ACR (Performance Indicators)</h3>
+    <table>
+      <tr><th>Criteria</th><th>Score</th></tr>
+      ${acr.map(a => `<tr><td>${a.label}</td><td class="center">${a.hod || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <p class="total">Part A Total: ${partATotal}</p>
+
+    <div class="page-break"></div>
+
+    <!-- ================= PART B ================= -->
+    <h2>PART B — Research & Development</h2>
+
+    <h3>Journals</h3>
+    <table>
+      <tr><th>Title</th><th>Journal</th><th>Index</th><th>Score</th></tr>
+      ${journals.map(j => `<tr><td>${j.title || "&nbsp;"}</td><td>${j.journal || "&nbsp;"}</td><td>${j.index || "&nbsp;"}</td><td class="center">${j.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Books</h3>
+    <table>
+      <tr><th>Title</th><th>Publisher</th><th>Score</th></tr>
+      ${books.map(b => `<tr><td>${b.title || "&nbsp;"}</td><td>${b.book || "&nbsp;"}</td><td class="center">${b.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>ICT</h3>
+    <table>
+      <tr><th>Title</th><th>Description</th><th>Score</th></tr>
+      ${ict.map(i => `<tr><td>${i.title || "&nbsp;"}</td><td>${i.desc || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Research Guidance</h3>
+    <table>
+      <tr><th>Degree</th><th>Name</th><th>Thesis</th><th>Score</th></tr>
+      ${research.map(r => `<tr><td>${r.degree || "&nbsp;"}</td><td>${r.name || "&nbsp;"}</td><td>${r.thesis || "&nbsp;"}</td><td class="center">${r.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Research Projects</h3>
+    <table>
+      <tr><th>Title</th><th>Agency</th><th>Amount</th><th>Score</th></tr>
+      ${projects2.map(p => `<tr><td>${p.title || "&nbsp;"}</td><td>${p.agency || "&nbsp;"}</td><td>${p.amount || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Patents</h3>
+    <table>
+      <tr><th>Title</th><th>Type</th><th>Date</th><th>Score</th></tr>
+      ${patents.map(p => `<tr><td>${p.title || "&nbsp;"}</td><td>${p.type || "&nbsp;"}</td><td>${p.date || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Awards</h3>
+    <table>
+      <tr><th>Title</th><th>Date</th><th>Agency</th><th>Score</th></tr>
+      ${awards.map(a => `<tr><td>${a.title || "&nbsp;"}</td><td>${a.date || "&nbsp;"}</td><td>${a.agency || "&nbsp;"}</td><td class="center">${a.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Conferences</h3>
+    <table>
+      <tr><th>Title</th><th>Type</th><th>Organizer</th><th>Score</th></tr>
+      ${confs.map(c => `<tr><td>${c.title || "&nbsp;"}</td><td>${c.type || "&nbsp;"}</td><td>${c.org || "&nbsp;"}</td><td class="center">${c.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Proposals</h3>
+    <table>
+      <tr><th>Title</th><th>Duration</th><th>Agency</th><th>Score</th></tr>
+      ${proposals.map(p => `<tr><td>${p.title || "&nbsp;"}</td><td>${p.duration || "&nbsp;"}</td><td>${p.agency || "&nbsp;"}</td><td class="center">${p.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>FDP / Training</h3>
+    <table>
+      <tr><th>Program</th><th>Duration</th><th>Organization</th><th>Score</th></tr>
+      ${fdps.map(f => `<tr><td>${f.program || "&nbsp;"}</td><td>${f.duration || "&nbsp;"}</td><td>${f.org || "&nbsp;"}</td><td class="center">${f.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <h3>Industrial Training</h3>
+    <table>
+      <tr><th>Company</th><th>Duration</th><th>Nature</th><th>Score</th></tr>
+      ${training.map(t => `<tr><td>${t.company || "&nbsp;"}</td><td>${t.duration || "&nbsp;"}</td><td>${t.nature || "&nbsp;"}</td><td class="center">${t.score || "&nbsp;"}</td></tr>`).join('')}
+    </table>
+
+    <p class="total">Part B Total: ${partBTotal}</p>
+    <p class="total">Grand Total: ${grandTotal}</p>
+    <p class="total">Grade: ${g.label}</p>
+
+  </body>
+  </html>
+  `;
+
+  win.document.write(html);
+  win.document.close();
+  win.print();
+};
+
+  const handleSubmitReview = (id, remarks) => {
+    const newStatus = "Dean Reviewed";
+    const remarksKey = "deanRemarks";
+
+    if (activeMainTab === "facultyApprovals") {
+      setFacultyList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus, [remarksKey]: remarks } : item));
     }
-    setReviewing(null);
+    if (activeMainTab === "hodApprovals") {
+      setHodList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus, [remarksKey]: remarks } : item));
+    }
+    if (activeMainTab === "directorApprovals") {
+      setDirectorList(prev => prev.map(item => item.id === id ? { ...item, status: newStatus, [remarksKey]: remarks } : item));
+    }
+    setReviewingApproval(null);
   };
 
-  const currentList = activeTab === "directors" ? dirList : activeTab === "hods" ? hodList : facList;
-  const filterOptions = activeTab === "directors"
-    ? ["All", "Pending Dean Review", "Dean Reviewed"]
-    : activeTab === "hods"
-    ? ["All", "Director Reviewed", "Dean Reviewed"]
-    : ["All", "Director Approved", "Dean Reviewed"];
-
-  const filtered = filterStatus === "All" ? currentList : currentList.filter(p => p.status === filterStatus);
-
-  const personModeFor = (tab) => tab === "directors" ? "director" : tab === "hods" ? "hod" : "faculty";
-
-  const NAV = [
-    { id: "self",      icon: "👤", label: "My Appraisal",         sub: "Self-assessment form" },
-    { id: "directors", icon: "🏛️", label: "Director Reviews",     sub: `${pendingDirs} awaiting review`, badge: pendingDirs },
-    { id: "hods",      icon: "👥", label: "HOD Reviews",           sub: `${pendingHods} awaiting review`, badge: pendingHods },
-    { id: "faculty",   icon: "📋", label: "Faculty Reviews",       sub: `${pendingFacs} awaiting review`, badge: pendingFacs },
-  ];
-
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#f0ede8", color: "#1e293b" }}>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#f8fafc", color: "#1e293b" }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{ width: 252, minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column", padding: "20px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0 }}>
+      <aside style={{ width: 252, minHeight: "100vh", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderTopRightRadius: 18, borderBottomRightRadius: 18, marginRight: 8, boxShadow: "6px 0 20px rgba(15,23,42,0.18)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#7c3aed,#a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13 }}>FA</div>
+          <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#6366f1,#0ea5e9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13 }}>FA</div>
           <div>
-            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 13 }}>FacultyAppraise</div>
-            <div style={{ color: "#475569", fontSize: 9 }}>D Y Patil International University</div>
+            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 13 }}>{APP_INFO.PORTAL_NAME}</div>
+            <div style={{ color: "#475569", fontSize: 9, lineHeight: 1.3 }}>{APP_INFO.UNIVERSITY_NAME}</div>
           </div>
-        </div>
-
-        {/* Role badge */}
-        <div style={{ background: "#3b0764", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#c4b5fd" }}>
-          <div style={{ fontWeight: 700, marginBottom: 2 }}>Dean of Academics</div>
-          <div style={{ color: "#6d28d9", fontSize: 10 }}>University-level oversight</div>
         </div>
 
         <div style={{ height: 1, background: "#1e293b" }} />
 
-        {NAV.map(tab => (
-          <button key={tab.id} onClick={() => { setActiveTab(tab.id); setReviewing(null); setFilterStatus("All"); }}
-            style={{ background: activeTab === tab.id ? "#1e293b" : "none", border: "none", borderRadius: 9, padding: "10px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, width: "100%", fontFamily: "Georgia, serif" }}>
+        {navItems.map(tab => (
+          <button key={tab.id} onClick={() => { setActiveMainTab(tab.id); setReviewingApproval(null); }}
+            style={{ background: activeMainTab === tab.id ? "#1e293b" : "none", border: "none", borderRadius: 9, padding: "10px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, width: "100%", fontFamily: "Georgia, serif" }}>
             <span style={{ fontSize: 16 }}>{tab.icon}</span>
             <div style={{ flex: 1, textAlign: "left" }}>
               <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 12 }}>{tab.label}</div>
               <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{tab.sub}</div>
             </div>
             {tab.badge > 0 && (
-              <div style={{ background: "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 10, minWidth: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</div>
+              <div style={{ background: "#f59e0b", color: "#fff", fontWeight: 800, fontSize: 10, minWidth: 18, height: 18, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{tab.badge}</div>
             )}
           </button>
         ))}
-
-        {/* Legend */}
-        <div style={{ marginTop: 4, background: "#1e293b", borderRadius: 8, padding: "10px 12px" }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Score Columns Legend</div>
-          {[
-            { color: "#818cf8", label: "HOD Score" },
-            { color: "#38bdf8", label: "Director Score" },
-            { color: "#a78bfa", label: "Dean Score (you)" },
-          ].map(({ color, label }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
-              <div style={{ fontSize: 10, color: "#94a3b8" }}>{label}</div>
+        {activeMainTab === "myAppraisal" && (
+          <div style={{ marginTop: 6, background: "#1e293b", borderRadius: 8, padding: "9px 10px" }}>
+            <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6 }}>
+              My Appraisal Section
             </div>
-          ))}
-        </div>
+            <select
+              value={hodAppraisalTab}
+              onChange={(e) => setHodAppraisalTab(e.target.value)}
+              style={{ width: "100%", border: "1px solid #334155", borderRadius: 7, padding: "7px 8px", fontSize: 12, fontFamily: "Georgia, serif", color: "#e2e8f0", background: "#0f172a", outline: "none" }}
+            >
+              <option value="partA">Part A</option>
+              <option value="partB">Part B</option>
+              <option value="summary">Summary</option>
+            </select>
+          </div>
+        )}
 
         <div style={{ flex: 1 }} />
         <div style={{ height: 1, background: "#1e293b" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Avatar initials={DEAN_USER.avatar} color="#7c3aed" size={34} />
-          <div>
+          <Avatar initials={DEAN_USER.avatar} color="#6366f1" size={34} />
+          <div style={{ flex: 1 }}>
             <div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700 }}>{DEAN_USER.name.split(" ").slice(0, 2).join(" ")}</div>
-            <div style={{ color: "#475569", fontSize: 9 }}>Dean · DYPIU</div>
+            <div style={{ color: "#475569", fontSize: 9 }}>Dean · {DEAN_USER.department.split(" ")[0]}</div>
           </div>
         </div>
         <button
@@ -1193,35 +1470,804 @@ export default function DeanDashboard() {
       </aside>
 
       {/* ── Main Content ── */}
-      <main style={{ flex: 1, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 16, overflowX: "auto" }}>
+      <main style={{ flex: 1, padding: "24px 30px", display: "flex", flexDirection: "column", gap: 18, overflowX: "auto" }}>
 
-        {/* SELF APPRAISAL */}
-        {activeTab === "self" && <SelfAppraisalPanel />}
+        {/* MY APPRAISAL TAB */}
+        {activeMainTab === "myAppraisal" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ background: "#fff", borderRadius: 9, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 4 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>My Appraisal Form</h2>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{info.name || "HOD"} · {info.ay}</p>
+            </div>
 
-        {/* LIST VIEWS */}
-        {activeTab !== "self" && !reviewing && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+
+            {/* Part A Tab */}
+            {hodAppraisalTab === "partA" && (
+              <SC title="Part A — Teaching & Academic Activities (Max 200)" accent="#6366f1">
+                <div style={{ marginBottom: 14, padding: "8px 12px", background: "#f0f4ff", borderRadius: 6, fontSize: 12, color: "#312e81", fontWeight: 600 }}>
+                  📊 Total Part A Score: {partATotal.toFixed(1)}/200
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Fill in your teaching and academic activities for the appraisal period. Enter scores for each item.</div>
+
+                {/* A1. Teaching Process */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(i) Lectures, Tutorials, Practicals, Projects — Max 50 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={TH}>SN</th>
+                        <th style={TH}>Semester</th>
+                        <th style={TH}>Course Code / Name</th>
+                        <th style={TH}>Planned</th>
+                        <th style={TH}>Conducted</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lectures.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.sem} onChange={(v) => setLec(i, "sem", v)} /></td>
+                          <td style={TD}><TI val={r.code} onChange={(v) => setLec(i, "code", v)} /></td>
+                          <td style={TDC}><TI val={r.planned} onChange={(v) => setLec(i, "planned", v)} center /></td>
+                          <td style={TDC}><TI val={r.conducted} onChange={(v) => setLec(i, "conducted", v)} center /></td>
+                          <td style={TD}><DocCell id={`lec-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`lec-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setLec(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={7}>Total</td>
+                        <td style={{ ...TDS, fontWeight: "bold", color: "#1e3a5f" }}>{totalLecScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setLectures((p) => [...p, { sem: "", code: "", planned: "", conducted: "", score: "" }])} onDel={() => setLectures((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={lectures.length > 1} />
+                </div>
+
+                {/* A2. Course File */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(ii) Course File — Max 20 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Course / Paper</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Details</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={TDC}>1</td>
+                        <td style={TD}><TI val={courseFile.course} onChange={(v) => setCourseFile((p) => ({ ...p, course: v }))} /></td>
+                        <td style={TD}><TI val={courseFile.title} onChange={(v) => setCourseFile((p) => ({ ...p, title: v }))} /></td>
+                        <td style={TD}><TI val={courseFile.details} onChange={(v) => setCourseFile((p) => ({ ...p, details: v }))} /></td>
+                        <td style={TD}><DocCell id="courseFile" docs={docs} setDocs={setDocs} /></td>
+                        <td style={TD}><ViewCell id="courseFile" docs={docs} /></td>
+                        <td style={TDS}><TI val={courseFile.score} onChange={(v) => setCourseFile((p) => ({ ...p, score: v }))} center /></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* A3. Innovative Teaching */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(iii) Innovative Teaching-Learning Methodologies — Max 10 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Methods Used</th>
+                        <th style={TH}>Details</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={TDC}>1</td>
+                        <td style={{ ...TD, fontSize: 10, color: "#555" }}>Blended learning, Virtual Lab, LMS, Project Based Learning, Flip classroom, Any other</td>
+                        <td style={TD}><TI val={innovDetails} onChange={setInnovDetails} /></td>
+                        <td style={TD}><DocCell id="innov" docs={docs} setDocs={setDocs} /></td>
+                        <td style={TD}><ViewCell id="innov" docs={docs} /></td>
+                        <td style={TDS}><TI val={innovScore} onChange={setInnovScore} center /></td>
+                      </tr>
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={5}>Total Score (Max 10)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{n(innovScore).toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* A4. Projects */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(iv) Projects — Max 10 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Project Description</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projects.map((r, i) => (
+                        <tr key={i}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.label} onChange={(v) => setProj(i, "label", v)} /></td>
+                          <td style={TD}><DocCell id={`proj-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`proj-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setProj(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={4}>Total Score (Max 10)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{projectTotal.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setProjects((p) => [...p, { label: "", score: "" }])} onDel={() => setProjects((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={projects.length > 1} />
+                </div>
+
+                {/* A5. Qualifications */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(v) Qualifications — Max 10 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Qualification</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quals.map((r, i) => (
+                        <tr key={i}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.label} onChange={(v) => setQual(i, "label", v)} /></td>
+                          <td style={TD}><DocCell id={`qual-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`qual-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setQual(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={4}>Total Score (Max 10)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{qualTotal.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setQuals((p) => [...p, { label: "", score: "" }])} onDel={() => setQuals((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={quals.length > 1} />
+                </div>
+
+                {/* A6. Student Feedback */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(vi) Student Feedback — Max 10 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Course Code</th>
+                        <th style={TH}>Feedback 1</th>
+                        <th style={TH}>Feedback 2</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feedback.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.code} onChange={(v) => setFb(i, "code", v)} /></td>
+                          <td style={TDC}><TI val={r.fb1} onChange={(v) => setFb(i, "fb1", v)} center /></td>
+                          <td style={TDC}><TI val={r.fb2} onChange={(v) => setFb(i, "fb2", v)} center /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setFb(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={4}>Total Score (Max 10)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{stuFeedbackScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setFeedback((p) => [...p, { code: "", fb1: "", fb2: "", score: "" }])} onDel={() => setFeedback((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={feedback.length > 1} />
+                </div>
+
+                {/* A7. Department Activities */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(vii) Department Activities — Max 20 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Activity</th>
+                        <th style={TH}>Nature</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deptActs.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.activity} onChange={(v) => setDept(i, "activity", v)} /></td>
+                          <td style={TD}><TI val={r.nature} onChange={(v) => setDept(i, "nature", v)} /></td>
+                          <td style={TD}><DocCell id={`dept-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`dept-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setDept(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={5}>Total Score (Max 20)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{deptScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setDeptActs((p) => [...p, { activity: "", nature: "", score: "" }])} onDel={() => setDeptActs((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={deptActs.length > 1} />
+                </div>
+
+                {/* A8. University Activities */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(viii) University Activities — Max 30 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Activity</th>
+                        <th style={TH}>Nature</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uniActs.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.activity} onChange={(v) => setUni(i, "activity", v)} /></td>
+                          <td style={TD}><TI val={r.nature} onChange={(v) => setUni(i, "nature", v)} /></td>
+                          <td style={TD}><DocCell id={`uni-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`uni-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setUni(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={5}>Total Score (Max 30)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{uniScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setUniActs((p) => [...p, { activity: "", nature: "", score: "" }])} onDel={() => setUniActs((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={uniActs.length > 1} />
+                </div>
+
+                {/* A9. Contribution to Society */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(ix) Contribution to Society — Max 10 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Activity</th>
+                        <th style={TH}>Details</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {society.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.label} onChange={(v) => setSoc(i, "label", v)} /></td>
+                          <td style={TD}><TI val={r.details} onChange={(v) => setSoc(i, "details", v)} /></td>
+                          <td style={TD}><DocCell id={`soc-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`soc-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setSoc(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={5}>Total Score (Max 10)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{societyScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setSociety((p) => [...p, { label: "", details: "", score: "" }])} onDel={() => setSociety((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={society.length > 1} />
+                </div>
+
+                {/* A10. Industry Connect */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(x) Industry Connect — Max 5 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Company/Organization</th>
+                        <th style={TH}>Details</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {industry.map((r, i) => (
+                        <tr key={i}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.name} onChange={(v) => setInd(i, "name", v)} /></td>
+                          <td style={TD}><TI val={r.details} onChange={(v) => setInd(i, "details", v)} /></td>
+                          <td style={TD}><DocCell id={`ind-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`ind-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setInd(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={5}>Total Score (Max 5)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{industryScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setIndustry((p) => [...p, { name: "", details: "", score: "" }])} onDel={() => setIndustry((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={industry.length > 1} />
+                </div>
+
+                {/* A11. ACR */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(xi) Annual Confidential Report (ACR) — Max 25 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Attribute</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {acr.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}>{r.label}</td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setAcr(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#eff6ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={2}>Total Score (Max 25)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{acrScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </SC>
+            )}
+
+            {/* Part B Tab */}
+            {hodAppraisalTab === "partB" && (
+              <SC title="Part B — Research & Academic Contributions (Max 375)" accent="#7c3aed">
+                <div style={{ marginBottom: 14, padding: "8px 12px", background: "#ede9fe", borderRadius: 6, fontSize: 12, color: "#6d28d9", fontWeight: 600 }}>
+                  📊 Total Part B Score: {partBTotal.toFixed(1)}/375
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Enter your research publications, patents, conferences, and other academic contributions.</div>
+
+                {/* B1. Research Papers / Journals */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B1. Research Papers / Journals — Max 120 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Journal</th>
+                        <th style={TH}>ISSN</th>
+                        <th style={TH}>Index</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {journals.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setJour(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.journal} onChange={(v) => setJour(i, "journal", v)} /></td>
+                          <td style={TD}><TI val={r.issn} onChange={(v) => setJour(i, "issn", v)} /></td>
+                          <td style={TD}><TI val={r.index} onChange={(v) => setJour(i, "index", v)} /></td>
+                          <td style={TD}><DocCell id={`jour-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`jour-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setJour(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={7}>Total Score (Max 120)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{journalScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setJournals((p) => [...p, { title: "", journal: "", issn: "", index: "", score: "" }])} onDel={() => setJournals((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={journals.length > 1} />
+                </div>
+
+                {/* B2. Books / Chapters */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B2. Books / Chapters — Max 50 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Book</th>
+                        <th style={TH}>ISBN</th>
+                        <th style={TH}>Publisher</th>
+                        <th style={TH}>Co-authors</th>
+                        <th style={TH}>First Author</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {books.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setBook(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.book} onChange={(v) => setBook(i, "book", v)} /></td>
+                          <td style={TD}><TI val={r.isbn} onChange={(v) => setBook(i, "isbn", v)} /></td>
+                          <td style={TD}><TI val={r.pub} onChange={(v) => setBook(i, "pub", v)} /></td>
+                          <td style={TD}><TI val={r.coauth} onChange={(v) => setBook(i, "coauth", v)} /></td>
+                          <td style={TD}><TI val={r.first} onChange={(v) => setBook(i, "first", v)} /></td>
+                          <td style={TD}><DocCell id={`book-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`book-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setBook(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={9}>Total Score (Max 50)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{bookScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setBooks((p) => [...p, { title: "", book: "", isbn: "", pub: "", coauth: "", first: "", score: "" }])} onDel={() => setBooks((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={books.length > 1} />
+                </div>
+
+                {/* B3. ICT Pedagogy */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B3. ICT Pedagogy — Max 20 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Description</th>
+                        <th style={TH}>Type</th>
+                        <th style={TH}>Quadrant</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ict.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setIct(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.desc} onChange={(v) => setIct(i, "desc", v)} /></td>
+                          <td style={TD}><TI val={r.type} onChange={(v) => setIct(i, "type", v)} /></td>
+                          <td style={TD}><TI val={r.quad} onChange={(v) => setIct(i, "quad", v)} /></td>
+                          <td style={TD}><DocCell id={`ict-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`ict-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setIct(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={7}>Total Score (Max 20)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{ictScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setIct((p) => [...p, { title: "", desc: "", type: "", quad: "", score: "" }])} onDel={() => setIct((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={ict.length > 1} />
+                </div>
+
+                {/* B4. Research Guidance + Projects */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B4. Research Guidance + Projects — Max 75 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Degree</th>
+                        <th style={TH}>Name</th>
+                        <th style={TH}>Thesis Title</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {research.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.degree} onChange={(v) => setRes(i, "degree", v)} /></td>
+                          <td style={TD}><TI val={r.name} onChange={(v) => setRes(i, "name", v)} /></td>
+                          <td style={TD}><TI val={r.thesis} onChange={(v) => setRes(i, "thesis", v)} /></td>
+                          <td style={TD}><DocCell id={`res-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`res-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setRes(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total Score (Max 75)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{researchScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />
+                </div>
+
+                {/* B5. Patents & Awards */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B5. Patents & Awards — Max 50 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Type</th>
+                        <th style={TH}>Date</th>
+                        <th style={TH}>Status</th>
+                        <th style={TH}>File No.</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {patents.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setPat(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.type} onChange={(v) => setPat(i, "type", v)} /></td>
+                          <td style={TD}><TI val={r.date} onChange={(v) => setPat(i, "date", v)} /></td>
+                          <td style={TD}><TI val={r.status} onChange={(v) => setPat(i, "status", v)} /></td>
+                          <td style={TD}><TI val={r.fileNo} onChange={(v) => setPat(i, "fileNo", v)} /></td>
+                          <td style={TD}><DocCell id={`pat-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`pat-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setPat(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={8}>Total Patents Score (Max 30)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{patentScore.toFixed(1)}</td>
+                      </tr>
+                      {awards.map((r, i) => (
+                        <tr key={`award-${i}`} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{patents.length + i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setAwd(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.type} onChange={(v) => setAwd(i, "type", v)} /></td>
+                          <td style={TD}><TI val={r.date} onChange={(v) => setAwd(i, "date", v)} /></td>
+                          <td style={TD}><TI val={r.agency} onChange={(v) => setAwd(i, "agency", v)} /></td>
+                          <td style={TD}><TI val={r.level} onChange={(v) => setAwd(i, "level", v)} /></td>
+                          <td style={TD}><DocCell id={`awd-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`awd-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setAwd(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={8}>Total Awards Score (Max 20)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{awardScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button style={{ padding: "6px 12px", background: "#10b981", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setPatents((p) => [...p, { title: "", type: "", date: "", status: "", fileNo: "", score: "" }])}>+ Add Patent</button>
+                    <button style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setPatents((p) => p.length > 1 ? p.slice(0, -1) : p)} disabled={patents.length <= 1}>− Delete Patent</button>
+                    <button style={{ padding: "6px 12px", background: "#10b981", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setAwards((p) => [...p, { title: "", type: "", date: "", agency: "", level: "", score: "" }])}>+ Add Award</button>
+                    <button style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setAwards((p) => p.length > 1 ? p.slice(0, -1) : p)} disabled={awards.length <= 1}>− Delete Award</button>
+                  </div>
+                </div>
+
+                {/* B6. Conferences / FDP */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B6. Conferences / FDP — Max 30 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Type</th>
+                        <th style={TH}>Organization</th>
+                        <th style={TH}>Level</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {confs.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setConf(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.type} onChange={(v) => setConf(i, "type", v)} /></td>
+                          <td style={TD}><TI val={r.org} onChange={(v) => setConf(i, "org", v)} /></td>
+                          <td style={TD}><TI val={r.level} onChange={(v) => setConf(i, "level", v)} /></td>
+                          <td style={TD}><DocCell id={`conf-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`conf-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setConf(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={7}>Total Score (Max 30)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{confScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setConfs((p) => [...p, { title: "", type: "", org: "", level: "", score: "" }])} onDel={() => setConfs((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={confs.length > 1} />
+                </div>
+
+                {/* B7. Research Proposals */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B7. Research Proposals — Max 20 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Title</th>
+                        <th style={TH}>Duration</th>
+                        <th style={TH}>Agency</th>
+                        <th style={TH}>Amount</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {proposals.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.title} onChange={(v) => setProp(i, "title", v)} /></td>
+                          <td style={TD}><TI val={r.duration} onChange={(v) => setProp(i, "duration", v)} /></td>
+                          <td style={TD}><TI val={r.agency} onChange={(v) => setProp(i, "agency", v)} /></td>
+                          <td style={TD}><TI val={r.amount} onChange={(v) => setProp(i, "amount", v)} /></td>
+                          <td style={TD}><DocCell id={`prop-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`prop-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setProp(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={7}>Total Score (Max 20)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{proposalScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <RowBtns onAdd={() => setProposals((p) => [...p, { title: "", duration: "", agency: "", amount: "", score: "" }])} onDel={() => setProposals((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={proposals.length > 1} />
+                </div>
+
+                {/* B8. Self Development */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B8. Self Development — Max 10 marks</div>
+                  <table style={T}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...TH, width: 30 }}>SN</th>
+                        <th style={TH}>Program</th>
+                        <th style={TH}>Duration</th>
+                        <th style={TH}>Organization</th>
+                        <th style={TH}>Attachment</th>
+                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fdps.map((r, i) => (
+                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.program} onChange={(v) => setFdp(i, "program", v)} /></td>
+                          <td style={TD}><TI val={r.duration} onChange={(v) => setFdp(i, "duration", v)} /></td>
+                          <td style={TD}><TI val={r.org} onChange={(v) => setFdp(i, "org", v)} /></td>
+                          <td style={TD}><DocCell id={`fdp-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`fdp-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setFdp(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total FDP Score (Max 5)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{fdpScore.toFixed(1)}</td>
+                      </tr>
+                      {training.map((r, i) => (
+                        <tr key={`train-${i}`} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                          <td style={TDC}>{fdps.length + i + 1}</td>
+                          <td style={TD}><TI val={r.company} onChange={(v) => setTrain(i, "company", v)} /></td>
+                          <td style={TD}><TI val={r.duration} onChange={(v) => setTrain(i, "duration", v)} /></td>
+                          <td style={TD}><TI val={r.nature} onChange={(v) => setTrain(i, "nature", v)} /></td>
+                          <td style={TD}><DocCell id={`train-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={`train-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setTrain(i, "score", v)} center /></td>
+                        </tr>
+                      ))}
+                      <tr style={{ background: "#f3e8ff" }}>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total Training Score (Max 5)</td>
+                        <td style={{ ...TDS, fontWeight: "bold" }}>{trainScore.toFixed(1)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button style={{ padding: "6px 12px", background: "#10b981", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setFdps((p) => [...p, { program: "", duration: "", org: "", score: "" }])}>+ Add FDP</button>
+                    <button style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setFdps((p) => p.length > 1 ? p.slice(0, -1) : p)} disabled={fdps.length <= 1}>− Delete FDP</button>
+                    <button style={{ padding: "6px 12px", background: "#10b981", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setTraining((p) => [...p, { company: "", duration: "", nature: "", score: "" }])}>+ Add Training</button>
+                    <button style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 5, cursor: "pointer", fontSize: 11, fontWeight: 600 }} onClick={() => setTraining((p) => p.length > 1 ? p.slice(0, -1) : p)} disabled={training.length <= 1}>− Delete Training</button>
+                  </div>
+                </div>
+              </SC>
+            )}
+
+            {/* Summary Tab */}
+            {hodAppraisalTab === "summary" && (
+              <SC title="Appraisal Summary & Submission" accent="#10b981">
+                <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 14 }}>
+                  <tbody>
+                    {[
+                      ["Part A — Teaching & Activities", partATotal, 200, "#6366f1"],
+                      ["Part B — Research & Contributions", partBTotal, 375, "#7c3aed"],
+                      ["Grand Total", grandTotal, 575, g.color],
+                    ].map(([label, score, max, color]) => (
+                      <tr key={label}>
+                        <td style={{ padding: "10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "50%" }}>{label}</td>
+                        <td style={{ padding: "10px", textAlign: "center", border: "1px solid #e2e8f0", color, fontWeight: 700, fontSize: 14 }}>
+                          {score.toFixed(1)}/{max}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div style={{ padding: "12px", background: g.bg + "40", border: `2px solid ${g.color}60`, borderRadius: 8, marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>Overall Grade</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: g.color, marginTop: 4 }}>{g.label}</div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+                  <button onClick={generateReport} style={{ padding: "10px 24px", background: "#e2e8f0", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
+                    Generate Report
+                  </button>
+                  <button style={{ padding: "10px 28px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
+                    ✔ Submit Appraisal
+                  </button>
+                </div>
+              </SC>
+            )}
+          </div>
+            </div>
+          </div>
+        )}
+
+        {/* APPROVALS TAB */}
+        {(activeMainTab === "hodApprovals" || activeMainTab === "directorApprovals" || activeMainTab === "facultyApprovals") && !reviewingApproval && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>
-                  {activeTab === "directors" ? "Director Reviews" : activeTab === "hods" ? "HOD Reviews" : "Faculty Reviews"}
+                  {activeMainTab === "hodApprovals" ? "HOD Approvals" : activeMainTab === "directorApprovals" ? "Director Approvals" : "Faculty Approvals"}
                 </h1>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>DYPIU · AY {DEAN_USER.ay}</p>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{DEAN_USER.department} · AY {DEAN_USER.ay}</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>
-                  ⏳ {activeTab === "directors" ? pendingDirs : activeTab === "hods" ? pendingHods : pendingFacs} Pending
-                </div>
-                <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#f3e8ff", color: "#6b21a8" }}>
-                  ✔ {currentList.filter(p => p.status === "Dean Reviewed").length} Dean Reviewed
-                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>⏳ {pendingCount} Pending</div>
+                <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#d1fae5", color: "#065f46" }}>✔ {reviewedCount} Reviewed</div>
               </div>
             </div>
 
             {/* Filter */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: "#fff", borderRadius: 9, boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Filter:</span>
-              {filterOptions.map(f => (
+              {["All", "Pending Review", "Reviewed"].map(f => (
                 <button key={f} onClick={() => setFilterStatus(f)}
                   style={{ fontSize: 11, padding: "4px 12px", border: "1px solid #e2e8f0", borderRadius: 20, cursor: "pointer", fontFamily: "Georgia, serif", background: filterStatus === f ? "#0f172a" : "none", color: filterStatus === f ? "#f1f5f9" : "#475569" }}>
                   {f}
@@ -1229,74 +2275,151 @@ export default function DeanDashboard() {
               ))}
             </div>
 
+            {/* Faculty Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
-              {filtered.map(person => (
-                <PersonCard
-                  key={person.id} person={person}
-                  personMode={personModeFor(activeTab)}
-                  onReview={(p, m) => setReviewing({ person: p, personMode: m })}
-                />
-              ))}
+              {filtered.map(faculty => {
+                const g = grade(faculty.grandTotal || 350, 575);
+                const facPartA = [
+                  ...(faculty.lectures || []).map(r => n(r.score)),
+                  n(faculty.courseFile?.score), n(faculty.innovScore),
+                  ...(faculty.projects || []).map(r => n(r.score)),
+                  ...(faculty.quals || []).map(r => n(r.score)),
+                  ...(faculty.feedback || []).map(r => n(r.score)),
+                  ...(faculty.deptActs || []).map(r => n(r.score)),
+                  ...(faculty.uniActs || []).map(r => n(r.score)),
+                  ...(faculty.society || []).map(r => n(r.score)),
+                  ...(faculty.industry || []).map(r => n(r.score)),
+                ].reduce((a, b) => a + b, 0);
+
+                const facPartB = [
+                  ...(faculty.journals || []).map(r => n(r.score)),
+                  ...(faculty.books || []).map(r => n(r.score)),
+                  ...(faculty.confs || []).map(r => n(r.score)),
+                  ...(faculty.patents || []).map(r => n(r.score)),
+                ].reduce((a, b) => a + b, 0);
+
+                const docCount = Object.values(faculty.docs || {}).reduce((a, arr) => a + arr.length, 0);
+
+                return (
+                  <div key={faculty.id} style={{ background: "#fff", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 6px rgba(0,0,0,.07)", display: "flex", flexDirection: "column", gap: 14 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <Avatar initials={faculty.avatar} color={faculty.avatarColor} size={46} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>{faculty.name}</div>
+                        <div style={{ fontSize: 11, color: "#475569", marginBottom: 2 }}>{faculty.designation}</div>
+                        <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "monospace" }}>{faculty.employeeId}</div>
+                      </div>
+                      <StatusBadge status={faculty.status} />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, background: "#f8fafc", borderRadius: 8, padding: "12px 14px" }}>
+                      {[
+                        { label: "Part A", val: facPartA, max: 200, color: "#6366f1" },
+                        { label: "Part B", val: facPartB, max: 375, color: "#0ea5e9" },
+                        { label: "Docs", val: docCount, max: null, color: "#10b981" },
+                      ].map(({ label, val, max, color }) => (
+                        <div key={label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.6 }}>{label}</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1 }}>
+                            {val.toFixed ? val.toFixed(1) : val}{max && <span style={{ fontSize: 9, color: "#94a3b8" }}>/{max}</span>}
+                          </div>
+                          {max && <ScoreBar score={val} max={max} color={color} />}
+                          {!max && <div style={{ fontSize: 9, color: "#94a3b8" }}>files uploaded</div>}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
+                      <div style={{ fontSize: 10, color: "#94a3b8" }}>Submitted: {faculty.submittedOn}</div>
+                      <button onClick={() => setReviewingApproval(faculty)}
+                        style={{ fontSize: 11, padding: "7px 18px", background: /Reviewed|Approved/.test(faculty.status) ? "#1e293b" : "#312e81", color: "#f1f5f9", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
+                        {/Reviewed|Approved/.test(faculty.status) ? "✎ Edit Review" : "🔍 Review Form →"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {filtered.length === 0 && (
               <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>✓</div>
                 <div style={{ fontWeight: 700, color: "#0f172a" }}>All caught up!</div>
-                <div style={{ color: "#64748b", fontSize: 12 }}>No records match the selected filter.</div>
+                <div style={{ color: "#64748b", fontSize: 12 }}>No forms match the selected filter.</div>
               </div>
             )}
           </>
         )}
 
         {/* REVIEW PANEL */}
-        {reviewing && (
-          <ReviewPanel
-            person={reviewing.person}
-            personMode={reviewing.personMode}
-            onBack={() => setReviewing(null)}
-            onSubmit={handleSubmit}
+        {(activeMainTab === "hodApprovals" || activeMainTab === "directorApprovals" || activeMainTab === "facultyApprovals") && reviewingApproval && (
+          <ApprovalReviewPanel
+            approval={reviewingApproval}
+            approvalType={activeMainTab}
+            onBack={() => setReviewingApproval(null)}
+            onSubmit={handleSubmitReview}
           />
         )}
       </main>
+
+      {/* ── Logout Confirmation Modal ── */}
       {showLogoutModal && (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setShowLogoutModal(false)}
-        >
-          <div
-            style={{ background: "#fff", borderRadius: 14, padding: "32px 36px", maxWidth: 380, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, fontFamily: "Georgia, serif" }}
-            onClick={e => e.stopPropagation()}
-          >
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowLogoutModal(false)}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "32px 36px", maxWidth: 380, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, fontFamily: "Georgia, serif" }}
+            onClick={e => e.stopPropagation()}>
             <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>🚪</div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 800, fontSize: 17, color: "#0f172a", marginBottom: 6 }}>Confirm Logout</div>
               <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                You are about to log out of <strong>FacultyAppraise</strong>.<br />Any unsaved changes will be lost.
+                You are about to log out of <strong>{APP_INFO.PORTAL_NAME}</strong>.<br />Any unsaved changes will be lost.
               </div>
             </div>
             <div style={{ display: "flex", gap: 12, width: "100%" }}>
               <button
-                onClick={() => setShowLogoutModal(false)}
-                style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowLogoutModal(false);
-                  localStorage.clear();
-                  navigate("/", { replace: true });
-                }}
-                style={{ flex: 1, padding: "10px 0", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}
-              >
-                Yes, Logout
-              </button>
+  onClick={() => setShowLogoutModal(false)}
+  style={{
+    flex: 1,
+    padding: "10px 0",
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 13,
+    fontFamily: "Georgia, serif"
+  }}
+>
+  Cancel
+</button>
+
+<button
+  onClick={() => {
+    setShowLogoutModal(false);
+    localStorage.removeItem("user");
+    sessionStorage.clear();
+    navigate("/login", { replace: true });
+  }}
+  style={{
+    flex: 1,
+    padding: "10px 0",
+    background: "#dc2626",
+    color: "#fff",
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 700,
+    fontSize: 13,
+    fontFamily: "Georgia, serif"
+  }}
+>
+  Yes, Logout
+</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

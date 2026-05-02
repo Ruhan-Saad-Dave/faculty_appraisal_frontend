@@ -1,15 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-// ─── Demo credentials ─────────────────────────────────────────────────────────
-// Replace with real API call in production
-const CREDENTIALS = {
-  faculty: { password: "1234",  role: "faculty" },
-  hod:     { password: "hod1",  role: "hod"     },
-  dean:    { password: "dean1", role: "dean"    },
-  director:{ password: "dir1",  role: "director"},
-  vc:      { password: "vc123", role: "vc"      },
-};
+import { SCHOOL_CONFIG, APP_INFO } from "../constants/formConfig";
+import { CREDENTIALS } from "../data/mockData";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -35,12 +27,21 @@ export default function Login() {
       const cred = CREDENTIALS[username.trim().toLowerCase()];
 
       if (cred && cred.password === password) {
-  localStorage.setItem("role", cred.role);
-  localStorage.setItem("username", username.trim().toLowerCase());
+        localStorage.setItem("role", cred.role);
+        localStorage.setItem("username", username.trim().toLowerCase());
+        // Save the school and whether this school has an HOD layer.
+        // This is read by HODDashboard and permissions.js to conditionally
+        // show/hide HOD columns and decide the approval routing.
+        const school = cred.school || "";
+        const dept = cred.department || "";
+        const hasHod = school ? (SCHOOL_CONFIG[school]?.hasHod !== false) : true;
+        localStorage.setItem("school", school);
+        localStorage.setItem("department", dept);
+        localStorage.setItem("hasHod", hasHod ? "true" : "false");
 
-  // Always go to profile first
-  navigate("/profile");
-} else {
+        // Always go to profile first
+        navigate("/profile");
+      } else {
         setError("Invalid username or password. Please try again.");
       }
     }, 900);
@@ -57,32 +58,21 @@ export default function Login() {
         {/* ── LEFT: Branding ───────────────────────────────────────────────── */}
         <div style={s.left}>
           <div style={s.logoBox}>
-            <img src="/dypiu.jpeg" alt="DYPIU Logo" style={{ height: 60 }} />
+            <img src="/dypiu.jpeg" alt="University Logo" style={{ height: 60 }} />
           </div>
-          <h2 style={s.heading}>D Y Patil International University, Akurdi, Pune</h2>
+          <h2 style={s.heading}>{APP_INFO.UNIVERSITY_NAME}, {APP_INFO.UNIVERSITY_LOCATION}</h2>
           <p style={s.desc}>
             To create a vibrant learning environment – fostering innovation and creativity,
             experiential learning, which is inspired by research, and focuses on regionally,
             nationally and globally relevant areas.
           </p>
 
-          {/* Demo credentials hint */}
-          <div style={s.hint}>
-            <div style={s.hintTitle}>Demo Accounts</div>
-            {Object.entries(CREDENTIALS).map(([user, { role }]) => (
-              <div key={user} style={s.hintRow}>
-                <span style={s.hintUser}>{user}</span>
-                <span style={s.hintRole}>{role}</span>
-              </div>
-            ))}
-            <div style={s.hintPwd}>All passwords shown in code</div>
-          </div>
         </div>
 
         {/* ── RIGHT: Login form ────────────────────────────────────────────── */}
         <div style={s.right}>
           <div style={s.formWrap}>
-            <h3 style={s.welcome}>Faculty Appraisal Portal</h3>
+            <h3 style={s.welcome}>{APP_INFO.PORTAL_NAME}</h3>
             <p style={s.sub}>Sign in to continue</p>
 
             {error && <div style={s.error}>{error}</div>}
@@ -136,20 +126,6 @@ export default function Login() {
 
             <div style={s.forgot}>Forgot password?</div>
 
-            {/* Role legend */}
-            <div style={s.roleLegend}>
-              {[
-  { role: "faculty",  color: "#6d28d9", bg: "#ede9fe" },
-  { role: "hod",      color: "#b45309", bg: "#fef3c7" },
-  { role: "dean",     color: "#065f46", bg: "#d1fae5" },
-  { role: "director", color: "#0e7490", bg: "#cffafe" },
-  { role: "vc",       color: "#991b1b", bg: "#fee2e2" },
-].map(({ role, color, bg }) => (
-                <span key={role} style={{ ...s.rolePill, color, background: bg }}>
-                  {role.toUpperCase()}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -329,15 +305,9 @@ const s = {
   },
 
   roleLegend: {
-    display: "flex",
-    gap: 6,
-    flexWrap: "wrap",
+    display: "flex", gap: 6, flexWrap: "wrap",
   },
   rolePill: {
-    fontSize: 10,
-    fontWeight: 700,
-    padding: "3px 9px",
-    borderRadius: 20,
-    letterSpacing: 0.5,
+    fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, letterSpacing: 0.5,
   },
 };
