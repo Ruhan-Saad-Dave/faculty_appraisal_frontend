@@ -890,7 +890,7 @@ export default function DirectorDashboard() {
   ]);
   const setLec = (i, k, v) => setLectures((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
-  const [courseFile, setCourseFile] = useState({ course: "", title: "", details: "", score: "", hod: "", director: "" });
+  const [courseFile, setCourseFile] = useState([{ course: "", title: "", details: "", score: "", hod: "", director: "" }]);
   const [innovScore, setInnovScore] = useState("");
   const [innovDetails, setInnovDetails] = useState("");
   const [projects, setProjects] = useState([
@@ -1471,17 +1471,20 @@ export default function DirectorDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td style={TDC}>1</td>
-                        <td style={TD}><TI val={courseFile.course} onChange={(v) => setCourseFile((p) => ({ ...p, course: v }))} /></td>
-                        <td style={TD}><TI val={courseFile.title} onChange={(v) => setCourseFile((p) => ({ ...p, title: v }))} /></td>
-                        <td style={TD}><TI val={courseFile.details} onChange={(v) => setCourseFile((p) => ({ ...p, details: v }))} /></td>
-                        <td style={TD}><DocCell id="courseFile" docs={docs} setDocs={setDocs} /></td>
-                        <td style={TD}><ViewCell id="courseFile" docs={docs} /></td>
-                        <td style={TDS}><TI val={courseFile.score} onChange={(v) => setCourseFile((p) => ({ ...p, score: v }))} center /></td>
-                      </tr>
-                    </tbody>
+                    {courseFile.map((r, i) => (
+                    <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                    <td style={TDC}>{i + 1}</td>
+                    <td style={TD}><TI val={r.course} onChange={(v) => setCF(i, "course", v)} /></td>
+                    <td style={TD}><TI val={r.title} onChange={(v) => setCF(i, "title", v)} /></td>
+                    <td style={TD}><TI val={r.details} onChange={(v) => setCF(i, "details", v)} /></td>
+                    <td style={TD}><DocCell id={`courseFile-${i}`} docs={docs} setDocs={setDocs} /></td>
+                    <td style={TD}><ViewCell id={`courseFile-${i}`} docs={docs} /></td>
+                    <td style={TDS}><TI val={r.score} onChange={(v) => setCF(i, "score", v)} center /></td>
+                   </tr>
+                 ))}
+                  </tbody>
                   </table>
+                  <RowBtns onAdd={() =>setCourseFile((p) => [ ...p, { course: "", title: "", details: "", score: "" }])}onDel={() =>setCourseFile((p) => (p.length > 1 ? p.slice(0, -1) : p))}canDel={courseFile.length > 1}/>
                 </div>
 
                 {/* A3. Innovative Teaching */}
