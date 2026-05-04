@@ -1,4 +1,9 @@
-import { SCHOOL_CONFIG } from "../constants/formConfig";
+import {
+  canonicalDepartmentValue,
+  canonicalSchoolValue,
+  isSoemrSchool,
+} from "../constants/universityHierarchy";
+import { departmentHasHod } from "../utils/hierarchy";
 
 export const VALID_ROLES = ["faculty", "hod", "director", "dean", "vc"];
 
@@ -26,26 +31,33 @@ export const normalizeRole = (role, fallback = "faculty") => {
 export const hasValidRole = (role) => VALID_ROLES.includes(normalizeRole(role, ""));
 
 export const schoolHasHod = (school) => {
-  if (!school) return true;
-  return SCHOOL_CONFIG[school]?.hasHod !== false;
+  if (!school) return false;
+  return isSoemrSchool(school);
 };
 
 const firstValue = (...values) =>
   values.find((value) => String(value ?? "").trim() !== "") || "";
 
-export const buildProfilePayload = (formData, academicYear = "2025-2026") => ({
-  email: String(formData.email || "").trim().toLowerCase(),
-  employee_id: String(formData.employeeId || "").trim() || null,
-  full_name: String(formData.name || "").trim(),
-  qualification: String(formData.qualification || "").trim() || null,
-  designation: String(formData.designation || "").trim() || null,
-  department: String(formData.department || "").trim() || null,
-  school: String(formData.school || "").trim() || null,
-  teaching_experience: String(formData.experience || "").trim() || null,
-  phone: String(formData.phone || "").trim() || null,
-  academic_year: academicYear,
-  appraisal_role: normalizeRole(formData.role),
-});
+export const buildProfilePayload = (formData, academicYear = "2025-2026") => {
+  const school = canonicalSchoolValue(formData.school);
+  const department = isSoemrSchool(school)
+    ? canonicalDepartmentValue(formData.department)
+    : "";
+
+  return {
+    email: String(formData.email || "").trim().toLowerCase(),
+    employee_id: String(formData.employeeId || "").trim() || null,
+    full_name: String(formData.name || "").trim(),
+    qualification: String(formData.qualification || "").trim() || null,
+    designation: String(formData.designation || "").trim() || null,
+    department: department || null,
+    school: school || null,
+    teaching_experience: String(formData.experience || "").trim() || null,
+    phone: String(formData.phone || "").trim() || null,
+    academic_year: academicYear,
+    appraisal_role: normalizeRole(formData.role),
+  };
+};
 
 export const storeUserSession = ({ session, user, profile = {}, fallbackEmail = "" }) => {
   const safeProfile = profile || {};
@@ -53,8 +65,10 @@ export const storeUserSession = ({ session, user, profile = {}, fallbackEmail = 
   const email = firstValue(safeProfile.email, user?.email, fallbackEmail).toLowerCase();
   const name = firstValue(safeProfile.full_name, metadata.name, metadata.full_name, email);
   const role = normalizeRole(firstValue(safeProfile.appraisal_role, metadata.role));
-  const school = firstValue(safeProfile.school, metadata.school);
-  const department = firstValue(safeProfile.department, metadata.department);
+  const school = canonicalSchoolValue(firstValue(safeProfile.school, metadata.school));
+  const department = isSoemrSchool(school)
+    ? canonicalDepartmentValue(firstValue(safeProfile.department, metadata.department))
+    : firstValue(safeProfile.department, metadata.department);
 
   if (session?.access_token) {
     localStorage.setItem("supabaseToken", session.access_token);
@@ -71,7 +85,7 @@ export const storeUserSession = ({ session, user, profile = {}, fallbackEmail = 
   localStorage.setItem("experience", firstValue(safeProfile.teaching_experience, metadata.experience, metadata.teaching_experience));
   localStorage.setItem("phone", firstValue(safeProfile.phone, metadata.phone));
 
-  const hasHod = schoolHasHod(school);
+  const hasHod = departmentHasHod(school, department);
   localStorage.setItem("hasHod", hasHod ? "true" : "false");
   localStorage.setItem("hasHOD", hasHod ? "true" : "false");
 

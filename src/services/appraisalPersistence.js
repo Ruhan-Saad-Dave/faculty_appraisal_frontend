@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { getReviewChain, pendingStatusFor, profileFromLocalStorage } from "../utils/hierarchy";
+import { getReviewChain, pendingStatusFor, profileFromLocalStorage, workflowValidationError } from "../utils/hierarchy";
 
 const n = (value) => parseFloat(value) || 0;
 const inputValue = (value) => value ?? "";
@@ -533,7 +533,11 @@ export const saveAppraisal = async ({
     training = [],
   } = form;
 
-  const reviewChain = getReviewChain(submitterProfile || profileFromLocalStorage());
+  const activeProfile = submitterProfile || profileFromLocalStorage();
+  const workflowError = workflowValidationError(activeProfile);
+  if (workflowError) throw new Error(workflowError);
+
+  const reviewChain = getReviewChain(activeProfile);
   const nextReviewer = reviewChain[0];
   const workflowStatus = nextReviewer ? pendingStatusFor(nextReviewer) : "Submitted";
 

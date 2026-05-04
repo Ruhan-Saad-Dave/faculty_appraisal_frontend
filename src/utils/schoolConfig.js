@@ -1,10 +1,8 @@
-export const SCHOOL_CONFIG = {
-  "School of Engineering": { hasHod: true },
-  "School of Management": { hasHod: false },
-  "School of Law": { hasHod: false },
-  "School of Design": { hasHod: false },
-  "School of Architecture": { hasHod: false },
-  "School of Health Sciences": { hasHod: false },
-  "School of Liberal Arts": { hasHod: false },
-  "School of Science": { hasHod: false },
-};
+import { SCHOOL_OPTIONS, SOEMR_SCHOOL } from "../constants/universityHierarchy";
+
+export const SCHOOL_CONFIG = Object.fromEntries(
+  SCHOOL_OPTIONS.map((school) => [
+    school.value,
+    { hasHod: school.value === SOEMR_SCHOOL.label },
+  ])
+);

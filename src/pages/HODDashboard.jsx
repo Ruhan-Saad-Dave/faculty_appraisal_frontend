@@ -5,7 +5,7 @@ import { HOD_USER, FACULTY_LIST } from "../data/mockData";
 import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal } from "../services/appraisalPersistence";
 import { uploadToCloudinary } from "../services/cloudinary";
 import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { profileFromLocalStorage } from "../utils/hierarchy";
+import { rejectedStatusFor, reviewedStatusFor, profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -39,7 +39,10 @@ function ScoreBar({ score, max, color = "#6366f1" }) {
 function StatusBadge({ status }) {
     const map = {
       "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
+      Reviewed:         { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
       "HOD Reviewed":   { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
+      Rejected:         { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+      "HOD Rejected":   { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
     };
     const s = map[status] || map["Pending Review"];
   return (
@@ -930,7 +933,17 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "Georgia, serif" }}>Cancel</button>
-            <button onClick={() => onSubmit(faculty.id, { partA, partB, total }, remarks, buildHodSectionScores(faculty, hodData))}
+            <button onClick={() => {
+              if (!remarks.trim()) {
+                alert("Please enter a rejection comment before rejecting this appraisal.");
+                return;
+              }
+              onSubmit(faculty.id, { partA, partB, total }, remarks, buildHodSectionScores(faculty, hodData), "rejected");
+            }}
+              style={{ padding: "10px 24px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
+              Reject
+            </button>
+            <button onClick={() => onSubmit(faculty.id, { partA, partB, total }, remarks, buildHodSectionScores(faculty, hodData), "approved")}
               style={{ padding: "10px 28px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
               ✔ Submit HOD Review
             </button>
@@ -1526,9 +1539,10 @@ export default function HODDashboard() {
   win.print();
 };
 
-  const handleSubmitReview = async (id, scores, remarks, sectionScores) => {
+  const handleSubmitReview = async (id, scores, remarks, sectionScores, decision = "approved") => {
     const item = facultyList.find((faculty) => faculty.id === id);
     if (!item) return;
+    const rejected = decision === "rejected";
 
     try {
       await submitWorkflowReview({
@@ -1540,11 +1554,12 @@ export default function HODDashboard() {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        decision,
       });
 
-      setFacultyList(prev => prev.map(f => f.id === id ? { ...f, ...sectionScores, innovHod: sectionScores?.innovativeTeaching?.hod ?? f.innovHod, status: "Reviewed", workflowStatus: "HOD Reviewed", hodPartA: scores.partA, hodPartB: scores.partB, hodTotal: scores.total, hodRemarks: remarks } : f));
+      setFacultyList(prev => prev.map(f => f.id === id ? { ...f, ...sectionScores, innovHod: sectionScores?.innovativeTeaching?.hod ?? f.innovHod, status: rejected ? "Rejected" : "Reviewed", workflowStatus: rejected ? rejectedStatusFor("hod") : reviewedStatusFor("hod"), hodPartA: scores.partA, hodPartB: scores.partB, hodTotal: scores.total, hodRemarks: remarks } : f));
       setReviewingFaculty(null);
-      alert("HOD review submitted and forwarded to Director.");
+      alert(rejected ? "HOD rejected this appraisal." : "HOD review approved and forwarded to Director.");
     } catch (err) {
       console.error("Could not submit HOD review:", err);
       alert(`Unable to submit HOD review.\n\n${err.message}`);

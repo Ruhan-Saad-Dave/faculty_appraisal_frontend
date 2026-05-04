@@ -1,0 +1,94 @@
+import assert from "node:assert/strict";
+import {
+  SCHOOL_OPTIONS,
+  SOEMR_DEPARTMENTS,
+  SOEMR_SCHOOL,
+  UNIVERSITY_SCHOOLS,
+} from "../src/constants/universityHierarchy.js";
+import {
+  canAuthorityReviewProfile,
+  getReviewChain,
+  workflowValidationError,
+} from "../src/utils/hierarchy.js";
+
+const roles = {
+  vc: { appraisal_role: "vc" },
+  engineeringDean: { appraisal_role: "dean", school: "SoCSEA" },
+  nonEngineeringDean: { appraisal_role: "dean", school: "SoC" },
+  soemrDirector: { appraisal_role: "director", school: SOEMR_SCHOOL.label },
+};
+
+assert.equal(SCHOOL_OPTIONS.length, 8, "Signup must expose exactly 8 schools");
+assert.deepEqual(
+  SCHOOL_OPTIONS.map((school) => school.value),
+  [
+    "SoCSEA — School of Computer Science, Engineering & Applications",
+    "SoBB — School of Bio-Engineering & Bio Science",
+    "SoCE — School of Continual Education",
+    "SoEMR — School of Engineering Management & Research",
+    "SoC — School of Commerce & Management",
+    "SoMCS — School of Media & Communication Studies",
+    "CioD — School of Design",
+    "SoAA — School of Applied Arts",
+  ],
+  "School dropdown values must match the approved list exactly"
+);
+
+for (const school of UNIVERSITY_SCHOOLS.filter((item) => item.code !== "SoEMR")) {
+  const faculty = { appraisal_role: "faculty", school: school.label, department: "" };
+  assert.deepEqual(
+    getReviewChain(faculty),
+    ["director", "dean", "vc"],
+    `${school.code} faculty must route Director -> Dean -> VC`
+  );
+}
+
+for (const department of SOEMR_DEPARTMENTS) {
+  const faculty = { appraisal_role: "faculty", school: SOEMR_SCHOOL.label, department };
+  assert.deepEqual(
+    getReviewChain(faculty),
+    ["hod", "director", "dean", "vc"],
+    `${department} faculty must route HOD -> Director -> Dean -> VC`
+  );
+
+  const matchingHod = { appraisal_role: "hod", school: SOEMR_SCHOOL.label, department };
+  assert.equal(canAuthorityReviewProfile(matchingHod, faculty), true, `${department} HOD must see own faculty`);
+
+  for (const otherDepartment of SOEMR_DEPARTMENTS.filter((item) => item !== department)) {
+    const otherHod = { appraisal_role: "hod", school: SOEMR_SCHOOL.label, department: otherDepartment };
+    assert.equal(
+      canAuthorityReviewProfile(otherHod, faculty),
+      false,
+      `${otherDepartment} HOD must not see ${department} faculty`
+    );
+  }
+}
+
+const socseaFaculty = { appraisal_role: "faculty", school: "SoCSEA", department: "" };
+const sobbDirector = { appraisal_role: "director", school: "SoBB" };
+const socseaDirector = { appraisal_role: "director", school: "SoCSEA" };
+assert.equal(canAuthorityReviewProfile(socseaDirector, socseaFaculty), true, "Same-school director must review faculty");
+assert.equal(canAuthorityReviewProfile(sobbDirector, socseaFaculty), false, "Other-school director must not review faculty");
+
+for (const school of UNIVERSITY_SCHOOLS) {
+  const faculty = { appraisal_role: "faculty", school: school.label, department: school.code === "SoEMR" ? SOEMR_DEPARTMENTS[0] : "" };
+  const engineering = school.deanTrack === "engineering";
+  assert.equal(
+    canAuthorityReviewProfile(roles.engineeringDean, faculty),
+    engineering,
+    `Engineering dean visibility mismatch for ${school.code}`
+  );
+  assert.equal(
+    canAuthorityReviewProfile(roles.nonEngineeringDean, faculty),
+    !engineering,
+    `Non-engineering dean visibility mismatch for ${school.code}`
+  );
+  assert.equal(canAuthorityReviewProfile(roles.vc, faculty), true, `VC must review ${school.code}`);
+}
+
+assert.ok(
+  workflowValidationError({ appraisal_role: "faculty", school: SOEMR_SCHOOL.label, department: "" }),
+  "SoEMR faculty without one of the four departments must be rejected"
+);
+
+console.log("Hierarchy verification passed.");

@@ -3,9 +3,12 @@ import { fetchSavedAppraisal } from "./appraisalPersistence";
 import {
   canAuthorityReviewProfile,
   getReviewChain,
+  isRejectedStatus,
   pendingStatusFor,
   profileFromLocalStorage,
+  rejectedStatusFor,
   reviewedStatusFor,
+  reviewStatusForDecision,
   roleLabel,
   normalizeRoleForWorkflow,
 } from "../utils/hierarchy";
@@ -87,9 +90,32 @@ const reviewKey = (email, academicYear, reviewerRole) =>
 const getCurrentReviewer = (chain, reviewMap, email, academicYear) =>
   chain.find((role) => !reviewMap.has(reviewKey(email, academicYear, role))) || null;
 
-const decorateStatusForViewer = ({ chain, reviewMap, email, academicYear, reviewerRole }) => {
+const decorateStatusForViewer = ({ chain, reviewMap, email, academicYear, reviewerRole, declarationStatus }) => {
+  const chainReviews = chain
+    .map((role) => reviewMap.get(reviewKey(email, academicYear, role)))
+    .filter(Boolean);
+  const rejectedReview = chainReviews.find((review) => isRejectedStatus(review.status));
   const currentReviewer = getCurrentReviewer(chain, reviewMap, email, academicYear);
   const hasReviewerRecord = reviewMap.has(reviewKey(email, academicYear, reviewerRole));
+  const reviewerRecord = reviewMap.get(reviewKey(email, academicYear, reviewerRole));
+
+  if (isRejectedStatus(declarationStatus) || rejectedReview) {
+    if (!hasReviewerRecord) {
+      return {
+        visible: false,
+        reviewState: "waiting",
+        status: "Waiting",
+        workflowStatus: declarationStatus || rejectedReview?.status || "Rejected",
+      };
+    }
+
+    return {
+      visible: true,
+      reviewState: isRejectedStatus(reviewerRecord?.status) ? "rejected" : "reviewed",
+      status: isRejectedStatus(reviewerRecord?.status) ? "Rejected" : "Reviewed",
+      workflowStatus: reviewerRecord?.status || declarationStatus || rejectedReview?.status,
+    };
+  }
 
   if (currentReviewer === reviewerRole) {
     return {
@@ -223,6 +249,7 @@ export const fetchReviewQueueForRole = async ({
       email: declaration.faculty_email,
       academicYear: declaration.academic_year,
       reviewerRole: role,
+      declarationStatus: declaration.status,
     }).visible;
   });
 
@@ -239,6 +266,7 @@ export const fetchReviewQueueForRole = async ({
       email: declaration.faculty_email,
       academicYear: declaration.academic_year,
       reviewerRole: role,
+      declarationStatus: declaration.status,
     });
     const appraisal = await fetchSavedAppraisal({
       facultyEmail: declaration.faculty_email,
@@ -309,9 +337,11 @@ export const submitWorkflowReview = async ({
   totalScore = 0,
   remarks = "",
   sectionScores,
+  decision = "approved",
 }) => {
   const role = normalizeRoleForWorkflow(reviewerRole);
   const reviewerEmail = localStorage.getItem("username") || "";
+  const reviewDecision = decision === "rejected" ? "rejected" : "approved";
 
   const { data: subjectProfile, error: profileError } = await supabase
     .from("faculty_profiles")
@@ -322,8 +352,51 @@ export const submitWorkflowReview = async ({
   if (profileError) throw profileError;
 
   const chain = getReviewChain(subjectProfile || { email: subjectEmail, appraisal_role: "faculty" });
-  const nextReviewer = chain[chain.indexOf(role) + 1];
-  const nextStatus = nextReviewer ? pendingStatusFor(nextReviewer) : "VC Reviewed";
+  if (!chain.includes(role)) {
+    throw new Error(`${roleLabel(role)} is not in the approval chain for this submission.`);
+  }
+
+  if (!canAuthorityReviewProfile({ ...profileFromLocalStorage(), appraisal_role: role }, subjectProfile || {})) {
+    throw new Error(`${roleLabel(role)} is not authorized to review this submission.`);
+  }
+
+  if (reviewDecision === "rejected" && !String(remarks || "").trim()) {
+    throw new Error("A rejection comment is required.");
+  }
+
+  const { data: existingReviews, error: existingReviewsError } = await supabase
+    .from("appraisal_reviews")
+    .select("*")
+    .eq("faculty_email", subjectEmail)
+    .eq("academic_year", academicYear);
+
+  if (existingReviewsError) throw existingReviewsError;
+
+  const existingReviewForRole = (existingReviews || []).find((review) => review.reviewer_role === role);
+  const rejectedReview = (existingReviews || []).find((review) => isRejectedStatus(review.status));
+
+  if (rejectedReview && rejectedReview.reviewer_role !== role) {
+    throw new Error(`This submission was already rejected by ${roleLabel(rejectedReview.reviewer_role)}.`);
+  }
+
+  if (existingReviewForRole && isRejectedStatus(existingReviewForRole.status) && reviewDecision !== "rejected") {
+    throw new Error("This submission has already been rejected. Delete/unlock it before starting a new review chain.");
+  }
+
+  const reviewedRoles = new Set((existingReviews || []).map((review) => review.reviewer_role));
+  const currentReviewer = chain.find((chainRole) => !reviewedRoles.has(chainRole));
+  if (!existingReviewForRole && currentReviewer !== role) {
+    throw new Error(currentReviewer
+      ? `This submission is currently assigned to ${roleLabel(currentReviewer)}.`
+      : "This submission has already completed the approval chain.");
+  }
+
+  const nextReviewer = reviewDecision === "rejected" ? null : chain[chain.indexOf(role) + 1];
+  const nextStatus = reviewDecision === "rejected"
+    ? rejectedStatusFor(role)
+    : nextReviewer
+      ? pendingStatusFor(nextReviewer)
+      : "VC Reviewed";
 
   await saveReviewerSectionScores({
     subjectEmail,
@@ -343,7 +416,7 @@ export const submitWorkflowReview = async ({
       part_b_score: n(partBScore),
       total_score: n(totalScore),
       remarks,
-      status: reviewedStatusFor(role),
+      status: reviewStatusForDecision(role, reviewDecision),
       reviewed_at: new Date().toISOString(),
     }, { onConflict: "faculty_email,academic_year,reviewer_role" });
 

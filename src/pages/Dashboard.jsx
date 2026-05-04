@@ -3,7 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { APP_INFO } from "../constants/formConfig";
 import { supabase } from "../services/supabase";
 import { uploadToCloudinary } from "../services/cloudinary";
-import { getReviewChain, pendingStatusFor, profileFromLocalStorage } from "../utils/hierarchy";
+import {
+  getReviewChain,
+  isRejectedStatus,
+  pendingStatusFor,
+  profileFromLocalStorage,
+  roleLabel,
+  workflowValidationError,
+} from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -73,13 +80,103 @@ function ScoreBar({ score, max, color = "#6366f1" }) {
 }
 
 function StatusBadge({ status }) {
-  const map = { "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" }, "Reviewed": { bg: "#d1fae5", color: "#065f46", dot: "#10b981" } };
+  const map = {
+    "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
+    Reviewed: { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
+    Rejected: { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+  };
   const s = map[status] || map["Pending Review"];
+
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: s.bg, color: s.color, fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20 }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot, display: "inline-block" }} />
       {status}
     </span>
+  );
+}
+
+function WorkflowStatusTracker({ declaration, reviews, profile }) {
+  const chain = getReviewChain(profile);
+  const status = declaration?.status || "";
+  const reviewByRole = new Map((reviews || []).map((review) => [review.reviewer_role, review]));
+  const rejected = isRejectedStatus(status) || (reviews || []).some((review) => isRejectedStatus(review.status));
+  const nextRole = rejected
+    ? null
+    : chain.find((role) => !reviewByRole.has(role));
+
+  const stepState = (role) => {
+    const review = reviewByRole.get(role);
+    if (review) {
+      return isRejectedStatus(review.status) ? "Rejected" : "Approved";
+    }
+    if (status === pendingStatusFor(role)) return "Pending";
+    return rejected ? "Stopped" : "Waiting";
+  };
+
+  const stateStyle = {
+    Submitted: { bg: "#dbeafe", color: "#1d4ed8", border: "#93c5fd" },
+    Pending: { bg: "#fef3c7", color: "#92400e", border: "#fcd34d" },
+    Approved: { bg: "#dcfce7", color: "#166534", border: "#86efac" },
+    Rejected: { bg: "#fee2e2", color: "#991b1b", border: "#fca5a5" },
+    Waiting: { bg: "#f8fafc", color: "#64748b", border: "#e2e8f0" },
+    Stopped: { bg: "#f1f5f9", color: "#94a3b8", border: "#e2e8f0" },
+  };
+
+  if (!declaration) {
+    return (
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 9, padding: "12px 14px", fontSize: 12, color: "#475569" }}>
+        Submit the appraisal to see the approval route and live authority status here.
+      </div>
+    );
+  }
+
+  const submittedStep = {
+    label: "Faculty Submission",
+    state: "Submitted",
+    timestamp: declaration.submitted_at,
+    comment: status,
+  };
+
+  const authoritySteps = chain.map((role) => {
+    const review = reviewByRole.get(role);
+    return {
+      label: roleLabel(role),
+      state: stepState(role),
+      timestamp: review?.reviewed_at,
+      comment: review?.remarks,
+    };
+  });
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #dbeafe", borderRadius: 9, padding: "14px 16px", boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>Approval Status Tracker</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+            {rejected ? "The approval chain has stopped because this submission was rejected." : nextRole ? `Next: ${roleLabel(nextRole)}` : "All approval stages are complete."}
+          </div>
+        </div>
+        <StatusBadge status={rejected ? "Rejected" : nextRole ? "Pending Review" : "Reviewed"} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${authoritySteps.length + 1}, minmax(130px, 1fr))`, gap: 8, overflowX: "auto" }}>
+        {[submittedStep, ...authoritySteps].map((step) => {
+          const colors = stateStyle[step.state] || stateStyle.Waiting;
+          return (
+            <div key={step.label} style={{ border: `1px solid ${colors.border}`, background: colors.bg, borderRadius: 8, padding: "10px 11px", minHeight: 88 }}>
+              <div style={{ fontSize: 10, color: colors.color, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6 }}>{step.state}</div>
+              <div style={{ marginTop: 5, fontSize: 12, fontWeight: 800, color: "#0f172a" }}>{step.label}</div>
+              <div style={{ marginTop: 5, fontSize: 10, color: "#64748b" }}>
+                {step.timestamp ? new Date(step.timestamp).toLocaleString() : "No timestamp yet"}
+              </div>
+              {step.comment && (
+                <div style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4, color: "#334155", maxHeight: 42, overflow: "auto" }}>{step.comment}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1078,6 +1175,52 @@ export default function HODDashboard() {
 
   const [docs, setDocs] = useState({});
   const [appraisalLocked, setAppraisalLocked] = useState(false);
+  const [workflowDeclaration, setWorkflowDeclaration] = useState(null);
+  const [workflowReviews, setWorkflowReviews] = useState([]);
+
+  useEffect(() => {
+    const userEmail = localStorage.getItem("username");
+    if (!userEmail || !info.ay) return undefined;
+
+    const loadWorkflowStatus = async () => {
+      try {
+        const [{ data: declaration, error: declarationError }, { data: reviews, error: reviewsError }] = await Promise.all([
+          supabase
+            .from("declarations")
+            .select("status,submitted_at,updated_at")
+            .eq("faculty_email", userEmail)
+            .eq("academic_year", info.ay)
+            .maybeSingle(),
+          supabase
+            .from("appraisal_reviews")
+            .select("reviewer_role,status,remarks,reviewed_at")
+            .eq("faculty_email", userEmail)
+            .eq("academic_year", info.ay)
+            .order("reviewed_at", { ascending: true }),
+        ]);
+
+        requireSupabase(declarationError, "Could not load workflow status");
+        requireSupabase(reviewsError, "Could not load review history");
+        setWorkflowDeclaration(declaration || null);
+        setWorkflowReviews(reviews || []);
+        setAppraisalLocked(Boolean(declaration));
+      } catch (err) {
+        console.error("Could not load workflow status:", err);
+      }
+    };
+
+    loadWorkflowStatus();
+
+    const channel = supabase
+      .channel(`workflow-status-${userEmail}-${info.ay}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "declarations", filter: `faculty_email=eq.${userEmail}` }, loadWorkflowStatus)
+      .on("postgres_changes", { event: "*", schema: "public", table: "appraisal_reviews", filter: `faculty_email=eq.${userEmail}` }, loadWorkflowStatus)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [info.ay]);
 
   useEffect(() => {
     const loadDocuments = async () => {
@@ -1519,6 +1662,12 @@ export default function HODDashboard() {
       return;
     }
 
+    const workflowError = workflowValidationError(profileFromLocalStorage());
+    if (workflowError) {
+      alert(workflowError);
+      return;
+    }
+
     const confirmSubmit = window.confirm("Are you sure you want to submit your appraisal? This will save your data to the database.");
     if (!confirmSubmit) return;
 
@@ -1937,6 +2086,12 @@ export default function HODDashboard() {
 
       alert("Appraisal submitted successfully!");
       setAppraisalLocked(true);
+      setWorkflowDeclaration({
+        status: workflowStatus,
+        submitted_at: declarationData.submitted_at,
+        updated_at: declarationData.submitted_at,
+      });
+      setWorkflowReviews([]);
     } catch (err) {
       console.error("Submission error:", err);
       alert(`Unable to submit appraisal.\n\n${err.message}`);
@@ -2203,6 +2358,8 @@ export default function HODDashboard() {
   const navItems = [
     { id: "myAppraisal", icon: "👤", label: "My Appraisal", sub: "View your self-appraisal form" },
   ];
+  const workflowRejected = isRejectedStatus(workflowDeclaration?.status) ||
+    workflowReviews.some((review) => isRejectedStatus(review.status));
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#f8fafc", color: "#1e293b" }}>
@@ -2279,9 +2436,16 @@ export default function HODDashboard() {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>My Appraisal Form</h2>
               <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{info.name || "Faculty"}.{info.ay}</p>
             </div>
+            <WorkflowStatusTracker
+              declaration={workflowDeclaration}
+              reviews={workflowReviews}
+              profile={profileFromLocalStorage()}
+            />
             {appraisalLocked && (
-              <div style={{ background: "#ecfdf5", border: "1px solid #bbf7d0", color: "#166534", borderRadius: 9, padding: "10px 14px", fontSize: 12, fontWeight: 700 }}>
-                Submitted and locked for review. Your saved data is visible here, but editing is disabled while authorities review it.
+              <div style={{ background: workflowRejected ? "#fef2f2" : "#ecfdf5", border: `1px solid ${workflowRejected ? "#fecaca" : "#bbf7d0"}`, color: workflowRejected ? "#991b1b" : "#166534", borderRadius: 9, padding: "10px 14px", fontSize: 12, fontWeight: 700 }}>
+                {workflowRejected
+                  ? "This appraisal was rejected. Review the authority comments in the tracker above."
+                  : "Submitted and locked for review. Your saved data is visible here, but editing is disabled while authorities review it."}
               </div>
             )}
 

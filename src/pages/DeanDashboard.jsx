@@ -7,7 +7,7 @@ import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal } from "../se
 import { uploadToCloudinary } from "../services/cloudinary";
 import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { supabase } from "../services/supabase";
-import { profileFromLocalStorage } from "../utils/hierarchy";
+import { rejectedStatusFor, reviewedStatusFor, profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -44,6 +44,8 @@ function StatusBadge({ status }) {
     "Director Approved":      { bg: "#cffafe", color: "#164e63", dot: "#06b6d4" },
     "Pending Dean Review":    { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
     "Dean Reviewed":          { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
+    Rejected:                 { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+    "Dean Rejected":          { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
   };
   const s = map[status] || map["Pending Review"];
   return (
@@ -1381,7 +1383,14 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit }) {
 
       <div style={{ display: "flex", gap: 12 }}>
         <button onClick={onBack} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, cursor: "pointer" }}>Cancel</button>
-        <button onClick={() => onSubmit(approval.id, deanScores, remarks, sectionScores)} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: "#0f172a", color: "#f8fafc", fontWeight: 700, cursor: "pointer" }}>Submit Review</button>
+        <button onClick={() => {
+          if (!remarks.trim()) {
+            alert("Please enter a rejection comment before rejecting this appraisal.");
+            return;
+          }
+          onSubmit(approval.id, deanScores, remarks, sectionScores, "rejected");
+        }} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: "#dc2626", color: "#f8fafc", fontWeight: 700, cursor: "pointer" }}>Reject</button>
+        <button onClick={() => onSubmit(approval.id, deanScores, remarks, sectionScores, "approved")} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: "#0f172a", color: "#f8fafc", fontWeight: 700, cursor: "pointer" }}>Approve & Forward</button>
       </div>
     </div>
   );
@@ -2026,7 +2035,7 @@ export default function DeanDashboard() {
     }
   };
 
-  const handleSubmitReview = async (id, scores, remarks, sectionScores) => {
+  const handleSubmitReview = async (id, scores, remarks, sectionScores, decision = "approved") => {
     const sourceList = activeMainTab === "facultyApprovals"
       ? facultyList
       : activeMainTab === "hodApprovals"
@@ -2034,6 +2043,7 @@ export default function DeanDashboard() {
         : directorList;
     const item = sourceList.find((entry) => entry.id === id);
     if (!item) return;
+    const rejected = decision === "rejected";
 
     try {
       await submitWorkflowReview({
@@ -2045,10 +2055,11 @@ export default function DeanDashboard() {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        decision,
       });
 
       const markReviewed = (entry) => entry.id === id
-        ? { ...entry, ...sectionScores, innovDean: sectionScores?.innovativeTeaching?.dean ?? entry.innovDean, status: "Reviewed", workflowStatus: "Dean Reviewed", deanPartA: scores.partA, deanPartB: scores.partB, deanTotal: scores.total, deanRemarks: remarks }
+        ? { ...entry, ...sectionScores, innovDean: sectionScores?.innovativeTeaching?.dean ?? entry.innovDean, status: rejected ? "Rejected" : "Reviewed", workflowStatus: rejected ? rejectedStatusFor("dean") : reviewedStatusFor("dean"), deanPartA: scores.partA, deanPartB: scores.partB, deanTotal: scores.total, deanRemarks: remarks }
         : entry;
 
       if (activeMainTab === "facultyApprovals") {
@@ -2061,7 +2072,7 @@ export default function DeanDashboard() {
         setDirectorList(prev => prev.map(markReviewed));
       }
       setReviewingApproval(null);
-      alert("Dean review submitted and forwarded to VC.");
+      alert(rejected ? "Dean rejected this appraisal." : "Dean review approved and forwarded to VC.");
     } catch (err) {
       console.error("Could not submit Dean review:", err);
       alert(`Unable to submit Dean review.\n\n${err.message}`);

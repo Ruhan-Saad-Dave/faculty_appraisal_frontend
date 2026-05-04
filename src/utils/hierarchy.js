@@ -1,76 +1,29 @@
-const ENGINEERING = "engineering";
-const NON_ENGINEERING = "non_engineering";
+import {
+  DEAN_TRACKS,
+  UNIVERSITY_SCHOOLS,
+  canonicalDepartmentValue,
+  getSchoolKey as getConfiguredSchoolKey,
+  normalizeHierarchyText,
+} from "../constants/universityHierarchy.js";
 
-export const SCHOOL_HIERARCHY = {
-  SoCSEA: {
-    name: "School of Computer Science, Engineering & Applications",
-    deanTrack: ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["socsea", "computer science", "school of computer science", "school of computer science engineering applications"],
-  },
-  SoBB: {
-    name: "School of Bio-Engineering & Bio Science",
-    deanTrack: ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["sobb", "bio-engineering", "bio engineering", "bio science"],
-  },
-  SoCE: {
-    name: "School of Continual Education",
-    deanTrack: ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["soce", "continual education"],
-  },
-  SoEMR: {
-    name: "School of Engineering Management & Research",
-    deanTrack: ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [
-      "Mechanical Engineering",
-      "Civil Engineering",
-      "Chemical Engineering",
-      "Semiconductor Engineering",
-    ],
-    aliases: ["soemr", "engineering management", "engineering management research"],
-  },
-  SoC: {
-    name: "School of Commerce & Management",
-    deanTrack: NON_ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["soc", "commerce", "commerce management", "management"],
-  },
-  SoMCS: {
-    name: "School of Media & Communication Studies",
-    deanTrack: NON_ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["somcs", "media", "communication studies"],
-  },
-  CioD: {
-    name: "School of Design",
-    deanTrack: NON_ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["ciod", "design", "school of design"],
-  },
-  SoAA: {
-    name: "School of Applied Arts",
-    deanTrack: NON_ENGINEERING,
-    directorLayer: true,
-    hodDepartments: [],
-    aliases: ["soaa", "applied arts"],
-  },
-};
+const ENGINEERING = DEAN_TRACKS.ENGINEERING;
+const NON_ENGINEERING = DEAN_TRACKS.NON_ENGINEERING;
 
-const normalizeText = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+export const SCHOOL_HIERARCHY = Object.fromEntries(
+  UNIVERSITY_SCHOOLS.map((school) => [
+    school.code,
+    {
+      name: school.name,
+      label: school.label,
+      deanTrack: school.deanTrack,
+      directorLayer: true,
+      hodDepartments: school.hodDepartments,
+      aliases: school.aliases,
+    },
+  ])
+);
+
+const normalizeText = normalizeHierarchyText;
 
 export const normalizeRoleForWorkflow = (role) => {
   const value = normalizeText(role);
@@ -81,17 +34,7 @@ export const normalizeRoleForWorkflow = (role) => {
   return "faculty";
 };
 
-export const getSchoolKey = (school) => {
-  const normalized = normalizeText(school);
-  if (!normalized) return "";
-
-  const found = Object.entries(SCHOOL_HIERARCHY).find(([key, config]) => {
-    const names = [key, config.name, ...(config.aliases || [])].map(normalizeText);
-    return names.some((name) => normalized === name || normalized.includes(name) || name.includes(normalized));
-  });
-
-  return found?.[0] || "";
-};
+export const getSchoolKey = getConfiguredSchoolKey;
 
 export const getSchoolHierarchy = (school) => SCHOOL_HIERARCHY[getSchoolKey(school)] || null;
 
@@ -111,13 +54,7 @@ export const departmentHasHod = (school, department) => {
   const config = getSchoolHierarchy(school);
   if (!config?.hodDepartments?.length) return false;
 
-  const normalizedDepartment = normalizeText(department);
-  return config.hodDepartments.some((hodDepartment) => {
-    const normalizedHodDepartment = normalizeText(hodDepartment);
-    return normalizedDepartment === normalizedHodDepartment ||
-      normalizedDepartment.includes(normalizedHodDepartment) ||
-      normalizedHodDepartment.includes(normalizedDepartment);
-  });
+  return Boolean(canonicalDepartmentValue(department));
 };
 
 export const getReviewChain = (profile = {}) => {
@@ -127,6 +64,10 @@ export const getReviewChain = (profile = {}) => {
   if (role === "dean") return ["vc"];
   if (role === "director") return ["dean", "vc"];
   if (role === "hod") return ["director", "dean", "vc"];
+
+  if (getSchoolKey(profile.school) === "SoEMR") {
+    return ["hod", "director", "dean", "vc"];
+  }
 
   return departmentHasHod(profile.school, profile.department)
     ? ["hod", "director", "dean", "vc"]
@@ -143,6 +84,29 @@ export const roleLabel = (role) => ({
 
 export const pendingStatusFor = (role) => `Pending ${roleLabel(role)} Review`;
 export const reviewedStatusFor = (role) => `${roleLabel(role)} Reviewed`;
+export const rejectedStatusFor = (role) => `${roleLabel(role)} Rejected`;
+export const isRejectedStatus = (status) => normalizeText(status).includes("rejected");
+export const reviewStatusForDecision = (role, decision = "approved") =>
+  decision === "rejected" ? rejectedStatusFor(role) : reviewedStatusFor(role);
+
+export const workflowValidationError = (profile = {}) => {
+  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
+  const schoolKey = getSchoolKey(profile.school);
+
+  if (role !== "vc" && !schoolKey) {
+    return "Please select one of the 8 approved schools before submitting.";
+  }
+
+  if (role === "hod" && schoolKey !== "SoEMR") {
+    return "HOD submissions are allowed only for SoEMR departments.";
+  }
+
+  if (schoolKey === "SoEMR" && (role === "faculty" || role === "hod") && !canonicalDepartmentValue(profile.department)) {
+    return "Please select a valid SoEMR department before submitting.";
+  }
+
+  return "";
+};
 
 export const canAuthorityReviewProfile = (reviewerProfile = {}, subjectProfile = {}) => {
   const reviewerRole = normalizeRoleForWorkflow(reviewerProfile.appraisal_role || reviewerProfile.role);
@@ -163,7 +127,7 @@ export const canAuthorityReviewProfile = (reviewerProfile = {}, subjectProfile =
     return subjectRole === "faculty" &&
       departmentHasHod(subjectProfile.school, subjectProfile.department) &&
       getSchoolKey(reviewerProfile.school) === getSchoolKey(subjectProfile.school) &&
-      normalizeText(reviewerProfile.department) === normalizeText(subjectProfile.department);
+      canonicalDepartmentValue(reviewerProfile.department) === canonicalDepartmentValue(subjectProfile.department);
   }
 
   return false;

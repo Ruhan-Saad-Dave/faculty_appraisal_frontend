@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
 import { VC_USER } from "../data/mockData";
-import { profileFromLocalStorage } from "../utils/hierarchy";
+import { rejectedStatusFor, reviewedStatusFor, profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
 const pct = (v, m) => Math.min(100, Math.round((v / m) * 100)) || 0;
-const isVcReviewed = (person = {}) => person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) > 0;
+const isVcReviewed = (person = {}) => person.status === "Reviewed" || person.status === "VC Reviewed" || person.status === "Rejected" || person.status === "VC Rejected" || n(person.vcTotal) > 0;
 const grade = (score, max) => {
   const p = (score / max) * 100;
   if (p >= 85) return { label: "Outstanding", color: "#059669", bg: "#d1fae5" };
@@ -40,6 +40,8 @@ function StatusBadge({ status }) {
     "VC Reviewed":     { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
     "Pending Review":  { bg: "#ede9fe", color: "#5b21b6", dot: "#7c3aed" },
     "Pending VC Review": { bg: "#ede9fe", color: "#5b21b6", dot: "#7c3aed" },
+    Rejected:          { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+    "VC Rejected":     { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
   };
   const s = map[status] || map["Pending VC Review"];
   const label = status === "Reviewed" ? "VC Reviewed" : status === "Pending Review" ? "Pending VC Review" : status;
@@ -745,7 +747,17 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit }) {
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
             <button onClick={onBack} style={{ padding: "10px 24px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>Cancel</button>
-            <button onClick={() => onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData))}
+            <button onClick={() => {
+              if (!remarks.trim()) {
+                alert("Please enter a rejection comment before rejecting this appraisal.");
+                return;
+              }
+              onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData), "rejected");
+            }}
+              style={{ padding: "11px 26px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>
+              Reject
+            </button>
+            <button onClick={() => onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData), "approved")}
               style={{ padding: "11px 32px", background: "#92400e", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif", boxShadow: "0 4px 10px rgba(146, 64, 14, 0.2)" }}>
               ✔ CONFIRM & SIGN APPRAISAL
             </button>
@@ -800,7 +812,7 @@ export default function VCDashboard() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleSubmit = async (id, scores, remarks, personMode, sectionScores) => {
+  const handleSubmit = async (id, scores, remarks, personMode, sectionScores, decision = "approved") => {
     const sourceList = personMode === "dean"
       ? deanList
       : personMode === "director"
@@ -810,6 +822,7 @@ export default function VCDashboard() {
           : facList;
     const item = sourceList.find((entry) => entry.id === id);
     if (!item) return;
+    const rejected = decision === "rejected";
 
     try {
       await submitWorkflowReview({
@@ -821,17 +834,18 @@ export default function VCDashboard() {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        decision,
       });
 
       const upd = (list) => list.map(p => p.id === id
-        ? { ...p, ...sectionScores, innovVc: sectionScores?.innovativeTeaching?.vc ?? p.innovVc, status: "Reviewed", workflowStatus: "VC Reviewed", vcPartA: scores.partA, vcPartB: scores.partB, vcTotal: scores.total, vcRemarks: remarks }
+        ? { ...p, ...sectionScores, innovVc: sectionScores?.innovativeTeaching?.vc ?? p.innovVc, status: rejected ? "Rejected" : "Reviewed", workflowStatus: rejected ? rejectedStatusFor("vc") : reviewedStatusFor("vc"), vcPartA: scores.partA, vcPartB: scores.partB, vcTotal: scores.total, vcRemarks: remarks }
         : p);
       if (personMode === "dean") setDeanList(upd);
       else if (personMode === "director") setDirList(upd);
       else if (personMode === "hod") setHodList(upd);
       else if (personMode === "faculty") setFacList(upd);
       setReviewing(null);
-      alert("VC final review submitted.");
+      alert(rejected ? "VC rejected this appraisal." : "VC final approval submitted.");
     } catch (err) {
       console.error("Could not submit VC review:", err);
       alert(`Unable to submit VC review.\n\n${err.message}`);

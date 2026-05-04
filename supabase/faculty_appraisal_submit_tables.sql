@@ -36,7 +36,28 @@ create table public.faculty_profiles (
   appraisal_role text not null default 'faculty',
   avatar text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint faculty_profiles_school_allowed check (
+    appraisal_role = 'vc' or school in (
+      'SoCSEA — School of Computer Science, Engineering & Applications',
+      'SoBB — School of Bio-Engineering & Bio Science',
+      'SoCE — School of Continual Education',
+      'SoEMR — School of Engineering Management & Research',
+      'SoC — School of Commerce & Management',
+      'SoMCS — School of Media & Communication Studies',
+      'CioD — School of Design',
+      'SoAA — School of Applied Arts'
+    )
+  ),
+  constraint faculty_profiles_soemr_department_allowed check (
+    school <> 'SoEMR — School of Engineering Management & Research'
+    or department in (
+      'Mechanical Engineering',
+      'Civil Engineering',
+      'Chemical Engineering',
+      'Semiconductor Engineering'
+    )
+  )
 );
 
 create trigger faculty_profiles_set_updated_at

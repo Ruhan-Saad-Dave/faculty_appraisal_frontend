@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { APP_INFO } from "../constants/formConfig";
+import {
+  SCHOOL_OPTIONS,
+  SOEMR_DEPARTMENTS,
+  canonicalDepartmentValue,
+  canonicalSchoolValue,
+  isSoemrSchool,
+  isValidSchool,
+  isValidSoemrDepartment,
+} from "../constants/universityHierarchy";
 import { supabase } from "../services/supabase";
 import { buildProfilePayload, storeUserSession } from "../auth/session";
 
@@ -21,15 +30,46 @@ export default function Signup() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const selectedSchool = canonicalSchoolValue(formData.school);
+  const needsDepartment = isSoemrSchool(selectedSchool);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      if (name === "school") {
+        return {
+          ...prev,
+          school: value,
+          department: isSoemrSchool(value) ? prev.department : "",
+        };
+      }
+
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.password || !formData.employeeId) {
-      setError("Please fill in all required fields (Name, Email, Password, Employee ID).");
+    const school = canonicalSchoolValue(formData.school);
+    const department = canonicalDepartmentValue(formData.department);
+
+    if (!formData.name || !formData.email || !formData.password || !formData.employeeId || !school) {
+      setError("Please fill in all required fields (Name, Email, Password, Employee ID, School).");
+      return;
+    }
+
+    if (!isValidSchool(formData.school)) {
+      setError("Please select one of the 8 approved schools from the dropdown.");
+      return;
+    }
+
+    if (isSoemrSchool(school) && (!department || !isValidSoemrDepartment(department))) {
+      setError("Please select the correct SoEMR department from the dropdown.");
+      return;
+    }
+
+    if (formData.role === "hod" && !isSoemrSchool(school)) {
+      setError("HOD accounts are allowed only for SoEMR departments in this hierarchy.");
       return;
     }
 
@@ -37,27 +77,33 @@ export default function Signup() {
     setError("");
 
     try {
+      const cleanFormData = {
+        ...formData,
+        school,
+        department: isSoemrSchool(school) ? department : "",
+      };
+
       const { data, error: authError } = await supabase.auth.signUp({
-        email: formData.email.trim(),
+        email: cleanFormData.email.trim(),
         password: formData.password,
         options: {
           data: {
-            name: formData.name,
-            role: formData.role,
-            employeeId: formData.employeeId,
-            designation: formData.designation,
-            department: formData.department,
-            school: formData.school,
-            qualification: formData.qualification,
-            experience: formData.experience,
-            phone: formData.phone,
+            name: cleanFormData.name,
+            role: cleanFormData.role,
+            employeeId: cleanFormData.employeeId,
+            designation: cleanFormData.designation,
+            department: cleanFormData.department,
+            school: cleanFormData.school,
+            qualification: cleanFormData.qualification,
+            experience: cleanFormData.experience,
+            phone: cleanFormData.phone,
           }
         }
       });
 
       if (authError) throw authError;
 
-      const profilePayload = buildProfilePayload(formData, APP_INFO.DEFAULT_AY);
+      const profilePayload = buildProfilePayload(cleanFormData, APP_INFO.DEFAULT_AY);
       const { data: profile, error: profileError } = await supabase
         .from("faculty_profiles")
         .upsert(profilePayload, { onConflict: "email" })
@@ -70,7 +116,7 @@ export default function Signup() {
         session: data?.session,
         user: data?.user,
         profile,
-        fallbackEmail: formData.email,
+        fallbackEmail: cleanFormData.email,
       });
 
       navigate("/profile");
@@ -136,14 +182,26 @@ export default function Signup() {
               </div>
               
               <div style={s.inputGroup}>
-                <label style={s.label}>School / Faculty</label>
-                <input style={s.input} type="text" name="school" placeholder="e.g. School of Engineering" value={formData.school} onChange={handleChange} />
+                <label style={s.label}>School *</label>
+                <select style={s.input} name="school" value={formData.school} onChange={handleChange} required>
+                  <option value="">Select school</option>
+                  {SCHOOL_OPTIONS.map((school) => (
+                    <option key={school.value} value={school.value}>{school.label}</option>
+                  ))}
+                </select>
               </div>
 
-              <div style={s.inputGroup}>
-                <label style={s.label}>Department</label>
-                <input style={s.input} type="text" name="department" placeholder="e.g. CSE" value={formData.department} onChange={handleChange} />
-              </div>
+              {needsDepartment && (
+                <div style={s.inputGroup}>
+                  <label style={s.label}>SoEMR Department *</label>
+                  <select style={s.input} name="department" value={formData.department} onChange={handleChange} required>
+                    <option value="">Select department</option>
+                    {SOEMR_DEPARTMENTS.map((department) => (
+                      <option key={department} value={department}>{department}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={s.inputGroup}>
                 <label style={s.label}>Designation</label>

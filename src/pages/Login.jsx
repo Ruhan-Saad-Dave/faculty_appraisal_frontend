@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { APP_INFO } from "../constants/formConfig";
 import { CREDENTIALS } from "../data/mockData";
 import { supabase } from "../services/supabase";
-import { normalizeRole, storeUserSession } from "../auth/session";
+import { buildProfilePayload, normalizeRole, storeUserSession } from "../auth/session";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -51,19 +51,18 @@ export default function Login() {
 
         if (!activeProfile) {
           const metadata = data.user.user_metadata || {};
-          const fallbackProfile = {
+          const fallbackProfile = buildProfilePayload({
             email: data.user.email || email,
-            employee_id: metadata.employeeId || metadata.employee_id || null,
-            full_name: metadata.name || metadata.full_name || data.user.email || email,
-            qualification: metadata.qualification || null,
-            designation: metadata.designation || null,
-            department: metadata.department || null,
-            school: metadata.school || null,
-            teaching_experience: metadata.experience || metadata.teaching_experience || null,
-            phone: metadata.phone || null,
-            academic_year: APP_INFO.DEFAULT_AY,
-            appraisal_role: normalizeRole(metadata.role),
-          };
+            employeeId: metadata.employeeId || metadata.employee_id || "",
+            name: metadata.name || metadata.full_name || data.user.email || email,
+            qualification: metadata.qualification || "",
+            designation: metadata.designation || "",
+            department: metadata.department || "",
+            school: metadata.school || "",
+            experience: metadata.experience || metadata.teaching_experience || "",
+            phone: metadata.phone || "",
+            role: normalizeRole(metadata.role),
+          }, APP_INFO.DEFAULT_AY);
 
           const { data: createdProfile, error: createProfileError } = await supabase
             .from("faculty_profiles")

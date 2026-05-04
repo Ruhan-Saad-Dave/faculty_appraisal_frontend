@@ -7,6 +7,9 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import RoleDashboard from "./pages/RoleDashboard";
 import { useNavigate } from "react-router-dom";
 import { normalizeRole } from "./auth/session";
+import { SOEMR_DEPARTMENTS, UNIVERSITY_SCHOOLS } from "./constants/universityHierarchy";
+
+const schoolLabel = (code) => UNIVERSITY_SCHOOLS.find((school) => school.code === code)?.label || "";
 
 // ─── Mock users (replace with API later) ─────────────────────────────────────
 const MOCK_USERS = {
@@ -14,8 +17,8 @@ const MOCK_USERS = {
     employeeId: "EMP-2025-001",
     name: "Dr. Priya Sharma",
     designation: "Assistant Professor",
-    department: "CSE",
-    school: "SoCSEA",
+    department: SOEMR_DEPARTMENTS[0],
+    school: schoolLabel("SoEMR"),
     role: "faculty",
     avatar: "PS",
   },
@@ -23,8 +26,8 @@ const MOCK_USERS = {
     employeeId: "EMP-2025-010",
     name: "Prof. Rajesh Kulkarni",
     designation: "Professor & Head",
-    department: "CSE",
-    school: "SoCSEA",
+    department: SOEMR_DEPARTMENTS[0],
+    school: schoolLabel("SoEMR"),
     role: "hod",
     avatar: "RK",
   },
@@ -33,7 +36,7 @@ const MOCK_USERS = {
     name: "Prof. Suresh Patil",
     designation: "Dean",
     department: "Engineering",
-    school: "SoEMR",
+    school: schoolLabel("SoCSEA"),
     role: "dean",
     avatar: "SP",
   },
@@ -41,8 +44,8 @@ const MOCK_USERS = {
     employeeId: "EMP-2025-030",
     name: "Dr. Mehta",
     designation: "Director",
-    department: "Administration",
-    school: "University",
+    department: "",
+    school: schoolLabel("SoEMR"),
     role: "director",
     avatar: "DM",
   },

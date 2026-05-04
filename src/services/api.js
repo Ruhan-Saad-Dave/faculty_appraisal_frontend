@@ -1,6 +1,6 @@
 import axios from "axios";
 import { FACULTY_LIST, HOD_LIST, DIRECTOR_LIST, DEAN_LIST } from "../data/mockData";
-import { SCHOOL_CONFIG } from "../constants/formConfig";
+import { isSoemrSchool } from "../constants/universityHierarchy";
 
 const DEFAULT_API_BASE_URL = "https://fastapi-backend-376777978967.us-central1.run.app/api/v1";
 
@@ -55,7 +55,7 @@ export const getFacultyForHOD = (hodDepartment, hodSchool) => {
 };
 
 export const getStaffForDirector = (directorSchool) => {
-  const hasHod = SCHOOL_CONFIG[directorSchool]?.hasHod ?? true;
+  const hasHod = isSoemrSchool(directorSchool);
   const faculty = FACULTY_LIST.filter(f => f.school === directorSchool);
   
   // If school has no HOD, director sees faculty pending approval directly

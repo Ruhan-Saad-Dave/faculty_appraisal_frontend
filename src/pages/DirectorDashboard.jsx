@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { HodInput } from "../components/Inputs";
 import { useNavigate } from "react-router-dom";
-import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO, SCHOOL_CONFIG } from "../constants/formConfig";
+import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
 import { DIRECTOR_USER, HOD_LIST, FACULTY_LIST, DIRECTOR_SELF_DATA } from "../data/mockData";
 import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal } from "../services/appraisalPersistence";
 import { uploadToCloudinary } from "../services/cloudinary";
 import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { profileFromLocalStorage } from "../utils/hierarchy";
+import { rejectedStatusFor, reviewedStatusFor, profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -43,6 +43,8 @@ function StatusBadge({ status }) {
     "HOD Reviewed":      { bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" },
     "Director Reviewed": { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
     "Dean Reviewed":     { bg: "#ede9fe", color: "#5b21b6", dot: "#7c3aed" },
+    Rejected:            { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
+    "Director Rejected": { bg: "#fee2e2", color: "#991b1b", dot: "#dc2626" },
   };
   const s = map[status] || map["Pending Review"];
   return (
@@ -1028,7 +1030,17 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "Georgia, serif" }}>Cancel</button>
-            <button onClick={() => onSubmit(faculty.id, { partA: dirPartA, partB: dirPartB, total: dirTotal || total }, dirRemarks, buildDirectorSectionScores(faculty, dirData))}
+            <button onClick={() => {
+              if (!dirRemarks.trim()) {
+                alert("Please enter a rejection comment before rejecting this appraisal.");
+                return;
+              }
+              onSubmit(faculty.id, { partA: dirPartA, partB: dirPartB, total: dirTotal || total }, dirRemarks, buildDirectorSectionScores(faculty, dirData), "rejected");
+            }}
+              style={{ padding: "10px 24px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
+              Reject
+            </button>
+            <button onClick={() => onSubmit(faculty.id, { partA: dirPartA, partB: dirPartB, total: dirTotal || total }, dirRemarks, buildDirectorSectionScores(faculty, dirData), "approved")}
               style={{ padding: "10px 28px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>
               ✔ Submit Director Review
             </button>
@@ -1632,10 +1644,11 @@ export default function DirectorDashboard() {
   win.print();
 };
 
-  const handleSubmitReview = async (type, id, scores, remarks, sectionScores) => {
+  const handleSubmitReview = async (type, id, scores, remarks, sectionScores, decision = "approved") => {
     const sourceList = type === "hod" ? hodList : facultyList;
     const item = sourceList.find((entry) => entry.id === id);
     if (!item) return;
+    const rejected = decision === "rejected";
 
     try {
       await submitWorkflowReview({
@@ -1647,17 +1660,18 @@ export default function DirectorDashboard() {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        decision,
       });
 
       if (type === "hod") {
-        setHodList(prev => prev.map(h => h.id === id ? { ...h, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? h.innovDirector, status: "Reviewed", workflowStatus: "Director Reviewed", directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : h));
+        setHodList(prev => prev.map(h => h.id === id ? { ...h, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? h.innovDirector, status: rejected ? "Rejected" : "Reviewed", workflowStatus: rejected ? rejectedStatusFor("director") : reviewedStatusFor("director"), directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : h));
         setReviewingHod(null);
       } else {
-        setFacultyList(prev => prev.map(f => f.id === id ? { ...f, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? f.innovDirector, status: "Reviewed", workflowStatus: "Director Reviewed", directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : f));
+        setFacultyList(prev => prev.map(f => f.id === id ? { ...f, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? f.innovDirector, status: rejected ? "Rejected" : "Reviewed", workflowStatus: rejected ? rejectedStatusFor("director") : reviewedStatusFor("director"), directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : f));
         setReviewingFaculty(null);
       }
 
-      alert("Director review submitted and forwarded to Dean.");
+      alert(rejected ? "Director rejected this appraisal." : "Director review approved and forwarded to Dean.");
     } catch (err) {
       console.error("Could not submit Director review:", err);
       alert(`Unable to submit Director review.\n\n${err.message}`);
@@ -2661,14 +2675,14 @@ export default function DirectorDashboard() {
           <ReviewPanel
             faculty={reviewingFaculty}
             onBack={() => setReviewingFaculty(null)}
-            onSubmit={(id, total, remarks, sectionScores) => handleSubmitReview("faculty", id, total, remarks, sectionScores)}
+            onSubmit={(id, total, remarks, sectionScores, decision) => handleSubmitReview("faculty", id, total, remarks, sectionScores, decision)}
           />
         )}
         {activeMainTab === "hodApprovals" && reviewingHod && (
           <ReviewPanel
             faculty={reviewingHod}
             onBack={() => setReviewingHod(null)}
-            onSubmit={(id, total, remarks, sectionScores) => handleSubmitReview("hod", id, total, remarks, sectionScores)}
+            onSubmit={(id, total, remarks, sectionScores, decision) => handleSubmitReview("hod", id, total, remarks, sectionScores, decision)}
           />
         )}
       </main>
