@@ -358,3 +358,64 @@ export const submitWorkflowReview = async ({
 
   return { nextStatus };
 };
+
+export const deleteWorkflowSubmission = async ({
+  subjectEmail,
+  academicYear,
+}) => {
+  if (!subjectEmail || !academicYear) {
+    throw new Error("Subject email and academic year are required to unlock this appraisal.");
+  }
+
+  const scoreReset = {
+    hod_score: null,
+    director_score: null,
+    dean_score: null,
+    vc_score: null,
+    updated_at: new Date().toISOString(),
+  };
+
+  for (const [, tableName] of REVIEW_SECTION_TABLES) {
+    const { error } = await supabase
+      .from(tableName)
+      .update(scoreReset)
+      .match({
+        faculty_email: subjectEmail,
+        academic_year: academicYear,
+      });
+
+    requireSupabase(error, `Could not reset review scores for ${tableName}`);
+  }
+
+  const { error: innovativeError } = await supabase
+    .from("innovative_teaching")
+    .update(scoreReset)
+    .match({
+      faculty_email: subjectEmail,
+      academic_year: academicYear,
+    });
+
+  requireSupabase(innovativeError, "Could not reset innovative teaching review scores");
+
+  const { error: reviewsError } = await supabase
+    .from("appraisal_reviews")
+    .delete()
+    .match({
+      faculty_email: subjectEmail,
+      academic_year: academicYear,
+    });
+
+  requireSupabase(reviewsError, "Could not delete review chain");
+
+  const { error: declarationError } = await supabase
+    .from("declarations")
+    .delete()
+    .match({
+      faculty_email: subjectEmail,
+      academic_year: academicYear,
+    });
+
+  requireSupabase(declarationError, "Could not delete appraisal submission");
+
+  return true;
+};

@@ -5,7 +5,8 @@ import { HodInput } from "../components/Inputs";
 import { DEAN_USER } from "../data/mockData";
 import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal } from "../services/appraisalPersistence";
 import { uploadToCloudinary } from "../services/cloudinary";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { supabase } from "../services/supabase";
 import { profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1561,6 +1562,7 @@ export default function DeanDashboard() {
   const setTrain = (i, k, v) => setTraining((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [docs, setDocs] = useState({});
+  const [appraisalLocked, setAppraisalLocked] = useState(false);
 
   useEffect(() => {
     const userEmail = localStorage.getItem("username");
@@ -1568,7 +1570,23 @@ export default function DeanDashboard() {
 
     const loadOwnAppraisal = async () => {
       try {
-        await Promise.all([
+        const fetchDeclaration = async () => {
+          const { data, error } = await supabase
+            .from("declarations")
+            .select("status")
+            .eq("faculty_email", userEmail)
+            .eq("academic_year", info.ay)
+            .maybeSingle();
+
+          if (error) {
+            throw new Error(`declarations: ${error.message}`);
+          }
+
+          return data;
+        };
+
+        const [declarationRow] = await Promise.all([
+          fetchDeclaration(),
           loadSavedAppraisal({
             facultyEmail: userEmail,
             academicYear: info.ay,
@@ -1604,6 +1622,8 @@ export default function DeanDashboard() {
             setDocs,
           }),
         ]);
+
+        setAppraisalLocked(Boolean(declarationRow));
       } catch (err) {
         console.error("Could not load saved dean appraisal:", err);
       }
@@ -1941,6 +1961,11 @@ export default function DeanDashboard() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmitAppraisal = async () => {
+    if (appraisalLocked) {
+      alert("This appraisal has already been submitted and is locked for review.");
+      return;
+    }
+
     if (!info.name || !info.ay) {
       alert("Please fill in basic faculty information (Name, Academic Year).");
       setHodAppraisalTab("partA");
@@ -1991,6 +2016,7 @@ export default function DeanDashboard() {
         docs,
       });
 
+      setAppraisalLocked(true);
       alert("Appraisal submitted successfully!");
     } catch (err) {
       console.error("Submission error:", err);
@@ -2039,6 +2065,29 @@ export default function DeanDashboard() {
     } catch (err) {
       console.error("Could not submit Dean review:", err);
       alert(`Unable to submit Dean review.\n\n${err.message}`);
+    }
+  };
+
+  const handleDeleteSubmission = async (item) => {
+    if (!item) return;
+    const confirmed = window.confirm(`Delete ${item.name}'s submitted appraisal and unlock it for editing? Their saved form data will remain available for resubmission.`);
+    if (!confirmed) return;
+
+    try {
+      await deleteWorkflowSubmission({
+        subjectEmail: item.email,
+        academicYear: item.academicYear || item.info?.ay,
+      });
+
+      setFacultyList(prev => prev.filter(entry => entry.id !== item.id));
+      setHodList(prev => prev.filter(entry => entry.id !== item.id));
+      setDirectorList(prev => prev.filter(entry => entry.id !== item.id));
+      if (reviewingApproval?.id === item.id) setReviewingApproval(null);
+
+      alert("Submission deleted. The user can now edit and submit the appraisal again.");
+    } catch (err) {
+      console.error("Could not delete appraisal submission:", err);
+      alert(`Unable to delete appraisal submission.\n\n${err.message}`);
     }
   };
 
@@ -2118,8 +2167,14 @@ export default function DeanDashboard() {
               <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{info.name || "HOD"} · {info.ay}</p>
             </div>
 
+            {appraisalLocked && (
+              <div style={{ padding: "12px 16px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, color: "#312e81", fontSize: 12, fontWeight: 700 }}>
+                Submitted and locked for review. Your superior must delete/unlock this submission before you can edit and resubmit.
+              </div>
+            )}
+
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, pointerEvents: appraisalLocked && hodAppraisalTab !== "summary" ? "none" : "auto", opacity: appraisalLocked && hodAppraisalTab !== "summary" ? 0.78 : 1 }}>
 
             {/* Part A Tab */}
             {hodAppraisalTab === "partA" && (
@@ -2881,8 +2936,8 @@ export default function DeanDashboard() {
                   </button>
                   <button
                     onClick={handleSubmitAppraisal}
-                    disabled={submitting}
-                    style={{ padding: "10px 28px", background: "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: submitting ? "wait" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif", opacity: submitting ? 0.7 : 1 }}
+                    disabled={submitting || appraisalLocked}
+                    style={{ padding: "10px 28px", background: appraisalLocked ? "#64748b" : "#059669", color: "#fff", border: "none", borderRadius: 7, cursor: appraisalLocked ? "not-allowed" : submitting ? "wait" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif", opacity: submitting ? 0.7 : 1 }}
                   >
                     {submitting ? "Submitting..." : "✔ Submit Appraisal"}
                   </button>
@@ -2977,6 +3032,10 @@ export default function DeanDashboard() {
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                       <div style={{ fontSize: 10, color: "#94a3b8" }}>Submitted: {faculty.submittedOn}</div>
+                      <button onClick={() => handleDeleteSubmission(faculty)}
+                        style={{ fontSize: 11, padding: "7px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif", marginRight: 8 }}>
+                        Delete
+                      </button>
                       <button onClick={() => setReviewingApproval(faculty)}
                         style={{ fontSize: 11, padding: "7px 18px", background: /Reviewed|Approved/.test(faculty.status) ? "#1e293b" : "#312e81", color: "#f1f5f9", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
                         {/Reviewed|Approved/.test(faculty.status) ? "✎ Edit Review" : "🔍 Review Form →"}

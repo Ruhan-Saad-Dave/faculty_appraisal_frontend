@@ -4,7 +4,7 @@ import { APP_INFO } from "../constants/formConfig";
 import { HOD_USER, FACULTY_LIST } from "../data/mockData";
 import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal } from "../services/appraisalPersistence";
 import { uploadToCloudinary } from "../services/cloudinary";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1551,6 +1551,25 @@ export default function HODDashboard() {
     }
   };
 
+  const handleDeleteSubmission = async (faculty) => {
+    if (!faculty) return;
+    const confirmed = window.confirm(`Delete ${faculty.name}'s submitted appraisal and unlock it for editing? Their saved form data will remain available for resubmission.`);
+    if (!confirmed) return;
+
+    try {
+      await deleteWorkflowSubmission({
+        subjectEmail: faculty.email,
+        academicYear: faculty.academicYear || faculty.info?.ay,
+      });
+      setFacultyList(prev => prev.filter(item => item.id !== faculty.id));
+      if (reviewingFaculty?.id === faculty.id) setReviewingFaculty(null);
+      alert("Submission deleted. The faculty can now edit and submit the appraisal again.");
+    } catch (err) {
+      console.error("Could not delete appraisal submission:", err);
+      alert(`Unable to delete appraisal submission.\n\n${err.message}`);
+    }
+  };
+
   const filtered = filterStatus === "All" ? facultyList : facultyList.filter(f => f.status === filterStatus);
 
   return (
@@ -2486,6 +2505,10 @@ export default function HODDashboard() {
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                       <div style={{ fontSize: 10, color: "#94a3b8" }}>Submitted: {faculty.submittedOn}</div>
+                      <button onClick={() => handleDeleteSubmission(faculty)}
+                        style={{ fontSize: 11, padding: "7px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif", marginRight: 8 }}>
+                        Delete
+                      </button>
                       <button onClick={() => setReviewingFaculty(faculty)}
                         style={{ fontSize: 11, padding: "7px 18px", background: faculty.status === "Reviewed" ? "#1e293b" : "#312e81", color: "#f1f5f9", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
                         {faculty.status === "Reviewed" ? "✎ Edit Review" : "🔍 Review Form →"}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
 import { VC_USER } from "../data/mockData";
 import { profileFromLocalStorage } from "../utils/hierarchy";
@@ -580,7 +580,7 @@ function AnalyticsPanel({ deans, directors, hods, faculty }) {
 }
 
 // ─── Person Card ──────────────────────────────────────────────────────────────
-function PersonCard({ person, personMode, onReview }) {
+function PersonCard({ person, personMode, onReview, onDelete }) {
   const g = grade(person.vcTotal || person.deanTotal || 300, MAX_SCORES.GRAND_TOTAL);
   const docCount = Object.values(person.docs || {}).reduce((a, arr) => a + arr.length, 0);
 
@@ -619,6 +619,10 @@ function PersonCard({ person, personMode, onReview }) {
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
         <div style={{ fontSize: 10, color: "#94a3b8" }}>Docs: {docCount} files · {person.submittedOn}</div>
+        <button onClick={() => onDelete(person, personMode)}
+          style={{ fontSize: 11, padding: "7px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif", marginRight: 8 }}>
+          Delete
+        </button>
         <button onClick={() => onReview(person, personMode)}
           style={{ fontSize: 11, padding: "7px 18px", background: isVcReviewed(person) ? "#1e293b" : "#b45309", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
           {isVcReviewed(person) ? "✎ Edit VC Approval" : "🔍 Review & Approve →"}
@@ -834,6 +838,31 @@ export default function VCDashboard() {
     }
   };
 
+  const handleDeleteSubmission = async (person, personMode) => {
+    if (!person) return;
+    const confirmed = window.confirm(`Delete ${person.name}'s submitted appraisal and unlock it for editing? Their saved form data will remain available for resubmission.`);
+    if (!confirmed) return;
+
+    try {
+      await deleteWorkflowSubmission({
+        subjectEmail: person.email,
+        academicYear: person.academicYear || person.info?.ay,
+      });
+
+      const remove = (list) => list.filter(entry => entry.id !== person.id);
+      if (personMode === "dean") setDeanList(remove);
+      else if (personMode === "director") setDirList(remove);
+      else if (personMode === "hod") setHodList(remove);
+      else if (personMode === "faculty") setFacList(remove);
+      if (reviewing?.person?.id === person.id) setReviewing(null);
+
+      alert("Submission deleted. The user can now edit and submit the appraisal again.");
+    } catch (err) {
+      console.error("Could not delete appraisal submission:", err);
+      alert(`Unable to delete appraisal submission.\n\n${err.message}`);
+    }
+  };
+
   const currentList = activeTab === "deans" ? deanList : activeTab === "directors" ? dirList : activeTab === "hods" ? hodList : facList;
   
   const filtered = filterStatus === "All" ? currentList : (filterStatus === "Pending VC Review"
@@ -944,6 +973,7 @@ export default function VCDashboard() {
                   key={person.id} person={person}
                   personMode={personModeFor(activeTab)}
                   onReview={(p, m) => setReviewing({ person: p, personMode: m })}
+                  onDelete={handleDeleteSubmission}
                 />
               ))}
             </div>

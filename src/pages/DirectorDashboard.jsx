@@ -5,7 +5,7 @@ import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO, SCHOOL_CONFIG } from 
 import { DIRECTOR_USER, HOD_LIST, FACULTY_LIST, DIRECTOR_SELF_DATA } from "../data/mockData";
 import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal } from "../services/appraisalPersistence";
 import { uploadToCloudinary } from "../services/cloudinary";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { deleteWorkflowSubmission, fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { profileFromLocalStorage } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1664,6 +1664,32 @@ export default function DirectorDashboard() {
     }
   };
 
+  const handleDeleteSubmission = async (type, item) => {
+    if (!item) return;
+    const confirmed = window.confirm(`Delete ${item.name}'s submitted appraisal and unlock it for editing? Their saved form data will remain available for resubmission.`);
+    if (!confirmed) return;
+
+    try {
+      await deleteWorkflowSubmission({
+        subjectEmail: item.email,
+        academicYear: item.academicYear || item.info?.ay,
+      });
+
+      if (type === "hod") {
+        setHodList(prev => prev.filter(entry => entry.id !== item.id));
+        if (reviewingHod?.id === item.id) setReviewingHod(null);
+      } else {
+        setFacultyList(prev => prev.filter(entry => entry.id !== item.id));
+        if (reviewingFaculty?.id === item.id) setReviewingFaculty(null);
+      }
+
+      alert("Submission deleted. The user can now edit and submit the appraisal again.");
+    } catch (err) {
+      console.error("Could not delete appraisal submission:", err);
+      alert(`Unable to delete appraisal submission.\n\n${err.message}`);
+    }
+  };
+
   const filtered = activeMainTab === "hodApprovals"
     ? (filterStatus === "All" ? hodList : (filterStatus === "Pending Review" ? hodList.filter(h => h.status === "Pending Review") : hodList.filter(h => h.status === "Reviewed")))
     : (filterStatus === "All" ? facultyList : (filterStatus === "Pending Review" ? facultyList.filter(f => f.status === "Pending Review") : facultyList.filter(f => f.status === "Reviewed")));
@@ -2606,6 +2632,10 @@ export default function DirectorDashboard() {
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 12 }}>
                       <div style={{ fontSize: 10, color: "#94a3b8" }}>Submitted: {item.submittedOn}</div>
+                      <button onClick={() => handleDeleteSubmission(activeMainTab === "facultyApprovals" ? "faculty" : "hod", item)}
+                        style={{ fontSize: 11, padding: "7px 14px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif", marginRight: 8 }}>
+                        Delete
+                      </button>
                       <button onClick={() => activeMainTab === "facultyApprovals" ? setReviewingFaculty(item) : setReviewingHod(item)}
                         style={{ fontSize: 11, padding: "7px 18px", background: item.status === "Reviewed" ? "#1e293b" : "#312e81", color: "#f1f5f9", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
                         {item.status === "Reviewed" ? "✎ Edit Review" : "🔍 Review Form →"}
@@ -2631,14 +2661,14 @@ export default function DirectorDashboard() {
           <ReviewPanel
             faculty={reviewingFaculty}
             onBack={() => setReviewingFaculty(null)}
-            onSubmit={(id, total, remarks) => handleSubmitReview("faculty", id, total, remarks)}
+            onSubmit={(id, total, remarks, sectionScores) => handleSubmitReview("faculty", id, total, remarks, sectionScores)}
           />
         )}
         {activeMainTab === "hodApprovals" && reviewingHod && (
           <ReviewPanel
             faculty={reviewingHod}
             onBack={() => setReviewingHod(null)}
-            onSubmit={(id, total, remarks) => handleSubmitReview("hod", id, total, remarks)}
+            onSubmit={(id, total, remarks, sectionScores) => handleSubmitReview("hod", id, total, remarks, sectionScores)}
           />
         )}
       </main>
