@@ -49,6 +49,9 @@ export const CREDENTIALS = {
   dean:    { name: "Prof. Suresh Patil", password: "dean1", role: "dean",      school: schoolLabel("SoCSEA"), department: "Engineering" },
   director:{ name: "Dr. Mehta", password: "dir1", role: "director",  school: schoolLabel("SoEMR"), department: "" },
   vc:      { name: "Prof. Anil Deshmukh", password: "vc1", role: "vc",        school: "University", department: "Management" },
+  registrar: { name: "Dr. Test Registrar", password: "reg1", role: "registrar", school: "", department: "Office of the Registrar" },
+  reportingofficer: { name: "Mr. Test Reporting Officer", password: "ro1", role: "reporting_officer", school: "", department: "Administration" },
+  staff: { name: "Ms. Test Staff", password: "staff1", role: "non_teaching_staff", school: "", department: "Administration" },
 };
 
 export const FACULTY_LIST = [

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { fetchNonTeachingQueueForRole, expectedPendingStatus, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
 import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
 import { VC_USER } from "../data/mockData";
 import { DEAN_TRACKS, UNIVERSITY_SCHOOLS } from "../constants/universityHierarchy";
@@ -9,6 +10,7 @@ import { getSchoolKey, reviewedStatusFor, profileFromLocalStorage } from "../uti
 import { openFullFormReport } from "../utils/fullFormReport";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
+import { NonTeachingAuthorityReviewPanel } from "./NonTeachingStaffDashboard";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -874,6 +876,89 @@ function SchoolPanel({ school, deanList, dirList, hodList, facList, onReview }) 
 
 // ─── University Structure ─────────────────────────────────────────────────────
 // ─── Main VC Dashboard ────────────────────────────────────────────────────────
+function NonTeachingCard({ item, onReview }) {
+  const reviewed = isNonTeachingReviewComplete(item);
+  return (
+    <div style={{ background: "#fff", borderRadius: 10, padding: "15px 16px", boxShadow: "0 1px 5px rgba(0,0,0,.06)", borderLeft: "3px solid #1d4ed8", display: "flex", flexDirection: "column", gap: 11 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <Avatar initials={item.avatar} color={item.avatarColor || "#1d4ed8"} size={40} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>{item.name}</div>
+          <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>{item.roleLabel} - {item.designation}</div>
+          <div style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace", marginTop: 1 }}>{item.employeeId}</div>
+        </div>
+        <StatusBadge status={item.status} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, background: "#f8fafc", borderRadius: 7, padding: "10px 12px" }}>
+        {[
+          ["Self", item.selfTotal, "#1d4ed8"],
+          ["RO", item.roTotal, "#0891b2"],
+          ["Registrar", item.registrarTotal, "#155e75"],
+          ["VC", item.vcTotal, "#6d28d9"],
+        ].map(([label, value, color]) => (
+          <div key={label}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>{label}</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color }}>{n(value).toFixed(1)}<span style={{ fontSize: 9, color: "#94a3b8" }}> / 130</span></div>
+            <ScoreBar score={value} max={130} color={color} />
+          </div>
+        ))}
+      </div>
+
+      {(item.form?.roRemarks || item.form?.registrarRemarks) && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {item.form?.roRemarks && (
+            <div style={{ background: "#eff6ff", borderLeft: "2px solid #1d4ed8", borderRadius: 5, padding: "5px 8px", color: "#1e40af", fontSize: 10 }}>
+              <strong>RO: </strong>{item.form.roRemarks.slice(0, 70)}{item.form.roRemarks.length > 70 ? "..." : ""}
+            </div>
+          )}
+          {item.form?.registrarRemarks && (
+            <div style={{ background: "#ecfeff", borderLeft: "2px solid #155e75", borderRadius: 5, padding: "5px 8px", color: "#155e75", fontSize: 10 }}>
+              <strong>Registrar: </strong>{item.form.registrarRemarks.slice(0, 70)}{item.form.registrarRemarks.length > 70 ? "..." : ""}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
+        <div style={{ fontSize: 9, color: "#94a3b8" }}>Submitted: {item.submittedOn || "-"}</div>
+        <button type="button" onClick={() => onReview(item)} style={{ fontSize: 11, padding: "6px 14px", background: reviewed ? "#1e293b" : "#1d4ed8", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>
+          {reviewed ? "View Review" : "Review"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NonTeachingPanel({ items, onReview }) {
+  const pending = items.filter((item) => item.status === expectedPendingStatus("vc")).length;
+  const reviewed = items.filter(isNonTeachingReviewComplete).length;
+
+  return (
+    <div>
+      <div style={{ background: "#fff", borderRadius: 10, padding: "16px 20px", marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,.06)", borderTop: "4px solid #1d4ed8", display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center", color: "#1d4ed8", fontWeight: 900 }}>NT</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 900, fontSize: 16, color: "#0f172a" }}>Non-Teaching Staff Reviews</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Registrar - Reporting Officer - Staff branch</div>
+        </div>
+        {pending > 0 && <div style={{ background: "#fef3c7", color: "#92400e", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800 }}>{pending} Pending</div>}
+        {reviewed > 0 && <div style={{ background: "#fdf4ff", color: "#6b21a8", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800 }}>{reviewed} VC Reviewed</div>}
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8", background: "#fff", borderRadius: 10 }}>
+          <div style={{ fontWeight: 700 }}>No non-teaching submissions pending VC review</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+          {items.map((item) => <NonTeachingCard key={item.id} item={item} onReview={onReview} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const SCHOOL_META = {
   SoCSEA: { color: "#6366f1", icon: "CS" },
   SoBB:   { color: "#10b981", icon: "BB" },
@@ -881,8 +966,9 @@ const SCHOOL_META = {
   SoEMR:  { color: "#f59e0b", icon: "EM" },
   SoC:    { color: "#14b8a6", icon: "CM" },
   SoMCS:  { color: "#8b5cf6", icon: "MC" },
-  SoD:    { color: "#ec4899", icon: "DS" },
+  CioD:   { color: "#ec4899", icon: "DS" },
   SoAA:   { color: "#f97316", icon: "AA" },
+  CISR:   { color: "#0f766e", icon: "CI" },
 };
 
 const toVcSchool = (school) => {
@@ -904,6 +990,9 @@ const HIERARCHY_SCHOOLS = {
     .map(toVcSchool),
   "non-engg": UNIVERSITY_SCHOOLS
     .filter((school) => school.deanTrack === DEAN_TRACKS.NON_ENGINEERING)
+    .map(toVcSchool),
+  cisr: UNIVERSITY_SCHOOLS
+    .filter((school) => school.deanTrack === DEAN_TRACKS.DIRECT_VC)
     .map(toVcSchool),
 };
 
@@ -927,6 +1016,7 @@ export default function VCDashboard() {
   const [dirList, setDirList] = useState([]);
   const [hodList, setHodList] = useState([]);
   const [facList, setFacList] = useState([]);
+  const [nonTeachingList, setNonTeachingList] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -936,16 +1026,24 @@ export default function VCDashboard() {
           reviewerRole: "vc",
           reviewerProfile: { ...profileFromLocalStorage(), appraisal_role: "vc" },
         });
+        let nonTeachingItems = [];
+        try {
+          nonTeachingItems = await fetchNonTeachingQueueForRole({ reviewerRole: "vc" });
+        } catch (nonTeachingErr) {
+          console.warn("Could not load VC non-teaching review queue:", nonTeachingErr.message);
+        }
         if (!active) return;
         const routedItems = items.map(withVcSchoolId);
         setFacList(routedItems.filter(item => item.appraisalRole === "faculty"));
         setHodList(routedItems.filter(item => item.appraisalRole === "hod"));
         setDirList(routedItems.filter(item => item.appraisalRole === "director"));
         setDeanList(routedItems.filter(item => item.appraisalRole === "dean"));
+        setNonTeachingList(nonTeachingItems);
       } catch (err) {
         console.error("Could not load VC review queue:", err);
         if (!active) return;
         setFacList([]); setHodList([]); setDirList([]); setDeanList([]);
+        setNonTeachingList([]);
       }
     };
     loadReviewQueue();
@@ -986,10 +1084,14 @@ export default function VCDashboard() {
     }
   };
 
-  const currentSchools = HIERARCHY_SCHOOLS[deanTypeFilter];
-  const activeSchool = currentSchools.find(s => s.id === activeSchoolId) || currentSchools[0];
+  const currentSchools = HIERARCHY_SCHOOLS[deanTypeFilter] || [];
+  const activeSchool = currentSchools.find(s => s.id === activeSchoolId) || currentSchools[0] || null;
 
-  const switchDeanType = (type) => { setDeanTypeFilter(type); setActiveSchoolId(HIERARCHY_SCHOOLS[type][0].id); setReviewing(null); };
+  const switchDeanType = (type) => {
+    setDeanTypeFilter(type);
+    setActiveSchoolId(HIERARCHY_SCHOOLS[type]?.[0]?.id || "");
+    setReviewing(null);
+  };
   const switchSchool = (schoolId) => { setActiveSchoolId(schoolId); setReviewing(null); };
 
   const getSchoolPending = (school) => {
@@ -1002,8 +1104,11 @@ export default function VCDashboard() {
     return all.filter(p => !isVcReviewed(p)).length;
   };
 
-  const totalPending  = [...deanList, ...dirList, ...hodList, ...facList].filter(p => !isVcReviewed(p)).length;
-  const totalReviewed = [...deanList, ...dirList, ...hodList, ...facList].filter(isVcReviewed).length;
+  const teachingItems = [...deanList, ...dirList, ...hodList, ...facList];
+  const totalPending = teachingItems.filter(p => !isVcReviewed(p)).length +
+    nonTeachingList.filter(item => !isNonTeachingReviewComplete(item)).length;
+  const totalReviewed = teachingItems.filter(isVcReviewed).length +
+    nonTeachingList.filter(isNonTeachingReviewComplete).length;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "Georgia, serif", background: "#f0ede8", color: "#1e293b" }}>
@@ -1058,7 +1163,9 @@ export default function VCDashboard() {
         <div style={{ background: "#1e293b", borderRadius: 8, padding: "10px 12px" }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>University Overview</div>
           <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 3 }}>🔧 4 Engineering Schools</div>
-          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>🎓 4 Non-Engineering Schools</div>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 3 }}>🎓 4 Non-Engineering Schools</div>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 3 }}>CISR Center</div>
+          <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>Non-Teaching Branch</div>
           <div style={{ display: "flex", gap: 6 }}>
             <div style={{ flex: 1, background: "#fef3c7", borderRadius: 5, padding: "4px 6px", textAlign: "center" }}>
               <div style={{ fontSize: 14, fontWeight: 800, color: "#92400e" }}>{totalPending}</div>
@@ -1105,7 +1212,7 @@ export default function VCDashboard() {
                 <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{APP_INFO.SHORT_NAME} · AY {VC_USER.ay}</p>
               </div>
               <div style={{ fontSize: 11, color: "#64748b", background: "#fff", padding: "8px 14px", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
-                {deanList.length + dirList.length + hodList.length + facList.length} total submissions
+                {deanList.length + dirList.length + hodList.length + facList.length + nonTeachingList.length} total submissions
               </div>
             </div>
 
@@ -1114,8 +1221,12 @@ export default function VCDashboard() {
               {[
                 { key: "engg",     label: "🔧 Engineering Schools",     color: "#1e40af", bg: "#dbeafe" },
                 { key: "non-engg", label: "🎓 Non-Engineering Schools", color: "#6b21a8", bg: "#f3e8ff" },
+                { key: "cisr", label: "CISR", color: "#0f766e", bg: "#ccfbf1" },
+                { key: "non-teaching", label: "Non-Teaching Staff", color: "#1d4ed8", bg: "#dbeafe" },
               ].map(({ key, label, color, bg }) => {
-                const schoolPending = HIERARCHY_SCHOOLS[key].reduce((a, s) => a + getSchoolPending(s), 0);
+                const schoolPending = key === "non-teaching"
+                  ? nonTeachingList.filter(item => !isNonTeachingReviewComplete(item)).length
+                  : (HIERARCHY_SCHOOLS[key] || []).reduce((a, s) => a + getSchoolPending(s), 0);
                 const isActive = deanTypeFilter === key;
                 return (
                   <button key={key} onClick={() => switchDeanType(key)}
@@ -1130,6 +1241,7 @@ export default function VCDashboard() {
             </div>
 
             {/* School Tabs */}
+            {activeSchool && (
             <div style={{ display: "flex", gap: 0, background: "#fff", borderRadius: 10, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.07)", borderBottom: `3px solid ${activeSchool.color}` }}>
               {currentSchools.map((school, idx) => {
                 const pending = getSchoolPending(school);
@@ -1147,20 +1259,39 @@ export default function VCDashboard() {
                 );
               })}
             </div>
+            )}
 
-            <SchoolPanel
-              school={activeSchool}
-              deanList={deanList}
-              dirList={dirList}
-              hodList={hodList}
-              facList={facList}
-              onReview={(person, personMode) => setReviewing({ person, personMode })}
-            />
+            {deanTypeFilter === "non-teaching" ? (
+              <NonTeachingPanel
+                items={nonTeachingList}
+                onReview={(person) => setReviewing({ person, personMode: "non_teaching" })}
+              />
+            ) : activeSchool ? (
+              <SchoolPanel
+                school={activeSchool}
+                deanList={deanList}
+                dirList={dirList}
+                hodList={hodList}
+                facList={facList}
+                onReview={(person, personMode) => setReviewing({ person, personMode })}
+              />
+            ) : null}
           </>
         )}
 
         {reviewing && (
-          formTypeForSchool(getSchoolKey(reviewing.person?.school)) === FORM_TYPES.MEDIA_COMM ? (
+          reviewing.personMode === "non_teaching" ? (
+            <NonTeachingAuthorityReviewPanel
+              item={reviewing.person}
+              reviewerRole="vc"
+              onBack={() => setReviewing(null)}
+              readOnly={isNonTeachingReviewComplete(reviewing.person)}
+              onSubmitted={(updated) => {
+                setNonTeachingList((current) => current.map((item) => item.id === updated.id ? updated : item));
+                setReviewing(null);
+              }}
+            />
+          ) : formTypeForSchool(getSchoolKey(reviewing.person?.school)) === FORM_TYPES.MEDIA_COMM ? (
             <MediaCommAuthorityReviewPanel
               person={reviewing.person}
               reviewerRole="vc"

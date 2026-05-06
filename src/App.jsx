@@ -68,6 +68,33 @@ const MOCK_USERS = {
     role: "vc",
     avatar: "AD",
   },
+  registrar: {
+    employeeId: "EMP-2025-050",
+    name: "Dr. Test Registrar",
+    designation: "Registrar",
+    department: "Office of the Registrar",
+    school: "",
+    role: "registrar",
+    avatar: "TR",
+  },
+  reporting_officer: {
+    employeeId: "EMP-2025-060",
+    name: "Mr. Test Reporting Officer",
+    designation: "Reporting Officer",
+    department: "Administration",
+    school: "",
+    role: "reporting_officer",
+    avatar: "RO",
+  },
+  non_teaching_staff: {
+    employeeId: "EMP-2025-070",
+    name: "Ms. Test Staff",
+    designation: "Office Assistant",
+    department: "Administration",
+    school: "",
+    role: "non_teaching_staff",
+    avatar: "TS",
+  },
 };
 
 // ─── Profile Loader ───────────────────────────────────────────────────────────

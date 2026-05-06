@@ -11,8 +11,9 @@ import {
   isValidSchool,
   isValidSoemrDepartment,
 } from "../constants/universityHierarchy";
+import { isNonTeachingRole } from "../constants/nonTeachingHierarchy";
 import { supabase } from "../services/supabase";
-import { buildProfilePayload, storeUserSession } from "../auth/session";
+import { buildProfilePayload, normalizeRole, storeUserSession } from "../auth/session";
 
 const BASE_ROLE_OPTIONS = [
   { value: "faculty", label: "Faculty" },
@@ -21,11 +22,32 @@ const BASE_ROLE_OPTIONS = [
   { value: "dean", label: "Dean" },
   { value: "director", label: "Director" },
   { value: "vc", label: "Vice Chancellor" },
+  { value: "registrar", label: "Registrar" },
+  { value: "reporting_officer", label: "Reporting Officer" },
+  { value: "non_teaching_staff", label: "Non-Teaching Staff" },
 ];
+
+const STAFF_TYPE_OPTIONS = [
+  { value: "teaching", label: "Teaching" },
+  { value: "non_teaching", label: "Non-Teaching" },
+];
+
+const DEFAULT_DESIGNATION_BY_ROLE = {
+  faculty: "Assistant Professor",
+  hod: "HOD",
+  center_head: "Center Head",
+  dean: "Dean",
+  director: "Director",
+  vc: "Vice Chancellor",
+  registrar: "Registrar",
+  reporting_officer: "Reporting Officer",
+  non_teaching_staff: "",
+};
 
 export default function Signup() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
+    staffType: "teaching",
     name: "",
     email: "",
     password: "",
@@ -41,10 +63,19 @@ export default function Signup() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const selectedSchool = canonicalSchoolValue(formData.school);
-  const needsDepartment = isSoemrSchool(selectedSchool);
+  const selectedRole = normalizeRole(formData.role, "");
+  const isNonTeachingType = formData.staffType === "non_teaching";
+  const isTeachingType = formData.staffType === "teaching";
+  const requiresSchool = isTeachingType && selectedRole !== "vc";
+  const schoolNeedsDepartment = isSoemrSchool(selectedSchool);
   const isCisr = isCisrSchool(selectedSchool);
+  const needsDepartment = isTeachingType && schoolNeedsDepartment;
   const roleOptions = BASE_ROLE_OPTIONS.filter((role) => {
-    if (role.value === "hod") return needsDepartment;
+    const roleIsNonTeaching = isNonTeachingRole(role.value);
+
+    if (isNonTeachingType) return roleIsNonTeaching;
+    if (roleIsNonTeaching) return false;
+    if (role.value === "hod") return schoolNeedsDepartment;
     if (role.value === "center_head") return isCisr;
     if (isCisr && (role.value === "director" || role.value === "dean")) return false;
     return true;
@@ -53,12 +84,31 @@ export default function Signup() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => {
+      if (name === "staffType") {
+        return {
+          ...prev,
+          staffType: value,
+          role: "",
+          school: "",
+          department: "",
+          designation: value === "teaching" ? "Assistant Professor" : "",
+        };
+      }
+
       if (name === "school") {
         return {
           ...prev,
           school: value,
           role: "",
           department: "",
+        };
+      }
+
+      if (name === "role") {
+        return {
+          ...prev,
+          role: value,
+          designation: DEFAULT_DESIGNATION_BY_ROLE[value] ?? prev.designation,
         };
       }
 
@@ -70,14 +120,38 @@ export default function Signup() {
     e.preventDefault();
     const school = canonicalSchoolValue(formData.school);
     const department = canonicalDepartmentValue(formData.department);
+    const role = normalizeRole(formData.role, "");
+    const nonTeaching = formData.staffType === "non_teaching";
+    const roleIsNonTeaching = isNonTeachingRole(role);
+    const schoolRequired = formData.staffType === "teaching" && role !== "vc";
 
-    if (!formData.name || !formData.email || !formData.password || !formData.employeeId || !school || !formData.role) {
-      setError("Please fill in all required fields (School, Role, Name, Email, Password, Employee ID).");
+    if (!formData.staffType) {
+      setError("Please select Teaching or Non-Teaching.");
       return;
     }
 
-    if (!isValidSchool(formData.school)) {
+    if (!formData.name || !formData.email || !formData.password || !formData.employeeId || !formData.role || (schoolRequired && !school)) {
+      setError("Please fill in all required fields (Staff Type, School, Role, Name, Email, Password, Employee ID).");
+      return;
+    }
+
+    if (formData.staffType === "teaching" && roleIsNonTeaching) {
+      setError("Please select a teaching role for Teaching staff type.");
+      return;
+    }
+
+    if (formData.staffType === "non_teaching" && !roleIsNonTeaching) {
+      setError("Please select a non-teaching role for Non-Teaching staff type.");
+      return;
+    }
+
+    if (schoolRequired && !isValidSchool(school)) {
       setError("Please select one of the approved schools or centers from the dropdown.");
+      return;
+    }
+
+    if (nonTeaching && !String(formData.department || "").trim()) {
+      setError("Please enter the department/office for non-teaching staff.");
       return;
     }
 
@@ -107,8 +181,13 @@ export default function Signup() {
     try {
       const cleanFormData = {
         ...formData,
-        school,
-        department: isSoemrSchool(school) ? department : "",
+        role,
+        school: nonTeaching ? "" : school,
+        department: nonTeaching
+          ? String(formData.department || "").trim()
+          : isSoemrSchool(school)
+            ? department
+            : "",
       };
 
       const { data, error: authError } = await supabase.auth.signUp({
@@ -218,14 +297,25 @@ export default function Signup() {
 
             <form onSubmit={handleSignup} style={s.formGrid}>
               <div style={{ ...s.inputGroup, gridColumn: "1 / -1" }}>
-                <label style={s.label}>School *</label>
-                <select className="dyp-input" name="school" value={formData.school} onChange={handleChange} required>
-                  <option value="">Select school</option>
-                  {SCHOOL_OPTIONS.map((school) => (
-                    <option key={school.value} value={school.value}>{school.label}</option>
+                <label style={s.label}>Staff Type *</label>
+                <select className="dyp-input" name="staffType" value={formData.staffType} onChange={handleChange} required>
+                  {STAFF_TYPE_OPTIONS.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
                   ))}
                 </select>
               </div>
+
+              {isTeachingType && (
+                <div style={{ ...s.inputGroup, gridColumn: "1 / -1" }}>
+                  <label style={s.label}>School {requiresSchool ? "*" : "(Optional for VC)"}</label>
+                  <select className="dyp-input" name="school" value={formData.school} onChange={handleChange} required={requiresSchool}>
+                    <option value="">Select school</option>
+                    {SCHOOL_OPTIONS.map((school) => (
+                      <option key={school.value} value={school.value}>{school.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={s.inputGroup}>
                 <label style={s.label}>Role *</label>
@@ -249,6 +339,13 @@ export default function Signup() {
                 </div>
               )}
 
+              {isNonTeachingType && (
+                <div style={s.inputGroup}>
+                  <label style={s.label}>Department / Office *</label>
+                  <input className="dyp-input" type="text" name="department" placeholder="e.g. Administration" value={formData.department} onChange={handleChange} required />
+                </div>
+              )}
+
               <div style={s.inputGroup}>
                 <label style={s.label}>Full Name *</label>
                 <input className="dyp-input" type="text" name="name" value={formData.name} onChange={handleChange} required />
@@ -268,7 +365,14 @@ export default function Signup() {
 
               <div style={s.inputGroup}>
                 <label style={s.label}>Designation</label>
-                <input className="dyp-input" type="text" name="designation" placeholder="e.g. Assistant Professor" value={formData.designation} onChange={handleChange} />
+                <input
+                  className="dyp-input"
+                  type="text"
+                  name="designation"
+                  placeholder={isNonTeachingType ? "e.g. Registrar, Reporting Officer" : "e.g. Assistant Professor"}
+                  value={formData.designation}
+                  onChange={handleChange}
+                />
               </div>
 
               <div style={s.inputGroup}>
@@ -277,7 +381,7 @@ export default function Signup() {
               </div>
 
               <div style={s.inputGroup}>
-                <label style={s.label}>Experience (Years)</label>
+                <label style={s.label}>{isNonTeachingType ? "Experience (Years)" : "Teaching Experience (Years)"}</label>
                 <input className="dyp-input" type="text" name="experience" placeholder="e.g. 10 Years" value={formData.experience} onChange={handleChange} />
               </div>
 

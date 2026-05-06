@@ -3,6 +3,9 @@ import Dashboard from "./Dashboard"; // Faculty
 import HODDashboard from "./HODDashboard";
 import CISRFacultyDashboard from "./CISRFacultyDashboard";
 import CISRCenterHeadDashboard from "./CISRCenterHeadDashboard";
+import NonTeachingStaffDashboard from "./NonTeachingStaffDashboard";
+import ReportingOfficerDashboard from "./ReportingOfficerDashboard";
+import RegistrarDashboard from "./RegistrarDashboard";
 import DeanDashboard from "./DeanDashboard";
 import NonEngineeringDeanDashboard from "./NonEngineeringDeanDashboard";
 import DirectorDashboard from "./DirectorDashboard";
@@ -73,6 +76,15 @@ export default function RoleDashboard() {
       
     case "vc":
       return <VCDashboard />;
+
+    case "registrar":
+      return <RegistrarDashboard />;
+
+    case "reporting_officer":
+      return <ReportingOfficerDashboard />;
+
+    case "non_teaching_staff":
+      return <NonTeachingStaffDashboard />;
       
     default:
       return <Navigate to="/login" />;

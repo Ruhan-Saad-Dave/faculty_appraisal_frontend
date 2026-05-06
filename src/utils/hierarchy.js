@@ -5,6 +5,7 @@ import {
   getSchoolKey as getConfiguredSchoolKey,
   normalizeHierarchyText,
 } from "../constants/universityHierarchy.js";
+import { isNonTeachingRole, normalizeNonTeachingRole } from "../constants/nonTeachingHierarchy.js";
 
 const ENGINEERING = DEAN_TRACKS.ENGINEERING;
 const NON_ENGINEERING = DEAN_TRACKS.NON_ENGINEERING;
@@ -29,6 +30,8 @@ const normalizeText = normalizeHierarchyText;
 export const normalizeRoleForWorkflow = (role) => {
   const value = normalizeText(role);
   if (value === "vice chancellor" || value === "vice chancelor" || value === "vc") return "vc";
+  const nonTeachingRole = normalizeNonTeachingRole(value, "");
+  if (nonTeachingRole) return nonTeachingRole;
   if (value === "center head" || value === "centre head" || value.includes("cisr center head") || value.includes("cisr centre head")) return "center_head";
   if (value.includes("dean")) return "dean";
   if (value.includes("director")) return "director";
@@ -66,6 +69,9 @@ export const getReviewChain = (profile = {}) => {
   const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
 
   if (role === "vc") return [];
+  if (role === "registrar") return ["vc"];
+  if (role === "reporting_officer") return ["registrar", "vc"];
+  if (role === "non_teaching_staff") return ["reporting_officer", "registrar", "vc"];
   if (role === "center_head") return ["vc"];
   if (role === "dean") return ["vc"];
   if (role === "director") return ["dean", "vc"];
@@ -88,8 +94,11 @@ export const roleLabel = (role) => ({
   hod: "HOD",
   director: "Director",
   center_head: "Center Head",
+  reporting_officer: "Reporting Officer",
+  registrar: "Registrar",
   dean: "Dean",
   vc: "VC",
+  non_teaching_staff: "Non-Teaching Staff",
   faculty: "Faculty",
 }[role] || role);
 
@@ -103,6 +112,10 @@ export const reviewStatusForDecision = (role, decision = "approved") =>
 export const workflowValidationError = (profile = {}) => {
   const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
   const schoolKey = getSchoolKey(profile.school);
+
+  if (isNonTeachingRole(role)) {
+    return "";
+  }
 
   if (role !== "vc" && !schoolKey) {
     return "Please select one of the approved schools or centers before submitting.";
@@ -128,6 +141,18 @@ export const canAuthorityReviewProfile = (reviewerProfile = {}, subjectProfile =
   const subjectRole = normalizeRoleForWorkflow(subjectProfile.appraisal_role || subjectProfile.role);
 
   if (reviewerRole === "vc") return subjectRole !== "vc";
+
+  if (reviewerRole === "registrar") {
+    return subjectRole === "non_teaching_staff" || subjectRole === "reporting_officer";
+  }
+
+  if (reviewerRole === "reporting_officer") {
+    return subjectRole === "non_teaching_staff";
+  }
+
+  if (isNonTeachingRole(reviewerRole) || isNonTeachingRole(subjectRole)) {
+    return false;
+  }
 
   if (reviewerRole === "dean") {
     const track = getDeanTrack(subjectProfile);

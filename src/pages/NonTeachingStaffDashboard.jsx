@@ -1,0 +1,1090 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { APP_INFO } from "../constants/formConfig";
+import { normalizeNonTeachingRole } from "../constants/nonTeachingHierarchy";
+import { uploadToCloudinary } from "../services/cloudinary";
+import {
+  NON_TEACHING_MAX,
+  NON_TEACHING_STATUS,
+  RATING_SCALE,
+  RATING_SECTIONS,
+  SELF_ITEMS,
+  calculateNonTeachingTotals,
+  emptyNonTeachingForm,
+  expectedPendingStatus,
+  fetchNonTeachingQueueForRole,
+  loadNonTeachingAppraisal,
+  nonTeachingRoleLabel,
+  openNonTeachingReport,
+  primeFormForReviewer,
+  submitNonTeachingReview,
+  submitNonTeachingSelfAppraisal,
+  validateNonTeachingForm,
+} from "../services/nonTeachingWorkflow";
+import { profileFromLocalStorage } from "../utils/hierarchy";
+
+const ACCENT = "#1d4ed8";
+const REG_ACCENT = "#155e75";
+const VC_ACCENT = "#6d28d9";
+
+const n = (value) => parseFloat(value) || 0;
+const pct = (value, max) => Math.min(100, Math.round((n(value) / max) * 100)) || 0;
+
+const T = { width: "100%", borderCollapse: "collapse", fontSize: 12 };
+const TH = { border: "1px solid #cbd5e1", padding: "7px 8px", background: "#0f172a", color: "#e2e8f0", fontWeight: 700, textAlign: "center", fontSize: 10 };
+const TD = { border: "1px solid #e2e8f0", padding: "7px 8px", verticalAlign: "top" };
+const TDC = { ...TD, textAlign: "center", verticalAlign: "middle" };
+
+const roleAccent = (role) => {
+  const normalized = normalizeNonTeachingRole(role, role);
+  if (normalized === "registrar") return REG_ACCENT;
+  if (normalized === "vc") return VC_ACCENT;
+  return ACCENT;
+};
+
+const initials = (name = "User") =>
+  String(name || "User")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+function Avatar({ name, color = ACCENT, size = 38 }) {
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: `linear-gradient(135deg,${color},${color}99)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.34, flexShrink: 0 }}>
+      {initials(name)}
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    [NON_TEACHING_STATUS.DRAFT]: { bg: "#f1f5f9", color: "#475569", dot: "#94a3b8" },
+    [NON_TEACHING_STATUS.SUBMITTED]: { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
+    [NON_TEACHING_STATUS.RO_REVIEWED]: { bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" },
+    [NON_TEACHING_STATUS.REGISTRAR_REVIEWED]: { bg: "#cffafe", color: "#155e75", dot: "#06b6d4" },
+    [NON_TEACHING_STATUS.VC_APPROVED]: { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
+  };
+  const current = map[status] || map[NON_TEACHING_STATUS.DRAFT];
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: current.bg, color: current.color, fontSize: 10, fontWeight: 800, padding: "4px 9px", borderRadius: 20 }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: current.dot }} />
+      {status || NON_TEACHING_STATUS.DRAFT}
+    </span>
+  );
+}
+
+function ScoreBar({ score, max, color = ACCENT }) {
+  return (
+    <div style={{ height: 5, borderRadius: 5, background: "#e2e8f0", overflow: "hidden" }}>
+      <div style={{ width: `${pct(score, max)}%`, height: "100%", background: color }} />
+    </div>
+  );
+}
+
+function SectionCard({ title, subtitle, accent = ACCENT, children }) {
+  return (
+    <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`, borderRadius: 9, boxShadow: "0 1px 3px rgba(15,23,42,0.06)", marginBottom: 14, overflow: "hidden" }}>
+      <div style={{ padding: "10px 15px", borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontWeight: 800, fontSize: 13, color: accent }}>{title}</div>
+        {subtitle && <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
+      </div>
+      <div style={{ padding: "14px 15px" }}>{children}</div>
+    </section>
+  );
+}
+
+function TextInput({ value, onChange, readOnly = false, placeholder = "", type = "text" }) {
+  return (
+    <input
+      type={type}
+      value={value ?? ""}
+      onChange={(event) => onChange(event.target.value)}
+      readOnly={readOnly}
+      placeholder={placeholder}
+      style={{ width: "100%", boxSizing: "border-box", height: 34, border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 9px", fontSize: 12, fontFamily: "Georgia, serif", outline: "none", background: readOnly ? "#f8fafc" : "#fff", color: "#0f172a" }}
+    />
+  );
+}
+
+function TextArea({ value, onChange, readOnly = false, placeholder = "", rows = 3 }) {
+  return (
+    <textarea
+      value={value ?? ""}
+      onChange={(event) => onChange(event.target.value)}
+      readOnly={readOnly}
+      placeholder={placeholder}
+      rows={rows}
+      style={{ width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 6, padding: "8px 10px", fontSize: 12, fontFamily: "Georgia, serif", resize: "vertical", outline: "none", background: readOnly ? "#f8fafc" : "#fff", color: "#0f172a" }}
+    />
+  );
+}
+
+function MarksInput({ value, onChange, max, readOnly = false, accent = ACCENT }) {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <input
+        type="number"
+        min="0"
+        max={max}
+        step="0.5"
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={readOnly}
+        style={{ width: 62, textAlign: "center", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "5px 6px", fontSize: 12, fontFamily: "Georgia, serif", outline: "none", background: readOnly ? "#f8fafc" : "#eff6ff" }}
+      />
+      <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>/ {max}</span>
+    </div>
+  );
+}
+
+function RatingPicker({ value, onChange, readOnly = false }) {
+  return (
+    <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
+      {RATING_SCALE.map((rating) => {
+        const active = n(value) === rating.value;
+        return (
+          <button
+            key={rating.value}
+            type="button"
+            title={`${rating.label} (${rating.value})`}
+            disabled={readOnly}
+            onClick={() => onChange(rating.value)}
+            style={{ width: 30, height: 30, border: active ? `1.5px solid ${rating.color}` : "1px solid #e2e8f0", borderRadius: 5, background: active ? rating.bg : "#fff", color: active ? rating.color : "#94a3b8", fontWeight: 800, cursor: readOnly ? "default" : "pointer", fontFamily: "Georgia, serif" }}
+          >
+            {rating.value}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DocCell({ id, docs, setDocs, readOnly = false }) {
+  const ref = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const files = docs?.[id] || [];
+
+  const handleFiles = async (selectedFiles) => {
+    const fileList = Array.from(selectedFiles || []);
+    if (!fileList.length) return;
+
+    setUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of fileList) {
+        uploaded.push(await uploadToCloudinary(file, { folder: `non-teaching-appraisal/${id}` }));
+      }
+      setDocs((current) => ({ ...current, [id]: [...(current[id] || []), ...uploaded] }));
+    } catch (err) {
+      console.error("Cloudinary upload error:", err);
+      alert(`Unable to upload file.\n\n${err.message}`);
+    } finally {
+      setUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
+  };
+
+  const removeFile = (index) => {
+    setDocs((current) => {
+      const nextFiles = [...(current[id] || [])];
+      nextFiles.splice(index, 1);
+      return { ...current, [id]: nextFiles };
+    });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      {files.length === 0 && readOnly && <span style={{ color: "#94a3b8", fontSize: 10 }}>No documents</span>}
+      {files.map((file, index) => (
+        <div key={`${file.url || file.name}-${index}`} style={{ display: "flex", alignItems: "center", gap: 6, background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 5, padding: "4px 7px" }}>
+          <a href={file.url} target="_blank" rel="noreferrer" style={{ minWidth: 0, flex: 1, color: ACCENT, fontSize: 10, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={file.name}>
+            {file.name || "Document"}
+          </a>
+          {!readOnly && (
+            <button type="button" onClick={() => removeFile(index)} style={{ border: "none", background: "transparent", color: "#dc2626", cursor: "pointer", fontWeight: 800, fontSize: 11 }}>x</button>
+          )}
+        </div>
+      ))}
+      {!readOnly && (
+        <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", borderRadius: 5, padding: "5px 8px", color: "#64748b", cursor: uploading ? "wait" : "pointer", fontSize: 10, fontFamily: "Georgia, serif" }}>
+          {uploading ? "Uploading..." : "Attach supporting document"}
+          <input ref={ref} type="file" multiple onChange={(event) => handleFiles(event.target.files)} style={{ display: "none" }} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function WorkflowTracker({ status, role }) {
+  const normalizedRole = normalizeNonTeachingRole(role, role);
+  const allStages = [
+    { id: "draft", label: "Draft", status: NON_TEACHING_STATUS.DRAFT },
+    { id: "submitted", label: "Submitted", status: NON_TEACHING_STATUS.SUBMITTED },
+    { id: "ro", label: "Reporting Officer", status: NON_TEACHING_STATUS.RO_REVIEWED },
+    { id: "registrar", label: "Registrar", status: NON_TEACHING_STATUS.REGISTRAR_REVIEWED },
+    { id: "vc", label: "VC", status: NON_TEACHING_STATUS.VC_APPROVED },
+  ];
+  const stageIds = normalizedRole === "registrar"
+    ? ["draft", "registrar", "vc"]
+    : normalizedRole === "reporting_officer"
+      ? ["draft", "ro", "registrar", "vc"]
+      : ["draft", "submitted", "ro", "registrar", "vc"];
+  const stages = allStages.filter((stage) => stageIds.includes(stage.id));
+  const order = [
+    NON_TEACHING_STATUS.DRAFT,
+    NON_TEACHING_STATUS.SUBMITTED,
+    NON_TEACHING_STATUS.RO_REVIEWED,
+    NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+    NON_TEACHING_STATUS.VC_APPROVED,
+  ];
+  const currentIndex = Math.max(0, order.indexOf(status));
+
+  return (
+    <SectionCard title="Approval Workflow" accent="#0f172a">
+      <div style={{ display: "flex", gap: 8 }}>
+        {stages.map((stage) => {
+          const stageIndex = order.indexOf(stage.status);
+          const done = stageIndex < currentIndex;
+          const active = stageIndex === currentIndex;
+          return (
+            <div key={stage.id} style={{ flex: 1, minHeight: 62, border: "1px solid #e2e8f0", borderRadius: 8, background: done ? "#f0fdf4" : active ? "#eff6ff" : "#f8fafc", padding: "10px 8px", textAlign: "center" }}>
+              <div style={{ margin: "0 auto 6px", width: 24, height: 24, borderRadius: "50%", background: done ? "#10b981" : active ? ACCENT : "#cbd5e1", color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>
+                {done ? "✓" : stages.indexOf(stage) + 1}
+              </div>
+              <div style={{ color: done ? "#166534" : active ? ACCENT : "#64748b", fontSize: 10, fontWeight: 800 }}>{stage.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </SectionCard>
+  );
+}
+
+function SelfAppraisalTable({ form, setForm, readOnly, accent }) {
+  const setItem = (key, field, value) => {
+    setForm((current) => ({
+      ...current,
+      [key]: { ...(current[key] || {}), [field]: value },
+    }));
+  };
+
+  const setDocs = (updater) => {
+    setForm((current) => ({
+      ...current,
+      docs: typeof updater === "function" ? updater(current.docs || {}) : updater,
+    }));
+  };
+
+  return (
+    <SectionCard title="Part A - Self Appraisal Details" subtitle={`Max ${NON_TEACHING_MAX.partA} marks. Attach proof wherever applicable.`} accent={accent}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={T}>
+          <thead>
+            <tr>
+              <th style={TH}>SN</th>
+              <th style={{ ...TH, textAlign: "left" }}>Particular</th>
+              <th style={{ ...TH, textAlign: "left" }}>Description</th>
+              <th style={TH}>Documents</th>
+              <th style={TH}>Marks Claimed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SELF_ITEMS.map((item, index) => (
+              <tr key={item.key} style={index % 2 ? { background: "#f8fafc" } : undefined}>
+                <td style={TDC}>{index + 1}</td>
+                <td style={{ ...TD, minWidth: 170, fontWeight: 700, color: "#0f172a" }}>
+                  {item.label}
+                  <div style={{ color: "#64748b", fontSize: 10, marginTop: 3, fontWeight: 500 }}>Max {item.max}</div>
+                </td>
+                <td style={{ ...TD, minWidth: 300 }}>
+                  <TextArea
+                    value={form[item.key]?.text}
+                    onChange={(value) => setItem(item.key, "text", value)}
+                    readOnly={readOnly}
+                    placeholder={`Enter ${item.label.toLowerCase()}...`}
+                    rows={3}
+                  />
+                </td>
+                <td style={{ ...TD, minWidth: 190 }}>
+                  <DocCell id={item.key} docs={form.docs || {}} setDocs={setDocs} readOnly={readOnly} />
+                </td>
+                <td style={TDC}>
+                  <MarksInput
+                    value={form[item.key]?.marks}
+                    max={item.max}
+                    accent={accent}
+                    readOnly={readOnly}
+                    onChange={(value) => setItem(item.key, "marks", value)}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
+function RatingRubric({ form, setForm, readOnly = false, accent = ACCENT }) {
+  const editable = typeof setForm === "function";
+  const setSelfRating = (sectionKey, index, value) => {
+    if (!editable || readOnly) return;
+    setForm((current) => ({
+      ...current,
+      partB: {
+        ...(current.partB || {}),
+        [sectionKey]: {
+          ...(current.partB?.[sectionKey] || {}),
+          [`p${index}_self`]: value,
+        },
+      },
+    }));
+  };
+
+  return (
+    <>
+      <SectionCard title="Rating Scale" accent="#0f172a">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {RATING_SCALE.map((rating) => (
+            <div key={rating.value} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 6, background: rating.bg, color: rating.color, border: `1px solid ${rating.color}35`, fontSize: 11, fontWeight: 800 }}>
+              <span>{rating.value}</span>
+              <span>{rating.label}</span>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      {RATING_SECTIONS.map((section) => (
+        <SectionCard
+          key={section.key}
+          title={`${section.title} (Max ${section.max})`}
+          subtitle={editable ? "Select one rating for each parameter." : undefined}
+          accent={section.accent}
+        >
+          <div style={{ overflowX: "auto" }}>
+            <table style={T}>
+              <thead>
+                <tr>
+                  <th style={TH}>SN</th>
+                  <th style={{ ...TH, textAlign: "left" }}>Parameter</th>
+                  {editable && <th style={TH}>Self Rating</th>}
+                  <th style={TH}>Reporting Officer</th>
+                  <th style={TH}>Registrar</th>
+                  <th style={TH}>VC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {section.params.map((param, index) => {
+                  const row = form.partB?.[section.key] || {};
+                  return (
+                    <tr key={param} style={index % 2 ? { background: "#f8fafc" } : undefined}>
+                      <td style={TDC}>{index + 1}</td>
+                      <td style={TD}>{param}</td>
+                      {editable && (
+                        <td style={TDC}>
+                          <RatingPicker
+                            value={row[`p${index}_self`]}
+                            readOnly={readOnly}
+                            onChange={(value) => setSelfRating(section.key, index, value)}
+                          />
+                        </td>
+                      )}
+                      <td style={TDC}>{row[`p${index}_ro`] || "-"}</td>
+                      <td style={TDC}>{row[`p${index}_reg`] || "-"}</td>
+                      <td style={TDC}>{row[`p${index}_vc`] || "-"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      ))}
+    </>
+  );
+}
+
+function SummaryPanel({ form, role, onSubmit, onReport, submitting, locked, confirmed, setConfirmed, accent }) {
+  const self = calculateNonTeachingTotals(form, "self");
+  const ro = calculateNonTeachingTotals(form, "reporting_officer");
+  const registrar = calculateNonTeachingTotals(form, "registrar");
+  const vc = calculateNonTeachingTotals(form, "vc");
+  const finalScore = vc.total || registrar.total || ro.total || self.total;
+
+  return (
+    <SectionCard title={`Summary of Total Score (Max ${NON_TEACHING_MAX.grand})`} accent="#059669">
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
+        {[
+          ["Self Claimed", self.total, ACCENT],
+          ["Reporting Officer", ro.total, "#0891b2"],
+          ["Registrar", registrar.total, REG_ACCENT],
+          ["VC Final", vc.total, VC_ACCENT],
+        ].map(([label, value, color]) => (
+          <div key={label} style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 12px", background: "#f8fafc" }}>
+            <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800, textTransform: "uppercase" }}>{label}</div>
+            <div style={{ color, fontSize: 18, fontWeight: 900, margin: "4px 0" }}>{n(value).toFixed(1)} / {NON_TEACHING_MAX.grand}</div>
+            <ScoreBar score={value} max={NON_TEACHING_MAX.grand} color={color} />
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 14, padding: "10px 12px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#1e3a8a", fontSize: 12, lineHeight: 1.6 }}>
+        Current visible score: <strong>{finalScore.toFixed(1)} / {NON_TEACHING_MAX.grand}</strong>
+      </div>
+
+      <label style={{ fontSize: 12, color: "#334155", fontWeight: 800, display: "block", marginBottom: 6 }}>Remarks</label>
+      <TextArea
+        value={form.remarks}
+        readOnly={locked}
+        rows={3}
+        placeholder="Optional remarks for the next authority..."
+        onChange={(value) => onSubmit.updateRemarks(value)}
+      />
+
+      {!locked && (
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 14, padding: "11px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 12, color: "#334155", lineHeight: 1.5 }}>
+          <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} style={{ marginTop: 3 }} />
+          <span>I have verified all the details and confirm that the information provided is correct.</span>
+        </label>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
+        <button type="button" onClick={onReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>
+          Generate Report
+        </button>
+        {!locked && (
+          <button type="button" onClick={onSubmit} disabled={!confirmed || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: confirmed ? accent : "#94a3b8", color: "#fff", cursor: confirmed && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "Georgia, serif" }}>
+            {submitting ? "Submitting..." : `Submit to ${role === "registrar" ? "VC" : role === "reporting_officer" ? "Registrar" : "Reporting Officer"}`}
+          </button>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+export function NonTeachingAppraisalForm({ role = localStorage.getItem("role"), embedded = false }) {
+  const normalizedRole = normalizeNonTeachingRole(role, "non_teaching_staff");
+  const navigate = useNavigate();
+  const [form, setForm] = useState(() => emptyNonTeachingForm(profileFromLocalStorage(), normalizedRole));
+  const [tab, setTab] = useState("info");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const accent = roleAccent(normalizedRole);
+  const locked = form.status !== NON_TEACHING_STATUS.DRAFT;
+
+  useEffect(() => {
+    let active = true;
+    const loadForm = async () => {
+      try {
+        const profile = profileFromLocalStorage();
+        const saved = await loadNonTeachingAppraisal({
+          email: profile.email,
+          academicYear: APP_INFO.DEFAULT_AY,
+          profile,
+          role: normalizedRole,
+        });
+        if (!active) return;
+        setForm(saved?.form || emptyNonTeachingForm(profile, normalizedRole));
+      } catch (err) {
+        console.error("Could not load non-teaching appraisal:", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    loadForm();
+    return () => { active = false; };
+  }, [normalizedRole]);
+
+  const updateInfo = (field, value) => {
+    setForm((current) => ({ ...current, info: { ...(current.info || {}), [field]: value } }));
+  };
+
+  const updateRemarks = (value) => {
+    setForm((current) => ({ ...current, remarks: value }));
+  };
+
+  const handleSubmit = async () => {
+    if (!confirmed) {
+      alert("Please confirm the accuracy declaration before submitting.");
+      return;
+    }
+    try {
+      validateNonTeachingForm(form, "self", true);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (!window.confirm("Submit your non-teaching appraisal? It will be locked and forwarded in the hierarchy.")) return;
+
+    setSubmitting(true);
+    try {
+      const saved = await submitNonTeachingSelfAppraisal({
+        form,
+        role: normalizedRole,
+        profile: profileFromLocalStorage(),
+      });
+      setForm(saved.form);
+      setConfirmed(false);
+      alert("Non-teaching appraisal submitted successfully.");
+    } catch (err) {
+      console.error("Could not submit non-teaching appraisal:", err);
+      alert(`Unable to submit appraisal.\n\n${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  handleSubmit.updateRemarks = updateRemarks;
+
+  const handleReport = () => {
+    openNonTeachingReport({
+      item: {
+        name: form.info?.name,
+        employeeId: form.info?.employeeId,
+        designation: form.info?.designation,
+        department: form.info?.department,
+        appraisalRole: normalizedRole,
+        status: form.status,
+        academicYear: form.info?.ay,
+      },
+      form,
+    });
+  };
+
+  const content = (
+    <main style={{ flex: 1, minWidth: 0, marginLeft: embedded ? 0 : 230, padding: embedded ? 0 : "22px 26px", overflowX: "auto" }}>
+      {loading ? (
+        <div style={{ color: "#64748b", padding: 30 }}>Loading appraisal...</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 22, color: "#0f172a" }}>Non-Teaching Staff Appraisal</h1>
+              <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12 }}>{nonTeachingRoleLabel(normalizedRole)} | AY {form.info?.ay || APP_INFO.DEFAULT_AY}</p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button type="button" onClick={() => navigate("/edit-profile")} style={S.headerButton}>Edit Profile</button>
+              <StatusBadge status={form.status} />
+            </div>
+          </div>
+
+          <WorkflowTracker status={form.status} role={normalizedRole} />
+
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+            {[
+              ["info", "General Information"],
+              ["partA", "Part A"],
+              ["partB", "Part B Rubric"],
+              ["summary", "Summary"],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => setTab(id)} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", fontFamily: "Georgia, serif", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "info" && (
+            <SectionCard title="General Information" accent={accent}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                {[
+                  ["Name", "name"],
+                  ["Employee ID", "employeeId"],
+                  ["Designation", "designation"],
+                  ["Department / Office", "department"],
+                  ["Reporting Head", "reportingHead"],
+                  ["Academic Year", "ay"],
+                ].map(([label, key]) => (
+                  <label key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <span style={{ color: "#334155", fontSize: 11, fontWeight: 800 }}>{label}</span>
+                    <TextInput value={form.info?.[key]} onChange={(value) => updateInfo(key, value)} readOnly={locked && key !== "reportingHead"} />
+                  </label>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {tab === "partA" && <SelfAppraisalTable form={form} setForm={setForm} readOnly={locked} accent={accent} />}
+          {tab === "partB" && <RatingRubric form={form} setForm={setForm} readOnly={locked} accent={accent} />}
+          {tab === "summary" && (
+            <SummaryPanel
+              form={form}
+              role={normalizedRole}
+              onSubmit={handleSubmit}
+              onReport={handleReport}
+              submitting={submitting}
+              locked={locked}
+              confirmed={confirmed}
+              setConfirmed={setConfirmed}
+              accent={accent}
+            />
+          )}
+        </>
+      )}
+    </main>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", fontFamily: "Georgia, serif", color: "#0f172a" }}>
+      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar name={localStorage.getItem("name") || "Staff"} color={accent} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 13 }}>{localStorage.getItem("name") || "Staff"}</div>
+            <div style={{ color: "#94a3b8", fontSize: 10 }}>{nonTeachingRoleLabel(normalizedRole)}</div>
+          </div>
+        </div>
+        <div style={{ background: "#1e293b", borderRadius: 8, padding: "10px 12px", fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>
+          {"Non-Teaching Staff -> Reporting Officer -> Registrar -> VC"}
+        </div>
+        <div style={S.sideActions}>
+          <button type="button" onClick={() => setShowLogoutModal(true)} style={{ ...S.sideButton, color: "#f87171" }}>Logout</button>
+        </div>
+      </aside>
+      {content}
+      {showLogoutModal && <LogoutModal onCancel={() => setShowLogoutModal(false)} onConfirm={() => { localStorage.clear(); navigate("/login", { replace: true }); }} />}
+    </div>
+  );
+}
+
+function AuthorityPartA({ form, setForm, reviewerRole, readOnly }) {
+  const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
+  const editableKey = role === "vc" ? "vcMarks" : role === "registrar" ? "regMarks" : "roMarks";
+  const accent = roleAccent(role);
+  const setMark = (key, value) => {
+    setForm((current) => ({
+      ...current,
+      [key]: { ...(current[key] || {}), [editableKey]: value },
+    }));
+  };
+
+  return (
+    <SectionCard title="Part A - Self Appraisal Review" accent={accent}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={T}>
+          <thead>
+            <tr>
+              <th style={{ ...TH, textAlign: "left" }}>Particular</th>
+              <th style={{ ...TH, textAlign: "left" }}>Staff Description</th>
+              <th style={TH}>Docs</th>
+              <th style={TH}>Self</th>
+              <th style={TH}>RO</th>
+              <th style={TH}>Registrar</th>
+              <th style={TH}>VC</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SELF_ITEMS.map((item, index) => (
+              <tr key={item.key} style={index % 2 ? { background: "#f8fafc" } : undefined}>
+                <td style={{ ...TD, minWidth: 160, fontWeight: 800 }}>{item.label}<div style={{ color: "#64748b", fontSize: 10, fontWeight: 500 }}>Max {item.max}</div></td>
+                <td style={{ ...TD, minWidth: 260 }}>{form[item.key]?.text || <span style={{ color: "#94a3b8" }}>No description</span>}</td>
+                <td style={{ ...TD, minWidth: 180 }}><DocCell id={item.key} docs={form.docs || {}} readOnly /></td>
+                <td style={TDC}>{form[item.key]?.marks || "-"}</td>
+                <td style={TDC}>
+                  {role === "reporting_officer" ? (
+                    <MarksInput value={form[item.key]?.roMarks} max={item.max} readOnly={readOnly} accent={accent} onChange={(value) => setMark(item.key, value)} />
+                  ) : form[item.key]?.roMarks || "-"}
+                </td>
+                <td style={TDC}>
+                  {role === "registrar" ? (
+                    <MarksInput value={form[item.key]?.regMarks} max={item.max} readOnly={readOnly} accent={accent} onChange={(value) => setMark(item.key, value)} />
+                  ) : form[item.key]?.regMarks || "-"}
+                </td>
+                <td style={TDC}>
+                  {role === "vc" ? (
+                    <MarksInput value={form[item.key]?.vcMarks} max={item.max} readOnly={readOnly} accent={accent} onChange={(value) => setMark(item.key, value)} />
+                  ) : form[item.key]?.vcMarks || "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </SectionCard>
+  );
+}
+
+function AuthorityPartB({ form, setForm, reviewerRole, readOnly }) {
+  const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
+  const suffix = role === "vc" ? "vc" : role === "registrar" ? "reg" : "ro";
+  const setRating = (sectionKey, index, value) => {
+    setForm((current) => ({
+      ...current,
+      partB: {
+        ...(current.partB || {}),
+        [sectionKey]: {
+          ...(current.partB?.[sectionKey] || {}),
+          [`p${index}_${suffix}`]: value,
+        },
+      },
+    }));
+  };
+
+  return (
+    <>
+      {RATING_SECTIONS.map((section) => (
+        <SectionCard key={section.key} title={`${section.title} (Max ${section.max})`} accent={section.accent}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={T}>
+              <thead>
+                <tr>
+                  <th style={TH}>SN</th>
+                  <th style={{ ...TH, textAlign: "left" }}>Parameter</th>
+                  <th style={TH}>Staff Self</th>
+                  <th style={TH}>Reporting Officer</th>
+                  <th style={TH}>Registrar</th>
+                  <th style={TH}>VC</th>
+                </tr>
+              </thead>
+              <tbody>
+                {section.params.map((param, index) => {
+                  const row = form.partB?.[section.key] || {};
+                  return (
+                    <tr key={param} style={index % 2 ? { background: "#f8fafc" } : undefined}>
+                      <td style={TDC}>{index + 1}</td>
+                      <td style={TD}>{param}</td>
+                      <td style={TDC}>{row[`p${index}_self`] || "-"}</td>
+                      <td style={TDC}>
+                        {role === "reporting_officer" ? (
+                          <RatingPicker value={row[`p${index}_ro`]} readOnly={readOnly} onChange={(value) => setRating(section.key, index, value)} />
+                        ) : row[`p${index}_ro`] || "-"}
+                      </td>
+                      <td style={TDC}>
+                        {role === "registrar" ? (
+                          <RatingPicker value={row[`p${index}_reg`]} readOnly={readOnly} onChange={(value) => setRating(section.key, index, value)} />
+                        ) : row[`p${index}_reg`] || "-"}
+                      </td>
+                      <td style={TDC}>
+                        {role === "vc" ? (
+                          <RatingPicker value={row[`p${index}_vc`]} readOnly={readOnly} onChange={(value) => setRating(section.key, index, value)} />
+                        ) : row[`p${index}_vc`] || "-"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      ))}
+    </>
+  );
+}
+
+export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, onSubmitted, readOnly = false }) {
+  const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
+  const [form, setForm] = useState(() => primeFormForReviewer(item.form, role));
+  const [tab, setTab] = useState("partA");
+  const [remarks, setRemarks] = useState(role === "vc" ? item.form?.vcRemarks : role === "registrar" ? item.form?.registrarRemarks : item.form?.roRemarks);
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const pendingStatus = expectedPendingStatus(role);
+  const locked = readOnly || item.status !== pendingStatus;
+  const accent = roleAccent(role);
+  const totals = calculateNonTeachingTotals(form, role === "vc" ? "vc" : role);
+
+  const handleSubmit = async () => {
+    if (!confirmed) {
+      alert("Please verify and confirm the accuracy declaration before submitting the review.");
+      return;
+    }
+    try {
+      validateNonTeachingForm(form, role === "vc" ? "vc" : role, true);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+    if (!window.confirm(`Submit ${nonTeachingRoleLabel(role)} review?`)) return;
+
+    setSubmitting(true);
+    try {
+      const updated = await submitNonTeachingReview({
+        item,
+        form,
+        reviewerRole: role,
+        remarks,
+      });
+      alert(`${nonTeachingRoleLabel(role)} review submitted.`);
+      onSubmitted?.(updated);
+    } catch (err) {
+      console.error("Could not submit non-teaching review:", err);
+      alert(`Unable to submit review.\n\n${err.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReport = () => {
+    openNonTeachingReport({
+      item,
+      form: {
+        ...form,
+        roRemarks: role === "reporting_officer" ? remarks : form.roRemarks,
+        registrarRemarks: role === "registrar" ? remarks : form.registrarRemarks,
+        vcRemarks: role === "vc" ? remarks : form.vcRemarks,
+      },
+    });
+  };
+
+  return (
+    <div>
+      <div style={{ background: "#0f172a", borderRadius: 10, padding: "14px 18px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
+        <button type="button" onClick={onBack} style={{ background: "#1e293b", color: "#cbd5e1", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontFamily: "Georgia, serif" }}>Back</button>
+        <Avatar name={item.name} color={item.avatarColor || accent} />
+        <div style={{ flex: 1 }}>
+          <div style={{ color: "#f8fafc", fontSize: 15, fontWeight: 800 }}>{item.name}</div>
+          <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.roleLabel} | {item.designation} | {item.employeeId}</div>
+        </div>
+        <StatusBadge status={item.status} />
+        <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", color: "#e2e8f0", textAlign: "center" }}>
+          <div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{nonTeachingRoleLabel(role)} Total</div>
+          <div style={{ color: accent, fontWeight: 900, fontSize: 16 }}>{totals.total.toFixed(1)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[
+          ["partA", "Part A"],
+          ["partB", "Part B"],
+          ["remarks", "Remarks & Submit"],
+        ].map(([id, label]) => (
+          <button key={id} type="button" onClick={() => setTab(id)} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", cursor: "pointer", fontFamily: "Georgia, serif", fontWeight: 800 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <fieldset disabled={locked} style={{ border: "none", padding: 0, margin: 0 }}>
+        {tab === "partA" && <AuthorityPartA form={form} setForm={setForm} reviewerRole={role} readOnly={locked} />}
+        {tab === "partB" && <AuthorityPartB form={form} setForm={setForm} reviewerRole={role} readOnly={locked} />}
+      </fieldset>
+
+      {tab === "remarks" && (
+        <SectionCard title={locked ? "Submitted Review" : `${nonTeachingRoleLabel(role)} Remarks & Submission`} accent={accent}>
+          {form.roRemarks && role !== "reporting_officer" && <PriorRemark label="Reporting Officer Remarks" value={form.roRemarks} color={ACCENT} />}
+          {form.registrarRemarks && role !== "registrar" && <PriorRemark label="Registrar Remarks" value={form.registrarRemarks} color={REG_ACCENT} />}
+          {form.vcRemarks && role !== "vc" && <PriorRemark label="VC Remarks" value={form.vcRemarks} color={VC_ACCENT} />}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
+            {[
+              ["Part A", totals.partA, NON_TEACHING_MAX.partA],
+              ["Part B", totals.partB, NON_TEACHING_MAX.partB],
+              ["Grand Total", totals.total, NON_TEACHING_MAX.grand],
+            ].map(([label, value, max]) => (
+              <div key={label} style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", padding: "10px 12px" }}>
+                <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800 }}>{label}</div>
+                <div style={{ color: accent, fontSize: 18, fontWeight: 900 }}>{n(value).toFixed(1)} / {max}</div>
+              </div>
+            ))}
+          </div>
+
+          <label style={{ fontSize: 12, color: "#334155", fontWeight: 800, display: "block", marginBottom: 6 }}>Remarks</label>
+          <TextArea value={remarks} onChange={setRemarks} readOnly={locked} rows={4} placeholder="Enter review remarks and recommendations..." />
+
+          {!locked && (
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 14, padding: "11px 12px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 12, color: "#334155", lineHeight: 1.5 }}>
+              <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} style={{ marginTop: 3 }} />
+              <span>I have verified all details and confirm that this review is accurate.</span>
+            </label>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
+            <button type="button" onClick={onBack} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>{locked ? "Close" : "Cancel"}</button>
+            <button type="button" onClick={handleReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#e2e8f0", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>Generate Report</button>
+            {!locked && (
+              <button type="button" onClick={handleSubmit} disabled={!confirmed || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: confirmed ? accent : "#94a3b8", color: "#fff", cursor: confirmed && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "Georgia, serif" }}>
+                {submitting ? "Submitting..." : "Confirm & Submit"}
+              </button>
+            )}
+          </div>
+        </SectionCard>
+      )}
+    </div>
+  );
+}
+
+function PriorRemark({ label, value, color }) {
+  return (
+    <div style={{ background: `${color}12`, border: `1px solid ${color}35`, borderLeft: `3px solid ${color}`, borderRadius: 8, padding: "10px 12px", marginBottom: 10 }}>
+      <div style={{ color, fontSize: 10, textTransform: "uppercase", fontWeight: 900, marginBottom: 4 }}>{label}</div>
+      <div style={{ color: "#334155", fontSize: 12, lineHeight: 1.6 }}>{value}</div>
+    </div>
+  );
+}
+
+function QueueCard({ item, active, onClick, accent }) {
+  return (
+    <button type="button" onClick={onClick} style={{ width: "100%", border: "none", borderLeft: active ? `3px solid ${accent}` : "3px solid transparent", borderRadius: 8, padding: "10px 11px", textAlign: "left", background: active ? `${accent}22` : "transparent", cursor: "pointer", marginBottom: 6, fontFamily: "Georgia, serif" }}>
+      <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: 12 }}>{item.name}</div>
+      <div style={{ color: "#94a3b8", fontSize: 10, marginTop: 2 }}>{item.roleLabel}</div>
+      <div style={{ marginTop: 7 }}><StatusBadge status={item.status} /></div>
+    </button>
+  );
+}
+
+export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, accent = ACCENT }) {
+  const navigate = useNavigate();
+  const [tab, setTab] = useState("review");
+  const [items, setItems] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const loadQueue = async () => {
+    setLoading(true);
+    try {
+      const queue = await fetchNonTeachingQueueForRole({ reviewerRole });
+      setItems(queue);
+      if (selectedId && !queue.some((item) => item.id === selectedId)) {
+        setSelectedId("");
+      }
+    } catch (err) {
+      console.error("Could not load non-teaching queue:", err);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadQueue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewerRole]);
+
+  const selected = items.find((item) => item.id === selectedId);
+  const pendingCount = items.filter((item) => item.status === expectedPendingStatus(reviewerRole)).length;
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", color: "#0f172a", fontFamily: "Georgia, serif" }}>
+      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar name={localStorage.getItem("name") || title} color={accent} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 900 }}>{title}</div>
+            <div style={{ color: "#94a3b8", fontSize: 10 }}>{subtitle}</div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 6 }}>
+          {[
+            ["review", "Review Queue"],
+            ["self", "My Appraisal"],
+          ].map(([id, label]) => (
+            <button key={id} type="button" onClick={() => setTab(id)} style={{ flex: 1, border: "none", borderRadius: 7, padding: "7px 6px", background: tab === id ? accent : "#1e293b", color: tab === id ? "#fff" : "#94a3b8", cursor: "pointer", fontSize: 10, fontWeight: 800, fontFamily: "Georgia, serif" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "review" && (
+          <div style={{ background: "#1e293b", borderRadius: 8, padding: "10px 12px", color: "#94a3b8", fontSize: 11 }}>
+            <strong style={{ color: "#e2e8f0" }}>{pendingCount}</strong> appraisals pending your review
+          </div>
+        )}
+
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {tab === "review" && (
+            loading ? (
+              <div style={{ color: "#64748b", fontSize: 11, padding: "10px 4px" }}>Loading queue...</div>
+            ) : items.length === 0 ? (
+              <div style={{ color: "#64748b", fontSize: 11, padding: "10px 4px" }}>No appraisals in your queue.</div>
+            ) : items.map((item) => (
+              <QueueCard key={item.id} item={item} active={selectedId === item.id} onClick={() => setSelectedId(item.id)} accent={accent} />
+            ))
+          )}
+        </div>
+
+        <div style={S.sideActions}>
+          <button type="button" onClick={() => setShowLogoutModal(true)} style={{ ...S.sideButton, color: "#f87171" }}>Logout</button>
+        </div>
+      </aside>
+
+      <main style={{ flex: 1, minWidth: 0, marginLeft: 244, padding: "22px 26px", overflowX: "auto" }}>
+        {tab === "self" ? (
+          <NonTeachingAppraisalForm role={reviewerRole} embedded />
+        ) : !selected ? (
+          <div style={{ color: "#64748b", fontSize: 14, marginTop: 40, textAlign: "center" }}>
+            {items.length === 0 ? "No submitted appraisals to review." : "Select an appraisal from the queue."}
+          </div>
+        ) : (
+          <NonTeachingAuthorityReviewPanel
+            item={selected}
+            reviewerRole={reviewerRole}
+            readOnly={selected.status !== expectedPendingStatus(reviewerRole)}
+            onBack={() => setSelectedId("")}
+            onSubmitted={(updated) => {
+              setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+              setSelectedId("");
+              loadQueue();
+            }}
+          />
+        )}
+      </main>
+
+      {showLogoutModal && <LogoutModal onCancel={() => setShowLogoutModal(false)} onConfirm={() => { localStorage.clear(); navigate("/login", { replace: true }); }} />}
+    </div>
+  );
+}
+
+function LogoutModal({ onCancel, onConfirm }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "grid", placeItems: "center" }} onClick={onCancel}>
+      <div style={{ width: "min(380px, 92vw)", background: "#fff", borderRadius: 12, padding: "26px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 17, marginBottom: 8 }}>Confirm Logout</div>
+        <div style={{ color: "#64748b", fontSize: 12, lineHeight: 1.6, marginBottom: 18 }}>You are about to leave {APP_INFO.PORTAL_NAME}. Any unsaved edits will be lost.</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" onClick={onCancel} style={{ flex: 1, border: "none", borderRadius: 8, background: "#f1f5f9", color: "#475569", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Cancel</button>
+          <button type="button" onClick={onConfirm} style={{ flex: 1, border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Logout</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const S = {
+  headerButton: {
+    border: "1px solid #cbd5e1",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#0f172a",
+    padding: "8px 12px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 12,
+    fontFamily: "Georgia, serif",
+  },
+  sideButton: {
+    width: "100%",
+    border: "1px solid #334155",
+    borderRadius: 8,
+    background: "#1e293b",
+    color: "#e2e8f0",
+    padding: "9px 11px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 12,
+    fontFamily: "Georgia, serif",
+  },
+  sideActions: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    paddingTop: 10,
+    borderTop: "1px solid #1e293b",
+    background: "#0f172a",
+  },
+};
+
+export default function NonTeachingStaffDashboard() {
+  return <NonTeachingAppraisalForm role="non_teaching_staff" />;
+}

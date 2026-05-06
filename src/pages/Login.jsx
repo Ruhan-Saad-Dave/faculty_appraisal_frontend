@@ -110,27 +110,7 @@ export default function Login() {
         return;
       }
 
-      // 3. Fallback to SQL-seeded development users.
-      const { data: devUsers, error: devLoginError } = await supabase.rpc("dev_login", {
-        p_email: email,
-        p_password: password,
-      });
-
-      if (devLoginError) {
-        console.warn("Dev login fallback failed:", devLoginError.message);
-      }
-
-      const devProfile = Array.isArray(devUsers) ? devUsers[0] : null;
-      if (devProfile) {
-        storeUserSession({
-          profile: devProfile,
-          fallbackEmail: email,
-        });
-
-        navigate("/dashboard", { replace: true });
-      } else {
-        setError(authError?.message || "Invalid credentials. Please try again.");
-      }
+      setError(authError?.message || "Invalid credentials. Please try again.");
     } catch (err) {
       console.error("Login error:", err);
       setError("An unexpected error occurred. Please try again.");

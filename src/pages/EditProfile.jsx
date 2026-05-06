@@ -11,6 +11,7 @@ import {
   isValidSchool,
   isValidSoemrDepartment,
 } from "../constants/universityHierarchy";
+import { isNonTeachingRole } from "../constants/nonTeachingHierarchy";
 import { buildProfilePayload, normalizeRole, storeUserSession } from "../auth/session";
 import { supabase } from "../services/supabase";
 
@@ -18,6 +19,9 @@ const ROLE_LABEL = {
   faculty: "Faculty",
   hod: "Head of Department",
   center_head: "Center Head",
+  non_teaching_staff: "Non-Teaching Staff",
+  reporting_officer: "Reporting Officer",
+  registrar: "Registrar",
   director: "Director",
   dean: "Dean",
   vc: "Vice Chancellor",
@@ -30,7 +34,15 @@ const BASE_ROLE_OPTIONS = [
   { value: "dean", label: "Dean" },
   { value: "director", label: "Director" },
   { value: "vc", label: "Vice Chancellor" },
+  { value: "registrar", label: "Registrar" },
+  { value: "reporting_officer", label: "Reporting Officer" },
+  { value: "non_teaching_staff", label: "Non-Teaching Staff" },
 ];
+
+const STAFF_TYPE_LABEL = {
+  teaching: "Teaching",
+  non_teaching: "Non-Teaching",
+};
 
 const initialsFromName = (name = "") =>
   String(name || "U")
@@ -43,9 +55,14 @@ const initialsFromName = (name = "") =>
 
 export default function EditProfile() {
   const navigate = useNavigate();
+  const initialRole = normalizeRole(localStorage.getItem("role"), "faculty");
   const initialSchool = canonicalSchoolValue(localStorage.getItem("school"));
+  const initialDepartment = isNonTeachingRole(initialRole)
+    ? localStorage.getItem("department") || ""
+    : canonicalDepartmentValue(localStorage.getItem("department"));
 
   const [formData, setFormData] = useState({
+    staffType: isNonTeachingRole(initialRole) ? "non_teaching" : "teaching",
     email: localStorage.getItem("username") || "",
     name: localStorage.getItem("name") || "",
     employeeId: localStorage.getItem("employeeId") || "",
@@ -54,18 +71,26 @@ export default function EditProfile() {
     experience: localStorage.getItem("experience") || "",
     phone: localStorage.getItem("phone") || "",
     school: initialSchool,
-    department: canonicalDepartmentValue(localStorage.getItem("department")),
-    role: normalizeRole(localStorage.getItem("role"), "faculty"),
+    department: initialDepartment,
+    role: initialRole,
   });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
   const selectedSchool = useMemo(() => canonicalSchoolValue(formData.school), [formData.school]);
-  const needsDepartment = isSoemrSchool(selectedSchool);
+  const selectedRole = normalizeRole(formData.role, "");
+  const isNonTeaching = formData.staffType === "non_teaching";
+  const requiresSchool = !isNonTeaching && selectedRole !== "vc";
+  const schoolNeedsDepartment = isSoemrSchool(selectedSchool);
   const isCisr = isCisrSchool(selectedSchool);
+  const needsDepartment = !isNonTeaching && schoolNeedsDepartment;
   const roleOptions = BASE_ROLE_OPTIONS.filter((role) => {
-    if (role.value === "hod") return needsDepartment;
+    const optionIsNonTeaching = isNonTeachingRole(role.value);
+
+    if (isNonTeaching) return optionIsNonTeaching;
+    if (optionIsNonTeaching) return false;
+    if (role.value === "hod") return schoolNeedsDepartment;
     if (role.value === "center_head") return isCisr;
     if (isCisr && (role.value === "director" || role.value === "dean")) return false;
     return true;
@@ -92,18 +117,40 @@ export default function EditProfile() {
     setMessage("");
 
     const email = String(formData.email || "").trim().toLowerCase();
+    const role = normalizeRole(formData.role, "");
+    const nonTeaching = formData.staffType === "non_teaching";
+    const selectedRoleIsNonTeaching = isNonTeachingRole(role);
     const school = canonicalSchoolValue(formData.school);
-    const department = isSoemrSchool(school)
-      ? canonicalDepartmentValue(formData.department)
-      : "";
+    const department = nonTeaching
+      ? String(formData.department || "").trim()
+      : isSoemrSchool(school)
+        ? canonicalDepartmentValue(formData.department)
+        : "";
 
-    if (!email || !school || !formData.role || !formData.name.trim() || !formData.employeeId.trim() || !formData.designation.trim()) {
-      setError("Please fill in School, Role, Email, Full Name, Employee ID, and Designation.");
+    if (!email || !formData.role || (!nonTeaching && role !== "vc" && !school) || !formData.name.trim() || !formData.employeeId.trim() || !formData.designation.trim()) {
+      setError(nonTeaching
+        ? "Please fill in Role, Email, Full Name, Employee ID, Designation, and Department / Office."
+        : "Please fill in School, Role, Email, Full Name, Employee ID, and Designation.");
       return;
     }
 
-    if (!isValidSchool(school)) {
+    if (!nonTeaching && selectedRoleIsNonTeaching) {
+      setError("Please select a teaching role for this teaching profile.");
+      return;
+    }
+
+    if (nonTeaching && !selectedRoleIsNonTeaching) {
+      setError("Please select a non-teaching role for this non-teaching profile.");
+      return;
+    }
+
+    if (!nonTeaching && role !== "vc" && !isValidSchool(school)) {
       setError("Please select one of the approved schools or centers from the dropdown.");
+      return;
+    }
+
+    if (nonTeaching && !department) {
+      setError("Please enter the department/office for non-teaching staff.");
       return;
     }
 
@@ -132,7 +179,8 @@ export default function EditProfile() {
       const cleanFormData = {
         ...formData,
         email,
-        school,
+        role,
+        school: nonTeaching ? "" : school,
         department,
       };
       const profilePayload = buildProfilePayload(cleanFormData, APP_INFO.DEFAULT_AY);
@@ -159,8 +207,8 @@ export default function EditProfile() {
           qualification: cleanFormData.qualification.trim(),
           experience: cleanFormData.experience.trim(),
           phone: cleanFormData.phone.trim(),
-          school,
-          department,
+          school: cleanFormData.school,
+          department: cleanFormData.department,
           role: cleanFormData.role,
         },
       });
@@ -211,13 +259,8 @@ export default function EditProfile() {
           {message && <div style={S.success}>{message}</div>}
 
           <div style={S.grid}>
-            <Field label="School" required wide>
-              <select style={S.input} name="school" value={formData.school} onChange={handleChange} required>
-                <option value="">Select school</option>
-                {SCHOOL_OPTIONS.map((school) => (
-                  <option key={school.value} value={school.value}>{school.label}</option>
-                ))}
-              </select>
+            <Field label="Staff Type">
+              <input style={{ ...S.input, background: "#f8fafc", color: "#64748b" }} value={STAFF_TYPE_LABEL[formData.staffType]} readOnly />
             </Field>
 
             <Field label="Role" required>
@@ -229,6 +272,17 @@ export default function EditProfile() {
               </select>
             </Field>
 
+            {!isNonTeaching && (
+              <Field label="School" required={requiresSchool} wide>
+                <select style={S.input} name="school" value={formData.school} onChange={handleChange} required={requiresSchool}>
+                  <option value="">Select school</option>
+                  {SCHOOL_OPTIONS.map((school) => (
+                    <option key={school.value} value={school.value}>{school.label}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+
             {needsDepartment && (
               <Field label="SoEMR Department" required>
                 <select style={S.input} name="department" value={formData.department} onChange={handleChange} required>
@@ -237,6 +291,12 @@ export default function EditProfile() {
                     <option key={department} value={department}>{department}</option>
                   ))}
                 </select>
+              </Field>
+            )}
+
+            {isNonTeaching && (
+              <Field label="Department / Office" required>
+                <input style={S.input} name="department" value={formData.department} onChange={handleChange} required />
               </Field>
             )}
 

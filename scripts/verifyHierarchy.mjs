@@ -17,6 +17,8 @@ const roles = {
   nonEngineeringDean: { appraisal_role: "dean", school: "SoC" },
   soemrDirector: { appraisal_role: "director", school: SOEMR_SCHOOL.label },
   cisrCenterHead: { appraisal_role: "center_head", school: "CISR" },
+  registrar: { appraisal_role: "registrar" },
+  reportingOfficer: { appraisal_role: "reporting_officer" },
 };
 
 assert.equal(SCHOOL_OPTIONS.length, 9, "Signup must expose exactly 8 schools plus CISR");
@@ -59,6 +61,31 @@ assert.deepEqual(
 assert.equal(canAuthorityReviewProfile(roles.cisrCenterHead, cisrFaculty), true, "CISR Center Head must review CISR faculty");
 assert.equal(canAuthorityReviewProfile(roles.engineeringDean, cisrFaculty), false, "Engineering dean must not review CISR faculty");
 assert.equal(canAuthorityReviewProfile(roles.nonEngineeringDean, cisrFaculty), false, "Non-engineering dean must not review CISR faculty");
+
+const nonTeachingStaff = { appraisal_role: "non_teaching_staff", department: "Administration", school: "" };
+const reportingOfficer = { appraisal_role: "reporting_officer", department: "Administration", school: "" };
+const registrar = { appraisal_role: "registrar", department: "Office of the Registrar", school: "" };
+assert.deepEqual(
+  getReviewChain(nonTeachingStaff),
+  ["reporting_officer", "registrar", "vc"],
+  "Non-teaching staff must route Reporting Officer -> Registrar -> VC"
+);
+assert.deepEqual(
+  getReviewChain(reportingOfficer),
+  ["registrar", "vc"],
+  "Reporting Officer self-appraisal must route Registrar -> VC"
+);
+assert.deepEqual(
+  getReviewChain(registrar),
+  ["vc"],
+  "Registrar self-appraisal must route directly to VC"
+);
+assert.equal(canAuthorityReviewProfile(roles.reportingOfficer, nonTeachingStaff), true, "Reporting Officer must review non-teaching staff");
+assert.equal(canAuthorityReviewProfile(roles.reportingOfficer, reportingOfficer), false, "Reporting Officer must not review self-role submissions");
+assert.equal(canAuthorityReviewProfile(roles.registrar, reportingOfficer), true, "Registrar must review Reporting Officer");
+assert.equal(canAuthorityReviewProfile(roles.registrar, nonTeachingStaff), true, "Registrar must review staff after Reporting Officer");
+assert.equal(canAuthorityReviewProfile(roles.vc, registrar), true, "VC must review Registrar");
+assert.equal(workflowValidationError(nonTeachingStaff), "", "Non-teaching staff should not require a school");
 
 for (const department of SOEMR_DEPARTMENTS) {
   const faculty = { appraisal_role: "faculty", school: SOEMR_SCHOOL.label, department };
