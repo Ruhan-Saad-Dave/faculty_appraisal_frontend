@@ -203,3 +203,5 @@ export const sectionRowsFromSnapshot = (snapshotPayload) => {
   if (!form) return {};
   return form;
 };
+
+export const saveAppraisal = saveAppraisalDraftSection;
