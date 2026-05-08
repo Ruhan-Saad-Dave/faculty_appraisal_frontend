@@ -1595,8 +1595,7 @@ export default function DeanDashboard() {
       try {
         const items = await fetchReviewQueueForRole({
           reviewerRole: "dean",
-          reviewerProfile: { ...profileFromsessionStorage(), school: ENGINEERING_SCHOOLS[0]?.label || "" },
-          schoolValues: ENGINEERING_SCHOOL_VALUES,
+          reviewerProfile: profileFromsessionStorage(),
         });
         const scopedItems = items.filter((item) => ENGINEERING_SCHOOL_CODES.includes(getSchoolKey(item.school)));
         setFacultyList(scopedItems.filter((item) => item.appraisalRole === "faculty"));

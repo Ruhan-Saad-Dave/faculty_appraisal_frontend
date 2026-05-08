@@ -1596,8 +1596,7 @@ export default function NonEngineeringDeanDashboard() {
       try {
         const items = await fetchReviewQueueForRole({
           reviewerRole: "dean",
-          reviewerProfile: { ...profileFromsessionStorage(), school: NON_ENGINEERING_SCHOOLS[0]?.label || "" },
-          schoolValues: NON_ENGINEERING_SCHOOL_VALUES,
+          reviewerProfile: profileFromsessionStorage(),
         });
         const scopedItems = items.filter((item) => NON_ENGINEERING_SCHOOL_CODES.includes(getSchoolKey(item.school)));
         setFacultyList(scopedItems.filter((item) => item.appraisalRole === "faculty"));
