@@ -14,6 +14,10 @@ import {
 import { isNonTeachingRole } from "../constants/nonTeachingHierarchy";
 import { buildProfilePayload, normalizeRole, storeUserSession } from "../auth/session";
 import { updateProfile } from "../services/authService";
+import {
+  isValidPhone, isValidName, isValidEmployeeId, isValidExperience,
+  sanitizeText, filterNumeric, filterPhone,
+} from "../utils/validation";
 
 const ROLE_LABEL = {
   faculty: "Faculty",
@@ -100,12 +104,13 @@ export default function EditProfile() {
     const { name, value } = event.target;
     setFormData((prev) => {
       if (name === "school") {
-        return {
-          ...prev,
-          school: value,
-          role: "",
-          department: "",
-        };
+        return { ...prev, school: value, role: "", department: "" };
+      }
+      if (name === "experience") {
+        return { ...prev, experience: filterNumeric(value) };
+      }
+      if (name === "phone") {
+        return { ...prev, phone: filterPhone(value) };
       }
       return { ...prev, [name]: value };
     });
@@ -131,6 +136,26 @@ export default function EditProfile() {
       setError(nonTeaching
         ? "Please fill in Role, Email, Full Name, Employee ID, Designation, and Department / Office."
         : "Please fill in School, Role, Email, Full Name, Employee ID, and Designation.");
+      return;
+    }
+
+    if (!isValidName(formData.name)) {
+      setError("Full name must be between 2 and 100 characters.");
+      return;
+    }
+
+    if (!isValidEmployeeId(formData.employeeId)) {
+      setError("Employee ID must be 2–30 characters and contain only letters, numbers, /, - or _.");
+      return;
+    }
+
+    if (formData.experience && !isValidExperience(formData.experience)) {
+      setError("Experience must be a number between 0 and 80.");
+      return;
+    }
+
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      setError("Please enter a valid phone number.");
       return;
     }
 
@@ -179,6 +204,12 @@ export default function EditProfile() {
       const cleanFormData = {
         ...formData,
         email,
+        name: sanitizeText(formData.name),
+        employeeId: sanitizeText(formData.employeeId),
+        designation: sanitizeText(formData.designation),
+        qualification: sanitizeText(formData.qualification),
+        experience: sanitizeText(formData.experience),
+        phone: sanitizeText(formData.phone),
         role,
         school: nonTeaching ? "" : school,
         department,
@@ -273,23 +304,23 @@ export default function EditProfile() {
             </Field>
 
             <Field label="Full Name" required>
-              <input style={S.input} name="name" value={formData.name} onChange={handleChange} required />
+              <input style={S.input} name="name" value={formData.name} onChange={handleChange} required maxLength={100} placeholder="e.g. Dr. Jane Smith" />
             </Field>
             <Field label="Employee ID" required>
-              <input style={S.input} name="employeeId" value={formData.employeeId} onChange={handleChange} required />
+              <input style={S.input} name="employeeId" value={formData.employeeId} onChange={handleChange} required maxLength={30} placeholder="e.g. EMP001" />
             </Field>
             <Field label="Designation" required>
-              <input style={S.input} name="designation" value={formData.designation} onChange={handleChange} required />
+              <input style={S.input} name="designation" value={formData.designation} onChange={handleChange} required maxLength={100} placeholder="e.g. Assistant Professor" />
             </Field>
             <Field label="Qualification">
-              <input style={S.input} name="qualification" value={formData.qualification} onChange={handleChange} />
+              <input style={S.input} name="qualification" value={formData.qualification} onChange={handleChange} maxLength={100} placeholder="e.g. Ph.D, M.Tech" />
             </Field>
 
-            <Field label="Experience">
-              <input style={S.input} name="experience" value={formData.experience} onChange={handleChange} />
+            <Field label="Experience (Years)">
+              <input style={S.input} name="experience" value={formData.experience} onChange={handleChange} inputMode="decimal" maxLength={4} placeholder="e.g. 10" />
             </Field>
             <Field label="Phone">
-              <input style={S.input} name="phone" value={formData.phone} onChange={handleChange} />
+              <input style={S.input} name="phone" value={formData.phone} onChange={handleChange} inputMode="tel" maxLength={20} placeholder="e.g. +91 98765 43210" />
             </Field>
           </div>
 

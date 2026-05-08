@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { APP_INFO } from "../constants/formConfig";
 import { resetPassword } from "../services/authService";
+import { passwordRequirements } from "../utils/validation";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -27,8 +28,9 @@ export default function ResetPassword() {
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const unmet = passwordRequirements(password);
+    if (unmet.length > 0) {
+      setError(`Password must have: ${unmet.join(', ')}.`);
       setMessage("");
       return;
     }

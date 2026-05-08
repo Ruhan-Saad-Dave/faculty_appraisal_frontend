@@ -234,7 +234,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
       setDocs((p) => ({ ...p, [id]: uploadedFiles.slice(0, 1) }));
     } catch (err) {
-      console.error("Cloudinary upload error:", err);
+      console.error("Upload error:", err);
       setUploadError(err.message);
       alert(`Unable to upload file.\n\n${err.message}`);
     } finally {

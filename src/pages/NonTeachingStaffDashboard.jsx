@@ -180,7 +180,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
       const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
       setDocs((current) => ({ ...current, [id]: [uploaded] }));
     } catch (err) {
-      console.error("Cloudinary upload error:", err);
+      console.error("Upload error:", err);
       alert(`Unable to upload file.\n\n${err.message}`);
     } finally {
       setUploading(false);

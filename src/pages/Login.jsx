@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { login, forgotPassword } from "../services/authService";
+import { isValidEmail, normalizeEmail } from "../utils/validation";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,8 +15,19 @@ export default function Login() {
   const [resetLoading, setResetLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
+    const email = normalizeEmail(username);
+    const pw = password.trim();
+
+    if (!email) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!pw) {
+      setError("Please enter your password.");
       return;
     }
 
@@ -24,8 +36,7 @@ export default function Login() {
     setMessage("");
 
     try {
-      const email = username.trim().toLowerCase();
-      await login(email, password);
+      await login(email, pw);
       navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err?.message || "Invalid credentials. Please try again.");
@@ -39,10 +50,15 @@ export default function Login() {
   };
 
   const handleForgotPassword = async () => {
-    const email = username.trim();
+    const email = normalizeEmail(username);
 
     if (!email) {
       setError("Please enter your email above, then click Forgot password.");
+      setMessage("");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
       setMessage("");
       return;
     }
@@ -164,12 +180,13 @@ export default function Login() {
 
             <input
               className="dyp-input"
-              type="text"
-              placeholder="Enter username"
+              type="email"
+              placeholder="Enter email address"
               value={username}
               onChange={e => setUsername(e.target.value)}
               onKeyDown={handleKeyDown}
-              autoComplete="username"
+              autoComplete="email"
+              maxLength={254}
             />
 
             <div style={{ position: "relative", marginBottom: 2 }}>

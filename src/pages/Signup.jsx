@@ -14,6 +14,11 @@ import {
 import { isNonTeachingRole } from "../constants/nonTeachingHierarchy";
 import { register } from "../services/authService";
 import { buildProfilePayload, normalizeRole } from "../auth/session";
+import {
+  isValidEmail, isValidPhone, isStrongPassword, passwordRequirements,
+  isValidName, isValidEmployeeId, isValidExperience,
+  normalizeEmail, sanitizeText, filterNumeric, filterPhone,
+} from "../utils/validation";
 
 const BASE_ROLE_OPTIONS = [
   { value: "faculty", label: "Faculty" },
@@ -94,24 +99,18 @@ export default function Signup() {
           designation: value === "teaching" ? "Assistant Professor" : "",
         };
       }
-
       if (name === "school") {
-        return {
-          ...prev,
-          school: value,
-          role: "",
-          department: "",
-        };
+        return { ...prev, school: value, role: "", department: "" };
       }
-
       if (name === "role") {
-        return {
-          ...prev,
-          role: value,
-          designation: DEFAULT_DESIGNATION_BY_ROLE[value] ?? prev.designation,
-        };
+        return { ...prev, role: value, designation: DEFAULT_DESIGNATION_BY_ROLE[value] ?? prev.designation };
       }
-
+      if (name === "experience") {
+        return { ...prev, experience: filterNumeric(value) };
+      }
+      if (name === "phone") {
+        return { ...prev, phone: filterPhone(value) };
+      }
       return { ...prev, [name]: value };
     });
   };
@@ -132,6 +131,37 @@ export default function Signup() {
 
     if (!formData.name || !formData.email || !formData.password || !formData.employeeId || !formData.role || (schoolRequired && !school)) {
       setError("Please fill in all required fields (Staff Type, School, Role, Name, Email, Password, Employee ID).");
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!isValidName(formData.name)) {
+      setError("Full name must be between 2 and 100 characters.");
+      return;
+    }
+
+    if (!isValidEmployeeId(formData.employeeId)) {
+      setError("Employee ID must be 2–30 characters and contain only letters, numbers, /, - or _.");
+      return;
+    }
+
+    const pwErrors = passwordRequirements(formData.password);
+    if (pwErrors.length > 0) {
+      setError(`Password must have: ${pwErrors.join(', ')}.`);
+      return;
+    }
+
+    if (formData.experience && !isValidExperience(formData.experience)) {
+      setError("Experience must be a number between 0 and 80.");
+      return;
+    }
+
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      setError("Please enter a valid phone number.");
       return;
     }
 
@@ -181,10 +211,17 @@ export default function Signup() {
     try {
       const cleanFormData = {
         ...formData,
+        email: normalizeEmail(formData.email),
+        name: sanitizeText(formData.name),
+        employeeId: sanitizeText(formData.employeeId),
+        designation: sanitizeText(formData.designation),
+        qualification: sanitizeText(formData.qualification),
+        experience: sanitizeText(formData.experience),
+        phone: sanitizeText(formData.phone),
         role,
         school: nonTeaching ? "" : school,
         department: nonTeaching
-          ? String(formData.department || "").trim()
+          ? sanitizeText(formData.department)
           : isSoemrSchool(school)
             ? department
             : "",
@@ -318,19 +355,19 @@ export default function Signup() {
 
               <div style={s.inputGroup}>
                 <label style={s.label}>Full Name *</label>
-                <input className="dyp-input" type="text" name="name" value={formData.name} onChange={handleChange} required />
+                <input className="dyp-input" type="text" name="name" value={formData.name} onChange={handleChange} required maxLength={100} placeholder="e.g. Dr. Jane Smith" />
               </div>
               <div style={s.inputGroup}>
                 <label style={s.label}>Email Address *</label>
-                <input className="dyp-input" type="email" name="email" value={formData.email} onChange={handleChange} required />
+                <input className="dyp-input" type="email" name="email" value={formData.email} onChange={handleChange} required maxLength={254} placeholder="e.g. jane@dypatil.edu" />
               </div>
               <div style={s.inputGroup}>
                 <label style={s.label}>Password *</label>
-                <input className="dyp-input" type="password" name="password" value={formData.password} onChange={handleChange} required />
+                <input className="dyp-input" type="password" name="password" value={formData.password} onChange={handleChange} required maxLength={128} placeholder="Min 8 chars, upper, lower, number" autoComplete="new-password" />
               </div>
               <div style={s.inputGroup}>
                 <label style={s.label}>Employee ID *</label>
-                <input className="dyp-input" type="text" name="employeeId" value={formData.employeeId} onChange={handleChange} required />
+                <input className="dyp-input" type="text" name="employeeId" value={formData.employeeId} onChange={handleChange} required maxLength={30} placeholder="e.g. EMP001" />
               </div>
 
               <div style={s.inputGroup}>
@@ -342,22 +379,23 @@ export default function Signup() {
                   placeholder={isNonTeachingType ? "e.g. Registrar, Reporting Officer" : "e.g. Assistant Professor"}
                   value={formData.designation}
                   onChange={handleChange}
+                  maxLength={100}
                 />
               </div>
 
               <div style={s.inputGroup}>
                 <label style={s.label}>Qualification</label>
-                <input className="dyp-input" type="text" name="qualification" placeholder="e.g. Ph.D, M.Tech" value={formData.qualification} onChange={handleChange} />
+                <input className="dyp-input" type="text" name="qualification" placeholder="e.g. Ph.D, M.Tech" value={formData.qualification} onChange={handleChange} maxLength={100} />
               </div>
 
               <div style={s.inputGroup}>
                 <label style={s.label}>{isNonTeachingType ? "Experience (Years)" : "Teaching Experience (Years)"}</label>
-                <input className="dyp-input" type="text" name="experience" placeholder="e.g. 10 Years" value={formData.experience} onChange={handleChange} />
+                <input className="dyp-input" type="text" name="experience" inputMode="decimal" placeholder="e.g. 10" value={formData.experience} onChange={handleChange} maxLength={4} />
               </div>
 
               <div style={{ ...s.inputGroup, gridColumn: "1 / -1" }}>
                 <label style={s.label}>Phone Number</label>
-                <input className="dyp-input" type="text" name="phone" placeholder="e.g. +91 98765 43210" value={formData.phone} onChange={handleChange} />
+                <input className="dyp-input" type="text" name="phone" inputMode="tel" placeholder="e.g. +91 98765 43210" value={formData.phone} onChange={handleChange} maxLength={20} />
               </div>
 
               <button
