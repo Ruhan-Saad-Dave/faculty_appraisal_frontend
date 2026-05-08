@@ -2,7 +2,7 @@ import axios from "axios";
 import { FACULTY_LIST, HOD_LIST, DIRECTOR_LIST, DEAN_LIST } from "../data/mockData";
 import { isSoemrSchool } from "../constants/universityHierarchy";
 
-const DEFAULT_API_BASE_URL = "https://fastapi-backend-376777978967.us-central1.run.app/api/v1";
+const DEFAULT_API_BASE_URL = "https://faculty-appraisal-git-376777978967.asia-south1.run.app/api/v1";
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
