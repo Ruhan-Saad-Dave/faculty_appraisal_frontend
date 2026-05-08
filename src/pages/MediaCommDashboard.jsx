@@ -912,7 +912,7 @@ export default function MediaCommDashboard({ fixedRole }) {
     try {
       await submitWorkflowReview({
         subjectEmail: item.email,
-        academicYear: item.academicYear || item.info?.ay,
+        academicYear: item.academicYear || item.academic_year || item.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026",
         reviewerRole: role,
         partAScore: scores.partA,
         partBScore: scores.partB,

@@ -1147,7 +1147,7 @@ export default function VCDashboard() {
     try {
       await submitWorkflowReview({
         subjectEmail: item.email,
-        academicYear: item.academicYear || item.info?.ay,
+        academicYear: item.academicYear || item.academic_year || item.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026",
         reviewerRole: "vc",
         partAScore: scores.partA,
         partBScore: scores.partB,
