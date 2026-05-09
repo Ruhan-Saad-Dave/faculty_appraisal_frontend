@@ -762,10 +762,12 @@ values
   ('design_proposals_10', 'design_arts', 'B', 'proposals', 'B7. Research Proposals', 10, 'research_proposals', '["title","duration","agency","amount"]'),
   ('standard_products_10', 'standard', 'B', 'products', 'B7(b). Product Developed and Used by Students in Lab / Commercialized', 10, 'products_developed', '["details","usage"]'),
   ('media_products_20', 'media', 'B', 'products', 'B6(b). Products Developed / Used', 20, 'products_developed', '["details","usage"]'),
-  ('standard_fdp_10', 'standard', 'B', 'fdps', 'B8(a). FDP / Self Development', 10, 'self_development', '["program","duration","organization"]'),
+  ('standard_fdp_5', 'standard', 'B', 'fdps', 'B8(a). FDP / Workshops Attended', 5, 'self_development', '["program","duration","organization"]'),
   ('media_fdp_20', 'media', 'B', 'fdps', 'B7. FDP / Self Development', 20, 'self_development', '["program","duration","organization"]'),
   ('design_fdp_10', 'design_arts', 'B', 'fdps', 'B8(a). FDP / Self Development', 10, 'self_development', '["program","duration","organization"]'),
-  ('industrial_training_10', 'all_teaching', 'B', 'training', 'B8(b). Industrial Training', 10, 'industrial_training', '["company","duration","nature"]'),
+  ('standard_industrial_training_5', 'standard', 'B', 'training', 'B8(b). Industrial Training', 5, 'industrial_training', '["company","duration","nature"]'),
+  ('media_industrial_training_10', 'media', 'B', 'training', 'B8. Industrial Training', 10, 'industrial_training', '["company","duration","nature"]'),
+  ('design_industrial_training_10', 'design_arts', 'B', 'training', 'B8(b). Industrial Training', 10, 'industrial_training', '["company","duration","nature"]'),
   ('non_teaching_resp_10', 'non_teaching', 'A', 'selfResp', 'Current Responsibilities', 10, 'non_teaching_part_a_items', '["details"]'),
   ('non_teaching_contrib_10', 'non_teaching', 'A', 'selfContrib', 'Other Useful Contributions', 10, 'non_teaching_part_a_items', '["details"]'),
   ('non_teaching_achieve_5', 'non_teaching', 'A', 'selfAchieve', 'Achievements', 5, 'non_teaching_part_a_items', '["details"]'),
@@ -773,6 +775,27 @@ values
   ('non_teaching_quality_25', 'non_teaching', 'B', 'quality', 'Quality of Work', 25, 'non_teaching_part_b_ratings', '["rating"]'),
   ('non_teaching_personal_30', 'non_teaching', 'B', 'personal', 'Personal Characteristics', 30, 'non_teaching_part_b_ratings', '["rating"]'),
   ('non_teaching_regular_25', 'non_teaching', 'B', 'regular', 'Regularity', 25, 'non_teaching_part_b_ratings', '["rating"]')
+on conflict (code) do nothing;
+
+-- Compatibility patch for older section-definition seeds.
+-- On a fresh reset this is a no-op because the corrected rows above are already inserted.
+update public.form_section_definitions
+set code = 'standard_fdp_5',
+    title = 'B8(a). FDP / Workshops Attended',
+    max_marks = 5
+where code = 'standard_fdp_10';
+
+update public.form_section_definitions
+set code = 'standard_industrial_training_5',
+    form_family = 'standard',
+    max_marks = 5
+where code = 'industrial_training_10';
+
+insert into public.form_section_definitions
+  (code, form_family, part, section_key, title, max_marks, storage_table, fields)
+values
+  ('media_industrial_training_10', 'media', 'B', 'training', 'B8. Industrial Training', 10, 'industrial_training', '["company","duration","nature"]'),
+  ('design_industrial_training_10', 'design_arts', 'B', 'training', 'B8(b). Industrial Training', 10, 'industrial_training', '["company","duration","nature"]')
 on conflict (code) do nothing;
 
 create index declarations_faculty_year_idx on public.declarations (faculty_email, academic_year);
