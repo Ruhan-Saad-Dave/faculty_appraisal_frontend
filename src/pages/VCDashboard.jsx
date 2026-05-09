@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { fetchNonTeachingQueueForRole, expectedPendingStatus, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
 import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
-import { VC_USER } from "../data/mockData";
+
 import { DEAN_TRACKS, UNIVERSITY_SCHOOLS } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
 import { getReviewChain, getSchoolKey, reviewedStatusFor, profileFromsessionStorage } from "../utils/hierarchy";
@@ -626,7 +626,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
       info: {
         ...(person.info || {}),
         name: person.info?.name || person.name,
-        ay: person.info?.ay || person.academicYear || VC_USER.ay,
+        ay: person.info?.ay || person.academicYear || APP_INFO.DEFAULT_AY,
         desig: person.info?.desig || person.designation || personMode,
         school: person.info?.school || person.schoolName || person.school,
       },
@@ -642,7 +642,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
     reportForm.innovVc = vcData.innovVc ?? vcData.innovVC ?? person.innovVc ?? "";
     openFullFormReport({
       title: "VC Appraisal Report",
-      subtitle: `${APP_INFO.UNIVERSITY_NAME} | Academic Year ${person.academicYear || person.info?.ay || VC_USER.ay || ""}`,
+      subtitle: `${APP_INFO.UNIVERSITY_NAME} | Academic Year ${person.academicYear || person.info?.ay || APP_INFO.DEFAULT_AY || ""}`,
       form: reportForm,
       docs: reportForm.docs,
       partASections: VC_REPORT_PART_A_SECTIONS,
@@ -1237,7 +1237,7 @@ export default function VCDashboard() {
         <div style={{ background: "#3b0764", borderRadius: 8, padding: "8px 12px", fontSize: 11, color: "#c4b5fd" }}>
           <div style={{ fontWeight: 700, marginBottom: 2 }}>Vice Chancellor</div>
           <div style={{ color: "#a78bfa", fontSize: 10 }}>Full university oversight</div>
-          <div style={{ color: "#6d28d9", fontSize: 9, marginTop: 2 }}>AY {VC_USER.ay}</div>
+          <div style={{ color: "#6d28d9", fontSize: 9, marginTop: 2 }}>AY {APP_INFO.DEFAULT_AY}</div>
         </div>
 
         <div style={{ height: 1, background: "#1e293b" }} />
@@ -1320,7 +1320,7 @@ export default function VCDashboard() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>School-wise Appraisal Reviews</h1>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{APP_INFO.SHORT_NAME} · AY {VC_USER.ay}</p>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{APP_INFO.SHORT_NAME} · AY {APP_INFO.DEFAULT_AY}</p>
               </div>
               <div style={{ fontSize: 11, color: "#64748b", background: "#fff", padding: "8px 14px", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
                 {deanList.length + dirList.length + hodList.length + centerHeadList.length + facList.length + nonTeachingList.length} total submissions

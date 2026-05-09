@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO } from "../constants/formConfig";
-import { HOD_USER, FACULTY_LIST } from "../data/mockData";
+
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal, saveAppraisalDraftSection } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
@@ -3015,7 +3015,7 @@ export default function HODDashboard({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>Pending Approvals</h1>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{HOD_USER.department} · AY {HOD_USER.ay}</p>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} · AY {APP_INFO.DEFAULT_AY}</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>⏳ {pendingCount} Pending</div>

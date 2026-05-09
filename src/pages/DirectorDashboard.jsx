@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { HodInput } from "../components/Inputs";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
-import { DIRECTOR_USER, HOD_LIST, FACULTY_LIST, DIRECTOR_SELF_DATA } from "../data/mockData";
+
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal, saveAppraisalDraftSection } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
@@ -3104,7 +3104,7 @@ export default function DirectorDashboard() {
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>
                   {activeMainTab === "facultyApprovals" ? "Faculty Approvals" : "HOD Approvals"}
                 </h1>
-                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{DIRECTOR_USER.department} · AY {DIRECTOR_USER.ay}</p>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} · AY {APP_INFO.DEFAULT_AY}</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>

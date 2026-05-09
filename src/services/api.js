@@ -1,6 +1,4 @@
 import axios from "axios";
-import { FACULTY_LIST, HOD_LIST, DIRECTOR_LIST, DEAN_LIST } from "../data/mockData";
-import { isSoemrSchool } from "../constants/universityHierarchy";
 
 const DEFAULT_API_BASE_URL = "https://faculty-appraisal-git-376777978967.asia-south1.run.app/api/v1";
 
@@ -29,6 +27,33 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Normalize every API error so err.message is always a user-safe string.
+// Priority: user_message → detail → generic fallback.
+// 401 clears the session and redirects to /login automatically.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const data = error?.response?.data;
+    const status = error?.response?.status;
+
+    const userMessage =
+      data?.user_message ??
+      (typeof data?.detail === "string" ? data.detail : null) ??
+      "Something went wrong. Please try again.";
+
+    error.message = userMessage;
+    error.userMessage = userMessage;
+    error.statusCode = status;
+
+    if (status === 401) {
+      sessionStorage.clear();
+      window.location.href = "/login";
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 export const api = {
   get: (url, config) => apiClient.get(url, config).then((response) => response.data),
   post: (url, data, config) => apiClient.post(url, data, config).then((response) => response.data),
@@ -50,39 +75,6 @@ export const createFormData = (fields = {}, file) => {
   }
 
   return formData;
-};
-
-export const getFacultyForHOD = (hodDepartment, hodSchool) => {
-  return FACULTY_LIST.filter(f => f.department === hodDepartment && f.school === hodSchool);
-};
-
-export const getStaffForDirector = (directorSchool) => {
-  const hasHod = isSoemrSchool(directorSchool);
-  const faculty = FACULTY_LIST.filter(f => f.school === directorSchool);
-  
-  // If school has no HOD, director sees faculty pending approval directly
-  // Otherwise, director might only see them after HOD review (or all of them)
-  // For now, let's return all faculty and HODs in that school
-  const hods = HOD_LIST.filter(h => h.school === directorSchool);
-  
-  return { faculty, hods: hasHod ? hods : [] };
-};
-
-export const getStaffForDean = (deanSchool) => {
-  const faculty = FACULTY_LIST.filter(f => f.school === deanSchool);
-  const hods = HOD_LIST.filter(h => h.school === deanSchool);
-  const directors = DIRECTOR_LIST.filter(d => d.school === deanSchool);
-  
-  return { faculty, hods, directors };
-};
-
-export const getStaffForVC = () => {
-  return {
-    faculty: FACULTY_LIST,
-    hods: HOD_LIST,
-    directors: DIRECTOR_LIST,
-    deans: DEAN_LIST
-  };
 };
 
 export const fetchFormData = async () => {
