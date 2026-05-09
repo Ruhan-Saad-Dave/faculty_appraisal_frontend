@@ -1100,6 +1100,7 @@ export default function HODDashboard({
         const items = await fetchReviewQueueForRole({
           reviewerRole,
           reviewerProfile: { ...profileFromsessionStorage(), appraisal_role: reviewerRole, school: hodSchool, department: hodDept },
+          schoolValues: [hodSchool],
         });
         setFacultyList(items);
       } catch (err) {
@@ -1895,6 +1896,7 @@ export default function HODDashboard({
         totalScore: scores.total,
         remarks,
         sectionScores,
+        subjectProfile: item,
       });
 
       setFacultyList(prev => prev.map(f => f.id === id ? { ...f, ...sectionScores, innovHod: sectionScores?.innovativeTeaching?.hod ?? f.innovHod, status: "Reviewed", workflowStatus: reviewedStatusFor(reviewerRole), hodPartA: scores.partA, hodPartB: scores.partB, hodTotal: scores.total, hodRemarks: remarks } : f));

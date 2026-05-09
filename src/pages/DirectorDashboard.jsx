@@ -1155,6 +1155,7 @@ export default function DirectorDashboard() {
         const items = await fetchReviewQueueForRole({
           reviewerRole: "director",
           reviewerProfile: { ...profileFromsessionStorage(), school: dirSchool },
+          schoolValues: [dirSchool],
         });
         setFacultyList(items.filter((item) => item.appraisalRole === "faculty"));
         setHodList(items.filter((item) => item.appraisalRole === "hod"));
@@ -1956,6 +1957,7 @@ export default function DirectorDashboard() {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        subjectProfile: item,
       });
 
       if (type === "hod") {

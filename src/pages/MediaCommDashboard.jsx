@@ -833,7 +833,11 @@ export default function MediaCommDashboard({ fixedRole }) {
     if (role === "faculty") return;
     setLoadingQueue(true);
     try {
-      const items = await fetchReviewQueueForRole({ reviewerRole: role, reviewerProfile: { ...profile, appraisal_role: role } });
+      const items = await fetchReviewQueueForRole({
+        reviewerRole: role,
+        reviewerProfile: { ...profile, appraisal_role: role },
+        schoolValues: FORM_SCHOOL_CODES[FORM_TYPES.MEDIA_COMM],
+      });
       setQueue(items.filter((item) => FORM_SCHOOL_CODES[FORM_TYPES.MEDIA_COMM].includes(getSchoolKey(item.school))));
     } catch (err) {
       console.error("Could not load SoMCS review queue:", err);
@@ -919,6 +923,7 @@ export default function MediaCommDashboard({ fixedRole }) {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        subjectProfile: item,
       });
       setReviewing(null);
       await loadQueue();

@@ -94,6 +94,8 @@ export const RATING_SECTIONS = [
 
 const n = (value) => parseFloat(value) || 0;
 const clean = (value) => String(value ?? "").trim();
+const firstNonEmpty = (...values) =>
+  values.find((value) => clean(value) !== "") || "";
 const emailKey = (value) => clean(value).toLowerCase();
 const academicYear = (value) =>
   clean(value) || APP_INFO.DEFAULT_AY || "2025-2026";
@@ -452,6 +454,74 @@ export const decorateNonTeachingRow = (row, profile = {}) => {
   };
 };
 
+const normalizeNonTeachingQueueItem = (item = {}) => {
+  const rawRole = firstNonEmpty(
+    item.appraisalRole,
+    item.appraisal_role,
+    item.role,
+    item.form?.submittedByRole,
+    item.payload?.submittedByRole,
+  );
+  const role = normalizeNonTeachingRole(rawRole, rawRole || "non_teaching_staff");
+  const form = normalizeNonTeachingForm(
+    item.form || item.payload || {},
+    item,
+    role,
+  );
+  const staffEmail = emailKey(firstNonEmpty(
+    item.email,
+    item.staff_email,
+    item.staffEmail,
+    form.info?.email,
+  ));
+  const ay = academicYear(firstNonEmpty(item.academicYear, item.academic_year, form.info?.ay));
+  const name = firstNonEmpty(item.name, item.full_name, item.fullName, form.info?.name, staffEmail);
+  const status = firstNonEmpty(item.status, form.status, NON_TEACHING_STATUS.DRAFT);
+  const selfTotals = calculateNonTeachingTotals(form, "self");
+  const roTotals = calculateNonTeachingTotals(form, "reporting_officer");
+  const registrarTotals = calculateNonTeachingTotals(form, "registrar");
+  const vcTotals = calculateNonTeachingTotals(form, "vc");
+
+  return {
+    ...item,
+    id: firstNonEmpty(item.id, `${staffEmail}:${ay}`),
+    email: staffEmail,
+    staff_email: staffEmail,
+    academicYear: ay,
+    academic_year: ay,
+    form: { ...form, status },
+    name,
+    employeeId: firstNonEmpty(item.employeeId, item.employee_id, form.info?.employeeId),
+    designation: firstNonEmpty(item.designation, form.info?.designation, nonTeachingRoleLabel(role)),
+    department: firstNonEmpty(item.department, form.info?.department),
+    appraisalRole: role,
+    appraisal_role: role,
+    roleLabel: nonTeachingRoleLabel(role),
+    avatar: item.avatar || initialsFor(name, staffEmail),
+    avatarColor: item.avatarColor ||
+      (role === "registrar" ? "#7c3aed" : role === "reporting_officer" ? "#0891b2" : "#1d4ed8"),
+    status,
+    selfTotal: n(firstNonEmpty(item.selfTotal, item.self_total, selfTotals.total)),
+    roTotal: n(firstNonEmpty(item.roTotal, item.ro_total, roTotals.total)),
+    registrarTotal: n(firstNonEmpty(item.registrarTotal, item.registrar_total, registrarTotals.total)),
+    vcTotal: n(firstNonEmpty(item.vcTotal, item.vc_total, vcTotals.total)),
+  };
+};
+
+const nonTeachingStatusIndex = (status) => [
+  NON_TEACHING_STATUS.DRAFT,
+  NON_TEACHING_STATUS.SUBMITTED,
+  NON_TEACHING_STATUS.RO_REVIEWED,
+  NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+  NON_TEACHING_STATUS.VC_APPROVED,
+].indexOf(status);
+
+const nonTeachingReachedReviewer = (item = {}, reviewerRole) => {
+  const expectedIndex = nonTeachingStatusIndex(expectedPendingStatus(reviewerRole));
+  const currentIndex = nonTeachingStatusIndex(item.status);
+  return expectedIndex >= 0 && currentIndex >= expectedIndex;
+};
+
 export const fetchNonTeachingQueueForRole = async ({
   reviewerRole,
   academicYear: ay,
@@ -464,18 +534,14 @@ export const fetchNonTeachingQueueForRole = async ({
     if (ay) params.academic_year = ay;
 
     const items = await api.get("/non-teaching/subordinates", { params });
-    return (items || []).map((item) => ({
-      ...item,
-      avatar: initialsFor(item.name || item.staff_email, item.staff_email),
-      avatarColor:
-        item.appraisalRole === "registrar"
-          ? "#7c3aed"
-          : item.appraisalRole === "reporting_officer"
-            ? "#0891b2"
-            : "#1d4ed8",
-    }));
+    return (items || [])
+      .map(normalizeNonTeachingQueueItem)
+      .filter((item) =>
+        canReviewNonTeachingItem(item, role) &&
+        nonTeachingReachedReviewer(item, role)
+      );
   } catch (err) {
-    throw new Error(err?.message || "Could not load non-teaching review queue.");
+    throw new Error(err?.message || "Could not load non-teaching review queue.", { cause: err });
   }
 };
 

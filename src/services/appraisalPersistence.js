@@ -1,6 +1,5 @@
 import { api } from "./api";
-
-const inputValue = (value) => value ?? "";
+import { getReviewChain, pendingStatusFor } from "../utils/hierarchy";
 
 const SNAPSHOT_SETTERS = {
   info: "setInfo",
@@ -37,13 +36,6 @@ const SNAPSHOT_SETTERS = {
   fdps: "setFdps",
   training: "setTraining",
 };
-
-const reviewerScores = (row) => ({
-  hod: inputValue(row.hod_score),
-  director: inputValue(row.director_score),
-  dean: inputValue(row.dean_score),
-  vc: inputValue(row.vc_score),
-});
 
 const snapshotFormFromPayload = (payload) => {
   if (!payload) return null;
@@ -227,13 +219,31 @@ export const submitAppraisal = async ({
   if (!facultyEmail) throw new Error("Please login again. Your email was not found in this session.");
   if (!academicYear) throw new Error("Academic year is required before submitting.");
 
-  await api.post("/appraisal/submit", {
+  const workflowProfile = submitterProfile || activeProfile || {};
+  const reviewChain = getReviewChain(workflowProfile);
+  const nextReviewer = reviewChain[0] || "";
+  const workflowStatus = nextReviewer ? pendingStatusFor(nextReviewer) : "Submitted";
+  const basePayload = {
     academic_year: academicYear,
     form: mapFormForSubmit(form),
     totals,
     docs,
     submitter_profile: submitterProfile || activeProfile,
-  });
+  };
+
+  try {
+    await api.post("/appraisal/submit", {
+      ...basePayload,
+      status: workflowStatus,
+      workflow_status: workflowStatus,
+      next_reviewer: nextReviewer,
+      next_reviewer_role: nextReviewer,
+      review_chain: reviewChain,
+    });
+  } catch (err) {
+    if (![400, 422].includes(err?.response?.status)) throw err;
+    await api.post("/appraisal/submit", basePayload);
+  }
 };
 
 // Section rows → used by the review workflow to get section data from snapshot rows.

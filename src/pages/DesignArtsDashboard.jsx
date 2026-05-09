@@ -836,7 +836,11 @@ export default function DesignArtsDashboard({ fixedRole }) {
     if (role === "faculty") return;
     setLoadingQueue(true);
     try {
-      const items = await fetchReviewQueueForRole({ reviewerRole: role, reviewerProfile: { ...profile, appraisal_role: role } });
+      const items = await fetchReviewQueueForRole({
+        reviewerRole: role,
+        reviewerProfile: { ...profile, appraisal_role: role },
+        schoolValues: FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS],
+      });
       setQueue(items.filter((item) => FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS].includes(getSchoolKey(item.school))));
     } catch (err) {
       console.error("Could not load Design & Applied Arts review queue:", err);
@@ -922,6 +926,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        subjectProfile: item,
       });
       setReviewing(null);
       await loadQueue();

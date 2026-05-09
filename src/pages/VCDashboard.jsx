@@ -1110,6 +1110,7 @@ export default function VCDashboard() {
         const items = await fetchReviewQueueForRole({
           reviewerRole: "vc",
           reviewerProfile: { ...profileFromsessionStorage(), appraisal_role: "vc" },
+          schoolValues: UNIVERSITY_SCHOOLS.flatMap((school) => [school.code, school.name, school.label]),
         });
         let nonTeachingItems = [];
         try {
@@ -1154,6 +1155,7 @@ export default function VCDashboard() {
         totalScore: scores.total,
         remarks,
         sectionScores,
+        subjectProfile: item,
       });
       const upd = (list) => list.map(p => p.id === id
         ? { ...p, ...sectionScores, innovVc: sectionScores?.innovativeTeaching?.vc ?? p.innovVc, status: "Reviewed", workflowStatus: reviewedStatusFor("vc"), vcPartA: scores.partA, vcPartB: scores.partB, vcTotal: scores.total, vcRemarks: remarks }
