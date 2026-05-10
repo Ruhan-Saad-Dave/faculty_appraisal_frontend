@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO } from "../constants/formConfig";
 
-import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal, saveAppraisalDraftSection } from "../services/appraisalPersistence";
+import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, courseFileRowScore, effectiveMaxScore, clearDraft, draftKeyFor, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isValidDDMMYYYY, loadDraft, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, saveDraft, scoreRemaining, societyRowScore, societySelectionForRow, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
-import { reviewedStatusFor, profileFromsessionStorage } from "../utils/hierarchy";
+import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError } from "../utils/hierarchy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -312,8 +312,6 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
   const getS = (key) => hodData[key] ?? faculty[key] ?? "";
 
   const { info, lectures, courseFile, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, docs } = faculty;
-  const courseFileRow = Array.isArray(courseFile) ? (courseFile[0] || {}) : (courseFile || {});
-
   const rows = (arr) => arr && arr.length > 0 ? arr : [{}];
   const reviewerScoreLabel = `${reviewerLabel} Score`;
 
@@ -387,7 +385,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
                 <td style={TD}><RO val={r.course} /></td>
                 <td style={TD}><RO val={r.title} /></td>
                 <td style={TDC}><RO val={r.details} center /></td>
-                <td style={TDV}><ViewDocsCell docKey={`cf-${i}`} docs={docs} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`courseFile-${i}`} docs={docs} /></td>
                 <td style={TDS}><RO val={courseFileRowScore(r) ? String(courseFileRowScore(r)) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={get("courseFile", i, "hod")} onChange={v => set("courseFile", i, "hod", v)} max={SCORE_LIMITS.courseFileRow} /></td>
               </tr>
@@ -413,7 +411,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
       </SC>
 
       {/* A4: Projects */}
-      <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
+      {faculty.sectionApplicability?.projects !== "notApplicable" && <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Project Type</th>
@@ -431,7 +429,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
             ))}
           </tbody>
         </table>
-      </SC>
+      </SC>}
 
       {/* A5: Qualification */}
       <SC title="A5. Qualification Enhancement (Max 10)" accent="#8b5cf6">
@@ -671,7 +669,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
       </SC>
 
       {/* B4: Research Guidance */}
-      <SC title="B4(a). Research Guidance — PhD / PG (Max 30)" accent="#059669">
+      {faculty.sectionApplicability?.research !== "notApplicable" && <SC title="B4(a). Research Guidance — PhD / PG (Max 30)" accent="#059669">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Degree</th><th style={TH}>Student Name</th><th style={TH}>Status</th>
@@ -691,7 +689,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
             ))}
           </tbody>
         </table>
-      </SC>
+      </SC>}
 
       <SC title="B4(b). Research / Consultancy Internal Projects (Max 15)" accent="#059669">
         <div style={{ overflowX: "auto" }}>
@@ -960,7 +958,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
     const lec = avgReviewRows("lectures", "hod", 50);
     const cf = avgReviewRows("courseFile", "hod", 20, SCORE_LIMITS.courseFileRow);
     const innov = clampScore(getS("innovHod"), 10);
-    const proj = sumReviewRows("projects", "hod", 10, projectGuidanceRowMax);
+    const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : sumReviewRows("projects", "hod", 10, projectGuidanceRowMax);
     const qual = sumReviewRows("quals", "hod", 10, SCORE_LIMITS.qualificationRow);
     const fb = sumReviewRows("feedback", "hod", 10, 10);
     const dept = sumReviewRows("deptActs", "hod", 20);
@@ -973,7 +971,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
     const jour = sumReviewRows("journals", "hod", 120);
     const bk = sumReviewRows("books", "hod", 50);
     const ictT = sumReviewRows("ict", "hod", 20);
-    const res = sumReviewRows("research", "hod", 30, researchGuidanceRowMax);
+    const res = faculty.sectionApplicability?.research === "notApplicable" ? 0 : sumReviewRows("research", "hod", 30, researchGuidanceRowMax);
     const resProjects = sumReviewRows("projects2", "hod", SCORE_LIMITS.researchInternalProjects);
     const externalResProjects = sumReviewRows("externalProjects", "hod", SCORE_LIMITS.researchExternalProjects);
     const pat = sumReviewRows("patents", "hod", 40);
@@ -1161,13 +1159,7 @@ export default function HODDashboard({
   const setLec = (i, k, v) => setLectures((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [courseFile, setCourseFile] = useState([{ course: "", title: "", details: "", score: "", hod: "", director: "" }]);
-  const setCF = (i, k, v) => setCourseFile((p) => p.map((r, j) => {
-    if (j !== i) return r;
-    const next = { ...r, [k]: v };
-    return ["course", "title", "details"].includes(k)
-      ? { ...next, score: courseFileRowScore(next) ? String(courseFileRowScore(next)) : "" }
-      : next;
-  }));
+  const setCF = (i, k, v) => setCourseFile((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const [innovScore, setInnovScore] = useState("");
   const [innovDetails, setInnovDetails] = useState("");
   const [projects, setProjects] = useState([
@@ -1605,17 +1597,26 @@ export default function HODDashboard({
       return;
     }
 
+    const submitterProfile = profileFromsessionStorage();
+    const workflowError = workflowValidationError(submitterProfile);
+    if (workflowError) {
+      alert(workflowError);
+      return;
+    }
+
     const confirmSubmit = window.confirm("Are you sure you want to submit your appraisal? This will save your data to the database.");
     if (!confirmSubmit) return;
 
     setSubmitting(true);
     try {
-      await saveAppraisal({
+      await submitAppraisal({
         facultyEmail: userEmail,
         academicYear: info.ay,
         totals: { partATotal, partBTotal, grandTotal },
         form: buildSelfDraftForm(),
         docs,
+        submitterProfile,
+        activeProfile: submitterProfile,
       });
 
       clearDraft(selfDraftKey);
@@ -1736,12 +1737,14 @@ export default function HODDashboard({
       </tr>
     </table>
 
+    ${sectionApplicability.projects !== "notApplicable" ? `
     <!-- A4 -->
     <h3>A4: Projects</h3>
     <table>
       <tr><th>Project Type</th><th>Score</th></tr>
       ${projects.map(p => `<tr><td>${p.label || "&nbsp;"}</td><td class="center">${clampScore(p.score, projectGuidanceRowMax(p)) || "&nbsp;"}</td></tr>`).join('')}
     </table>
+    ` : ""}
 
     <!-- A5 -->
     <h3>A5: Qualification Enhancement</h3>
@@ -1824,11 +1827,13 @@ export default function HODDashboard({
       ${ict.map(i => `<tr><td>${i.title || "&nbsp;"}</td><td>${i.desc || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
     </table>
 
+    ${sectionApplicability.research !== "notApplicable" ? `
     <h3>B4(a). Research Guidance</h3>
     <table>
       <tr><th>Degree</th><th>Name</th><th>Thesis</th><th>Score</th></tr>
       ${research.map(r => `<tr><td>${r.degree || "&nbsp;"}</td><td>${r.name || "&nbsp;"}</td><td>${r.thesis || "&nbsp;"}</td><td class="center">${researchGuidanceScore(r).toFixed(1)}</td></tr>`).join('')}
     </table>
+    ` : ""}
 
     <h3>B4(b). Ongoing & Completed Research / Consultancy Internal Projects (Max 15)</h3>
     <table>
@@ -2069,7 +2074,6 @@ export default function HODDashboard({
                         <th style={TH}>Course / Paper</th>
                         <th style={TH}>Title</th>
                         <th style={TH}>Details</th>
-                        <th style={TH}>Participation</th>
                         <th style={TH}>Attachment</th>
                         <th style={TH}>View Docs</th>
                         <th style={TH}>Score</th>
@@ -2084,7 +2088,7 @@ export default function HODDashboard({
                     <td style={TD}><TI val={r.details} onChange={(v) => setCF(i, "details", v)} /></td>
                     <td style={TD}><DocCell id={`courseFile-${i}`} docs={docs} setDocs={setDocs} /></td>
                     <td style={TD}><ViewCell id={`courseFile-${i}`} docs={docs} /></td>
-                    <td style={TDS}><RO val={courseFileRowScore(r) ? String(courseFileRowScore(r)) : ""} center /></td>
+                    <td style={TDS}><TI val={r.score} onChange={(v) => setCF(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.courseFileRow)))} numeric max={SCORE_LIMITS.courseFileRow} center /></td>
                    </tr>
                  ))}
                       <tr style={{ background: "#eff6ff" }}>
@@ -2153,6 +2157,7 @@ export default function HODDashboard({
                       </label>
                     ))}
                   </div>
+                  {sectionApplicability.projects !== "notApplicable" && (<>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -2179,7 +2184,8 @@ export default function HODDashboard({
                       </tr>
                     </tbody>
                   </table>
-                  {sectionApplicability.projects !== "notApplicable" && <RowBtns onAdd={() => setProjects((p) => [...p, { label: "", score: "" }])} onDel={() => setProjects((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={projects.length > 1} />}
+                  <RowBtns onAdd={() => setProjects((p) => [...p, { label: "", score: "" }])} onDel={() => setProjects((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={projects.length > 1} />
+                  </>)}
                 </div>
 
                 {/* A5. Qualifications */}
@@ -2398,6 +2404,7 @@ export default function HODDashboard({
                 {/* A11. ACR */}
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(xi) Annual Confidential Report (ACR) — Max 25 marks</div>
+                  <div style={{ fontSize: 11, color: "#b45309", background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 5, padding: "6px 10px", marginBottom: 8 }}>This section is filled by your superior. Your scores here are read-only.</div>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -2411,7 +2418,7 @@ export default function HODDashboard({
                         <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
                           <td style={TDC}>{i + 1}</td>
                           <td style={TD}><div style={{ fontWeight: 700 }}>{r.label}</div>{ACR_DETAIL_POINTS[r.label] && <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>{ACR_DETAIL_POINTS[r.label].map((point) => <li key={point}>{point}</li>)}</ul>}</td>
-                          <td style={TDS}><TI val={r.score} numeric onChange={(v) => setAcrRow(i, "score", v)} center /></td>
+                          <td style={TDS}><RO val={r.score || "-"} center /></td>
 
                         </tr>
                       ))}
@@ -2561,6 +2568,7 @@ export default function HODDashboard({
                       </label>
                     ))}
                   </div>
+                  {sectionApplicability.research !== "notApplicable" && (<>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -2602,7 +2610,8 @@ export default function HODDashboard({
                       </tr>
                     </tbody>
                   </table>
-                  {sectionApplicability.research !== "notApplicable" && <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />}
+                  <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />
+                  </>)}
                 </div>
 
                 {/* B4(b). Research / Consultancy Internal Projects */}
@@ -3038,10 +3047,16 @@ export default function HODDashboard({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
               {filtered.map(faculty => {
                 const g = grade(faculty.grandTotal || 350, 620);
+                const courseFilePartA = Array.isArray(faculty.courseFile)
+                  ? (() => {
+                      const filled = faculty.courseFile.filter(row => String(row?.score ?? "").trim() !== "");
+                      return filled.length ? filled.reduce((total, row) => total + courseFileRowScore(row), 0) / filled.length : 0;
+                    })()
+                  : n(faculty.courseFile?.score);
                 const facPartA = [
                   ...(faculty.lectures || []).map(r => n(r.score)),
-                  n(faculty.courseFile?.score), n(faculty.innovScore),
-                  ...(faculty.projects || []).map(r => n(r.score)),
+                  courseFilePartA, n(faculty.innovScore),
+                  ...(faculty.sectionApplicability?.projects === "notApplicable" ? [] : (faculty.projects || []).map(r => n(r.score))),
                   ...(faculty.quals || []).map(r => n(r.score)),
                   ...(faculty.feedback || []).map(r => n(r.score)),
                   ...(faculty.deptActs || []).map(r => n(r.score)),
@@ -3102,8 +3117,8 @@ export default function HODDashboard({
                             const form = data?.payload?.form || data?.form || {};
                             const docs = data?.payload?.docs || data?.docs || {};
                             setReviewingFaculty({ ...faculty, ...form, docs });
-                          } catch {
-                            setReviewingFaculty(faculty);
+                          } catch (err) {
+                            alert(`Unable to open submitted form.\n\n${err.message}`);
                           } finally {
                             setReviewLoading(null);
                           }

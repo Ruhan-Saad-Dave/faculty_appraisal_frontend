@@ -14,7 +14,7 @@ import MediaCommDashboard from "./MediaCommDashboard";
 import DesignArtsDashboard from "./DesignArtsDashboard";
 import { normalizeRole } from "../auth/session";
 import { departmentHasHod, getDeanTrack } from "../utils/hierarchy";
-import { DEAN_TRACKS, getSchoolKey, isCisrSchool } from "../constants/universityHierarchy";
+import { DEAN_TRACKS, getSchoolKey, isCisrSchool, normalizeHierarchyText } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
 
 function UnknownSchoolDashboard() {
@@ -68,11 +68,15 @@ export default function RoleDashboard() {
       return <DirectorDashboard />;
       
     case "dean":
-      if (!formType) return <UnknownSchoolDashboard />;
-      if (getDeanTrack({ school, department, designation: sessionStorage.getItem("designation") || "" }) === DEAN_TRACKS.NON_ENGINEERING) {
+      {
+      const deanTrack = getDeanTrack({ school, department, designation: sessionStorage.getItem("designation") || "" });
+      const deanDivisionSchool = ["engineering", "non engineering", "nonengineering"].includes(normalizeHierarchyText(school));
+      if (!formType && !deanDivisionSchool) return <UnknownSchoolDashboard />;
+      if (deanTrack === DEAN_TRACKS.NON_ENGINEERING) {
         return <NonEngineeringDeanDashboard />;
       }
       return <DeanDashboard />;
+      }
       
     case "vc":
       return <VCDashboard />;

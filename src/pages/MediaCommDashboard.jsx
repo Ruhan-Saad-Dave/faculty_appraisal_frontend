@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO } from "../constants/formConfig";
 import { FORM_SCHOOL_CODES, FORM_TYPES } from "../constants/formRouting";
 import { getSchoolKey } from "../constants/universityHierarchy";
-import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal, saveAppraisalDraftSection } from "../services/appraisalPersistence";
+import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { openFullFormReport } from "../utils/fullFormReport";
@@ -36,7 +36,7 @@ import {
   toggleInnovativeMethod,
   validateCompleteRows,
 } from "../utils/appraisalFormUtils";
-import { getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles } from "../utils/hierarchy";
+import { getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError } from "../utils/hierarchy";
 
 const ACCENT = "#b45309";
 const ACCENT2 = "#0f766e";
@@ -206,7 +206,7 @@ const validateMediaBeforeSubmit = (form, sectionView = "all") => {
     rows: form[section.key] || [],
     fields: [
       ...section.fields.filter(([, , readOnly]) => !readOnly).map(([key]) => key),
-      ...(section.selfReadOnlyScore || section.autoScore || section.key === "feedback" || section.key === "courseFile" ? [] : ["score"]),
+      ...(section.selfReadOnlyScore || section.autoScore || section.key === "feedback" ? [] : ["score"]),
     ],
     rowMax: section.rowMax,
     maxScore: section.max,
@@ -371,6 +371,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
   const currentRole = reviewerRole;
   const applicability = form.sectionApplicability || {};
   const notApplicable = applicability[section.key] === "notApplicable";
+  const selfLocked = mode === "self" && section.key === "acr";
   const canToggleApplicability = editableSelf && ["projects", "research"].includes(section.key);
   const earned = notApplicable ? 0 : scoreSectionRows(section.key, rows, section.max);
 
@@ -390,7 +391,6 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
         const rowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
         const nextValue = key === "date" ? maskDateDDMMYYYY(value) : key === "score" ? clampScore(value, rowMax) : value;
         const nextRow = { ...row, [key]: nextValue };
-        if (section.key === "courseFile" && ["course", "title", "details"].includes(key)) return { ...nextRow, score: courseFileRowScore(nextRow) ? String(courseFileRowScore(nextRow)) : "" };
         if (section.key === "society" && key === "participated") return { ...nextRow, score: nextValue ? String(societyRowScore({ participated: nextValue })) : "" };
         if (section.key === "research" && ["degree", "name", "thesis"].includes(key)) return { ...nextRow, score: researchGuidanceScore(nextRow) ? String(researchGuidanceScore(nextRow)) : "" };
         return nextRow;
@@ -446,6 +446,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
           ))}
         </div>
       )}
+      {!notApplicable && (<>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
           <thead>
@@ -468,7 +469,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                     {mode !== "self" ? <RO value={row[key]} /> : key === "first" || key === "participated" ? (
                       <select
                         value={key === "participated" ? societySelectionForRow(row) : row[key] || ""}
-                        disabled={!editableSelf || readOnlyField || notApplicable}
+                        disabled={!editableSelf || readOnlyField || notApplicable || selfLocked}
                         onChange={(event) => updateRow(index, key, event.target.value)}
                         style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "Georgia, serif", fontSize: 11 }}
                       >
@@ -479,7 +480,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                     ) : section.key === "research" && key === "degree" ? (
                       <select
                         value={row[key] || ""}
-                        disabled={!editableSelf || readOnlyField || notApplicable}
+                        disabled={!editableSelf || readOnlyField || notApplicable || selfLocked}
                         onChange={(event) => updateRow(index, key, event.target.value)}
                         style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "Georgia, serif", fontSize: 11 }}
                       >
@@ -489,7 +490,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </select>
                     ) : (
                       <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key)} readOnly={!editableSelf || readOnlyField || notApplicable} onChange={(value) => updateRow(index, key, value)} />
+                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key)} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked} onChange={(value) => updateRow(index, key, value)} />
                         {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
                           <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
                             {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
@@ -503,14 +504,14 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                   </td>
                 ))}
                 {section.key === "feedback" && <td style={tdCenter}>{feedbackAverage(row).toFixed(2)}</td>}
-                <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable} /></td>
+                <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked} /></td>
                 <td style={tdCenter}>
                   {mode === "self"
                     ? section.key === "feedback"
                       ? <RO value={feedbackRowScore(row, section.max).toFixed(1)} center />
-                      : section.autoScore || section.key === "courseFile"
+                      : section.autoScore
                         ? <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />
-                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable} onChange={(value) => updateRow(index, "score", value)} />
+                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked} onChange={(value) => updateRow(index, "score", value)} />
                     : <RO value={section.key === "research" ? researchGuidanceScore(row).toFixed(1) : rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
                 </td>
                 {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={row[role]} center /></td>)}
@@ -524,12 +525,13 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
           </tbody>
         </table>
       </div>
-      {editableSelf && !section.selfReadOnlyScore && !notApplicable && (
+      {editableSelf && !section.selfReadOnlyScore && (
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           <button type="button" onClick={addRow} style={smallButton("#10b981")}>+ Add Row</button>
           <button type="button" onClick={deleteRow} style={smallButton("#ef4444")}>Delete Last</button>
         </div>
       )}
+      </>)}
     </SectionShell>
   );
 }
@@ -943,6 +945,12 @@ export default function MediaCommDashboard({ fixedRole }) {
       navigate("/login", { replace: true });
       return;
     }
+    const submitterProfile = { ...profile, appraisal_role: role };
+    const workflowError = workflowValidationError(submitterProfile);
+    if (workflowError) {
+      alert(workflowError);
+      return;
+    }
     const normalizedForm = normalizeScoresForSubmit(form);
     const validationErrors = validateMediaBeforeSubmit(normalizedForm);
     if (validationErrors.length) {
@@ -951,13 +959,14 @@ export default function MediaCommDashboard({ fixedRole }) {
     }
     setSubmitting(true);
     try {
-      await saveAppraisal({
+      await submitAppraisal({
         facultyEmail: userEmail,
         academicYear,
         totals: { partATotal: totals.partA, partBTotal: totals.partB, grandTotal: totals.total },
         form: normalizedForm,
         docs,
-        submitterProfile: { ...profile, appraisal_role: role },
+        submitterProfile,
+        activeProfile: submitterProfile,
       });
       clearDraft(draftKey);
       setDeclaration({ status: pendingStatusFor(getReviewChain({ ...profile, appraisal_role: role })[0]), submitted_at: new Date().toISOString() });

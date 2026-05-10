@@ -1,11 +1,13 @@
 import {
+  DEAN_TRACKS,
   canonicalDepartmentValue,
   canonicalSchoolValue,
   isCisrSchool,
   isSoemrSchool,
+  normalizeHierarchyText,
 } from "../constants/universityHierarchy";
 import { NON_TEACHING_ROLES, isNonTeachingRole } from "../constants/nonTeachingHierarchy";
-import { departmentHasHod } from "../utils/hierarchy";
+import { departmentHasHod, getDeanTrack } from "../utils/hierarchy";
 
 export const VALID_ROLES = ["faculty", "hod", "center_head", "director", "dean", "vc", ...NON_TEACHING_ROLES];
 
@@ -54,10 +56,26 @@ export const schoolHasHod = (school) => {
 const firstValue = (...values) =>
   values.find((value) => String(value ?? "").trim() !== "") || "";
 
+const deanDivisionValue = (value) => {
+  const normalized = normalizeHierarchyText(value);
+  if (normalized === "engineering") return DEAN_TRACKS.ENGINEERING;
+  if (normalized === "non engineering" || normalized === "nonengineering") return DEAN_TRACKS.NON_ENGINEERING;
+  return "";
+};
+
+const profileSchoolValue = (role, rawSchool, profile = {}) => {
+  if (isNonTeachingRole(role)) return "";
+  const division = deanDivisionValue(rawSchool);
+  if (role === "dean" && division) return division;
+  const canonical = canonicalSchoolValue(rawSchool);
+  if (role === "dean" && canonical) return getDeanTrack({ ...profile, school: canonical });
+  return canonical;
+};
+
 export const buildProfilePayload = (formData, academicYear = "2025-2026") => {
   const role = normalizeRole(formData.role);
   const nonTeachingRole = isNonTeachingRole(role);
-  const school = nonTeachingRole ? "" : canonicalSchoolValue(formData.school);
+  const school = profileSchoolValue(role, formData.school, formData);
   const department = nonTeachingRole
     ? String(formData.department || "").trim()
     : isSoemrSchool(school)
@@ -85,7 +103,7 @@ export const storeUserSession = ({ token, profile = {}, fallbackEmail = "" }) =>
   const name = firstValue(safeProfile.full_name, email);
   const role = normalizeRole(firstValue(safeProfile.appraisal_role, safeProfile.role));
   const nonTeachingRole = isNonTeachingRole(role);
-  const school = nonTeachingRole ? "" : canonicalSchoolValue(firstValue(safeProfile.school));
+  const school = profileSchoolValue(role, firstValue(safeProfile.school), safeProfile);
   const department = nonTeachingRole
     ? firstValue(safeProfile.department)
     : isSoemrSchool(school)

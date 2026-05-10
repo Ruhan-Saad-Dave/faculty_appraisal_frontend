@@ -1,5 +1,7 @@
 import { api } from "./api";
-import { getReviewChain, pendingStatusFor } from "../utils/hierarchy";
+import { storeUserSession } from "../auth/session";
+import { getDeanTrack, getReviewChain, normalizeRoleForWorkflow, pendingStatusFor } from "../utils/hierarchy";
+import { DEAN_TRACKS } from "../constants/universityHierarchy";
 
 const SNAPSHOT_SETTERS = {
   info: "setInfo",
@@ -157,16 +159,333 @@ export const loadSavedAppraisal = async ({ facultyEmail, academicYear, setters }
 
 // Used by reviewWorkflow to load any faculty's appraisal for authority review.
 export const fetchSavedAppraisal = async ({ facultyEmail, academicYear }) => {
-  if (!facultyEmail || !academicYear) return {};
+  if (!facultyEmail) throw new Error("Faculty email is required to open the submitted form.");
+  if (!academicYear) throw new Error("Academic year is required to open the submitted form.");
   try {
     const data = await api.get(
       `/dashboard/faculty/${encodeURIComponent(facultyEmail)}`,
       { params: { academic_year: academicYear } }
     );
-    return data || {};
-  } catch {
-    return {};
+    return readSubmittedAppraisalResponse(data, facultyEmail, academicYear);
+  } catch (err) {
+    if (err?.statusCode === 403) {
+      const repaired = await repairDeanDivisionProfile();
+      if (repaired) {
+        try {
+          const data = await api.get(
+            `/dashboard/faculty/${encodeURIComponent(facultyEmail)}`,
+            { params: { academic_year: academicYear } }
+          );
+          return readSubmittedAppraisalResponse(data, facultyEmail, academicYear);
+        } catch {
+          // Fall through to the explicit authority message below.
+        }
+      }
+      throw new Error("Access denied while opening this submitted form. I tried the Dean division-profile repair, but the backend still rejected the request. Please log out and log in again so the refreshed profile/token is used. If it still fails, the backend faculty_profiles.school for this Dean must be updated to 'engineering' or 'non_engineering'.", { cause: err });
+    }
+    throw err;
   }
+};
+
+const readSubmittedAppraisalResponse = (data, facultyEmail, academicYear) => {
+  if (!data) {
+    throw new Error(`No saved appraisal snapshot was found for ${facultyEmail} in academic year ${academicYear}. Check that the academic year matches the submitted record.`);
+  }
+  const normalized = normalizeFetchedAppraisal(data);
+  const form = normalized.payload?.form || normalized.form;
+  if (!hasSubmittedFormData(form)) {
+    throw new Error(`The saved appraisal snapshot for ${facultyEmail} does not contain submitted form section data. The user may need to resubmit the appraisal for academic year ${academicYear}.`);
+  }
+  return normalized;
+};
+
+const repairDeanDivisionProfile = async () => {
+  const role = normalizeRoleForWorkflow(sessionStorage.getItem("role"));
+  if (role !== "dean") return false;
+
+  const profile = {
+    school: sessionStorage.getItem("school") || "",
+    department: sessionStorage.getItem("department") || "",
+    designation: sessionStorage.getItem("designation") || "",
+  };
+  if (!profile.school) return false;
+  const deanTrack = getDeanTrack(profile);
+  if (![DEAN_TRACKS.ENGINEERING, DEAN_TRACKS.NON_ENGINEERING].includes(deanTrack)) return false;
+
+  try {
+    await api.put("/auth/me", { school: deanTrack });
+    const refreshedProfile = await api.get("/auth/me").catch(() => null);
+    if (refreshedProfile) {
+      storeUserSession({ profile: refreshedProfile });
+    }
+    sessionStorage.setItem("school", deanTrack);
+    sessionStorage.setItem("hasHod", "false");
+    sessionStorage.setItem("hasHOD", "false");
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const FORM_SECTION_KEYS = [
+  "lectures", "courseFile", "projects", "quals", "feedback", "deptActs", "uniActs",
+  "society", "industry", "acr", "journals", "books", "ict", "research", "projects2",
+  "internalProjects", "externalProjects", "ipr", "patents", "awards", "confs",
+  "proposals", "products", "fdps", "training", "popularWritings",
+];
+
+const REVIEW_FIELD_BY_ROLE = {
+  hod: "hod",
+  center_head: "hod",
+  director: "director",
+  dean: "dean",
+  vc: "vc",
+};
+
+const REVIEW_INNOV_FIELD_BY_ROLE = {
+  hod: "innovHod",
+  center_head: "innovHod",
+  director: "innovDirector",
+  dean: "innovDean",
+  vc: "innovVc",
+};
+
+const hasSubmittedFormData = (form = {}) =>
+  Boolean(form && FORM_SECTION_KEYS.some((key) => Array.isArray(form[key]) && form[key].length > 0));
+
+const firstPresent = (...values) =>
+  values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+
+const reviewArrayFrom = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "object") return [];
+
+  return Object.entries(value).map(([role, review]) => {
+    if (review && typeof review === "object" && !Array.isArray(review)) {
+      return { reviewer_role: review.reviewer_role || review.reviewerRole || role, ...review };
+    }
+    return { reviewer_role: role, section_scores: review };
+  });
+};
+
+const syntheticReviewFromRoleFields = (source = {}) =>
+  ["hod", "center_head", "director", "dean", "vc"].flatMap((role) => {
+    const camel = role.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    const sectionScores = source[`${role}_section_scores`] || source[`${camel}SectionScores`];
+    if (!sectionScores) return [];
+    return [{
+      reviewer_role: role,
+      section_scores: sectionScores,
+      part_a_score: source[`${role}_part_a`] || source[`${camel}PartA`],
+      part_b_score: source[`${role}_part_b`] || source[`${camel}PartB`],
+      total_score: source[`${role}_total`] || source[`${camel}Total`],
+      remarks: source[`${role}_remarks`] || source[`${camel}Remarks`],
+    }];
+  });
+
+const reviewsFromAppraisalResponse = (data = {}) => [
+  ...reviewArrayFrom(data.reviews),
+  ...reviewArrayFrom(data.review_history),
+  ...reviewArrayFrom(data.reviewHistory),
+  ...reviewArrayFrom(data.appraisal_reviews),
+  ...reviewArrayFrom(data.appraisalReviews),
+  ...reviewArrayFrom(data.payload?.reviews),
+  ...reviewArrayFrom(data.payload?.review_history),
+  ...reviewArrayFrom(data.payload?.reviewHistory),
+  ...reviewArrayFrom(data.payload?.appraisal_reviews),
+  ...reviewArrayFrom(data.payload?.appraisalReviews),
+  ...syntheticReviewFromRoleFields(data),
+  ...syntheticReviewFromRoleFields(data.payload || {}),
+];
+
+const reviewRowScore = (row, roleField, role) => {
+  if (row === undefined || row === null) return undefined;
+  if (typeof row !== "object" || Array.isArray(row)) return row;
+  return firstPresent(
+    row[roleField],
+    row[role],
+    row[`${roleField}_score`],
+    row[`${role}_score`],
+    row.reviewScore,
+    row.review_score,
+    row.reviewerScore,
+    row.reviewer_score,
+    row.value,
+    row.total,
+  );
+};
+
+const mergeSectionReviewScore = (rows, sectionScore, roleField, role) => {
+  const baseRows = Array.isArray(rows) ? rows : [];
+
+  if (Array.isArray(sectionScore)) {
+    const length = Math.max(baseRows.length, sectionScore.length);
+    return Array.from({ length }, (_, index) => {
+      const existing = baseRows[index] || {};
+      const reviewValue = reviewRowScore(sectionScore[index], roleField, role);
+      return reviewValue === undefined ? existing : { ...existing, [roleField]: reviewValue };
+    });
+  }
+
+  if (sectionScore && typeof sectionScore === "object") {
+    const numericEntries = Object.entries(sectionScore)
+      .filter(([key]) => /^\d+$/.test(key))
+      .sort(([a], [b]) => Number(a) - Number(b));
+    if (numericEntries.length) {
+      return mergeSectionReviewScore(baseRows, numericEntries.map(([, value]) => value), roleField, role);
+    }
+  }
+
+  const reviewValue = reviewRowScore(sectionScore, roleField, role);
+  if (reviewValue === undefined) return rows;
+  if (!baseRows.length) return [{ [roleField]: reviewValue }];
+  return baseRows.map((row, index) => index === 0 ? { ...row, [roleField]: reviewValue } : row);
+};
+
+const applyReviewToForm = (form = {}, review = {}) => {
+  const role = normalizeRoleForWorkflow(review.reviewer_role || review.reviewerRole || review.role);
+  const roleField = REVIEW_FIELD_BY_ROLE[role];
+  if (!roleField) return form;
+
+  const rawScores = review.section_scores || review.sectionScores || review.scores || {};
+  const scores = rawScores?.form || rawScores?.payload?.form || rawScores;
+  if (!scores || typeof scores !== "object") return form;
+
+  const next = { ...form };
+  FORM_SECTION_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(scores, key)) return;
+    next[key] = mergeSectionReviewScore(next[key], scores[key], roleField, role);
+  });
+
+  const innovField = REVIEW_INNOV_FIELD_BY_ROLE[role];
+  const innovScore = firstPresent(
+    reviewRowScore(scores.innovativeTeaching, roleField, role),
+    scores[innovField],
+    scores.innovative_teaching,
+    scores.innovativeTeachingScore,
+  );
+  if (innovField && innovScore !== undefined) next[innovField] = innovScore;
+
+  return next;
+};
+
+const mergeReviewScoresIntoForm = (form = {}, reviews = []) =>
+  (reviews || []).reduce((current, review) => applyReviewToForm(current, review), form);
+
+const aliasKeys = (rows, mapping) =>
+  (rows || []).map((row) => {
+    const out = { ...row };
+    Object.entries(mapping).forEach(([from, to]) => {
+      if (out[to] == null && out[from] != null) out[to] = out[from];
+    });
+    return out;
+  });
+
+const normalizeFetchedForm = (form = {}) => {
+  const normalized = { ...form };
+  const lectures = normalized.lectures || normalized.teaching_process || normalized.teachingProcess;
+  if (lectures) {
+    normalized.lectures = aliasKeys(lectures, {
+      semester: "sem",
+      course_code: "code",
+      courseCode: "code",
+      planned_classes: "planned",
+      plannedClasses: "planned",
+      conducted_classes: "conducted",
+      conductedClasses: "conducted",
+    });
+  }
+  if (normalized.feedback) {
+    normalized.feedback = aliasKeys(normalized.feedback, {
+      course_code: "code",
+      courseCode: "code",
+      feedback_1: "fb1",
+      feedback1: "fb1",
+      feedback_2: "fb2",
+      feedback2: "fb2",
+    });
+  }
+  if (normalized.society) {
+    normalized.society = aliasKeys(normalized.society, { activity: "label" });
+  }
+  if (normalized.journals) {
+    normalized.journals = aliasKeys(normalized.journals, { indexing: "index" });
+  }
+  if (normalized.books) {
+    normalized.books = aliasKeys(normalized.books, {
+      publisher: "pub",
+      coauthor: "coauth",
+      co_author: "coauth",
+      first_author: "first",
+      firstAuthor: "first",
+    });
+  }
+  if (normalized.ict) {
+    normalized.ict = aliasKeys(normalized.ict, {
+      description: "desc",
+      quadrant: "quad",
+    });
+  }
+  if (normalized.research) {
+    normalized.research = aliasKeys(normalized.research, {
+      student_name: "name",
+      studentName: "name",
+    });
+  }
+  if (normalized.projects2) {
+    normalized.projects2 = aliasKeys(normalized.projects2, {
+      sanction_date: "date",
+      sanctionDate: "date",
+      project_status: "status",
+      projectStatus: "status",
+    });
+  }
+  if (normalized.externalProjects) {
+    normalized.externalProjects = aliasKeys(normalized.externalProjects, {
+      sanction_date: "date",
+      sanctionDate: "date",
+      project_status: "status",
+      projectStatus: "status",
+    });
+  }
+  if (normalized.patents) {
+    normalized.patents = aliasKeys(normalized.patents, {
+      patent_date: "date",
+      patentDate: "date",
+      patent_status: "status",
+      patentStatus: "status",
+      file_no: "fileNo",
+      fileNo: "fileNo",
+    });
+  }
+  if (normalized.awards) {
+    normalized.awards = aliasKeys(normalized.awards, {
+      award_date: "date",
+      awardDate: "date",
+    });
+  }
+  if (normalized.confs) {
+    normalized.confs = aliasKeys(normalized.confs, { organization: "org" });
+  }
+  if (normalized.fdps) {
+    normalized.fdps = aliasKeys(normalized.fdps, { organization: "org" });
+  }
+  return normalized;
+};
+
+const normalizeFetchedAppraisal = (data = {}) => {
+  const reviews = reviewsFromAppraisalResponse(data);
+  const payload = data.payload ? { ...data.payload } : null;
+  const payloadForm = payload?.form ? mergeReviewScoresIntoForm(normalizeFetchedForm(payload.form), reviews) : null;
+  const directForm = data.form ? mergeReviewScoresIntoForm(normalizeFetchedForm(data.form), reviews) : null;
+  const directData = mergeReviewScoresIntoForm(normalizeFetchedForm(data), reviews);
+
+  return {
+    ...directData,
+    ...(directForm ? { form: directForm } : {}),
+    ...(payload ? { payload: { ...payload, ...(payloadForm ? { form: payloadForm } : {}) } } : {}),
+  };
 };
 
 const renameKeys = (rows, mapping) =>

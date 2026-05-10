@@ -1,13 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { createContext, useContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
 import { HodInput } from "../components/Inputs";
-import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisal, saveAppraisalDraftSection } from "../services/appraisalPersistence";
+import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, courseFileRowScore, effectiveMaxScore, clearDraft, draftKeyFor, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isValidDDMMYYYY, loadDraft, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, saveDraft, scoreRemaining, societyRowScore, societySelectionForRow, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { DEAN_TRACKS, getSchoolKey, getSchoolsByDeanTrack } from "../constants/universityHierarchy";
-import { reviewedStatusFor, profileFromsessionStorage } from "../utils/hierarchy";
+import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError } from "../utils/hierarchy";
 
 const ENGINEERING_SCHOOLS = getSchoolsByDeanTrack(DEAN_TRACKS.ENGINEERING);
 const ENGINEERING_SCHOOL_VALUES = ENGINEERING_SCHOOLS.flatMap((school) => [
@@ -26,6 +26,12 @@ const SCHOOL_VISUALS = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
 const pct = (v, m) => Math.min(100, Math.round((v / m) * 100)) || 0;
+const preserveScrollAfterStateUpdate = (update) => {
+  const x = window.scrollX || 0;
+  const y = window.scrollY || 0;
+  update();
+  requestAnimationFrame(() => window.scrollTo(x, y));
+};
 const grade = (score, max) => {
   const p = (score / max) * 100;
   if (p >= 85) return { label: "Outstanding", color: "#059669", bg: "#d1fae5" };
@@ -364,7 +370,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
                 <td style={TD}><RO val={r.course} /></td>
                 <td style={TD}><RO val={r.title} /></td>
                 <td style={TDC}><RO val={r.details} center /></td>
-                <td style={TDV}><ViewDocsCell docKey={`cf-${i}`} docs={docs} /></td>
+                <td style={TDV}><ViewDocsCell docKey={`courseFile-${i}`} docs={docs} /></td>
                 <td style={TDS}><RO val={courseFileRowScore(r) ? String(courseFileRowScore(r)) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={get("courseFile", i, "hod")} onChange={v => set("courseFile", i, "hod", v)} max={SCORE_LIMITS.courseFileRow} /></td>
               </tr>
@@ -390,7 +396,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
       </SC>
 
       {/* A4: Projects */}
-      <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
+      {faculty.sectionApplicability?.projects !== "notApplicable" && <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Project Type</th>
@@ -408,7 +414,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
             ))}
           </tbody>
         </table>
-      </SC>
+      </SC>}
 
       {/* A5: Qualification */}
       <SC title="A5. Qualification Enhancement (Max 10)" accent="#8b5cf6">
@@ -648,7 +654,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
       </SC>
 
       {/* B4: Research Guidance */}
-      <SC title="B4(a). Research Guidance — PhD / PG (Max 30)" accent="#059669">
+      {faculty.sectionApplicability?.research !== "notApplicable" && <SC title="B4(a). Research Guidance — PhD / PG (Max 30)" accent="#059669">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Degree</th><th style={TH}>Student Name</th><th style={TH}>Status</th>
@@ -668,7 +674,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
             ))}
           </tbody>
         </table>
-      </SC>
+      </SC>}
 
       <SC title="B4(b). Research / Consultancy Internal Projects (Max 15)" accent="#059669">
         <div style={{ overflowX: "auto" }}>
@@ -919,9 +925,15 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const getS = (key) => n(hodData[key] ?? faculty[key]);
 
     const lec = (() => { const rows = faculty.lectures || []; const filled = rows.filter((_, i) => get("lectures", i, "hod") > 0); return filled.length ? clampScore(rows.reduce((a, _, i) => a + get("lectures", i, "hod"), 0) / filled.length, 50) : 0; })();
-    const cf = get("courseFile", null, "hod");
+    const cf = (() => {
+      const rows = Array.isArray(faculty.courseFile) ? faculty.courseFile : (faculty.courseFile ? [faculty.courseFile] : []);
+      const filled = rows.filter((row, i) => get("courseFile", i, "hod") > 0 || row?.course || row?.title || row?.details);
+      return filled.length
+        ? clampScore(rows.reduce((a, _, i) => a + clampScore(get("courseFile", i, "hod"), SCORE_LIMITS.courseFileRow), 0) / filled.length, 20)
+        : 0;
+    })();
     const innov = getS("innovHod");
-    const proj = (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
+    const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
     const qual = (faculty.quals || []).reduce((a, _, i) => a + get("quals", i, "hod"), 0);
     const fb = (faculty.feedback || []).reduce((a, _, i) => a + get("feedback", i, "hod"), 0);
     const dept = (faculty.deptActs || []).reduce((a, _, i) => a + get("deptActs", i, "hod"), 0);
@@ -934,7 +946,7 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const jour = (faculty.journals || []).reduce((a, _, i) => a + get("journals", i, "hod"), 0);
     const bk = (faculty.books || []).reduce((a, _, i) => a + get("books", i, "hod"), 0);
     const ictT = (faculty.ict || []).reduce((a, _, i) => a + get("ict", i, "hod"), 0);
-    const res = (faculty.research || []).reduce((a, _, i) => a + get("research", i, "hod"), 0);
+    const res = faculty.sectionApplicability?.research === "notApplicable" ? 0 : (faculty.research || []).reduce((a, _, i) => a + get("research", i, "hod"), 0);
     const resProjects = clampScore((faculty.projects2 || []).reduce((a, _, i) => a + get("projects2", i, "hod"), 0), SCORE_LIMITS.researchInternalProjects);
     const externalResProjects = clampScore((faculty.externalProjects || []).reduce((a, _, i) => a + get("externalProjects", i, "hod"), 0), SCORE_LIMITS.researchExternalProjects);
     const pat = (faculty.patents || []).reduce((a, _, i) => a + get("patents", i, "hod"), 0);
@@ -1053,6 +1065,10 @@ const deanScorePayload = (approval, deanData) => {
   const payload = {};
 
   DEAN_REVIEW_ARRAY_KEYS.forEach((key) => {
+    if (approval.sectionApplicability?.[key] === "notApplicable") {
+      payload[key] = [];
+      return;
+    }
     const rows = Array.isArray(approval[key]) ? approval[key] : [];
     payload[key] = rows.map((row, index) => ({
       ...row,
@@ -1084,12 +1100,12 @@ function DeanScoreCell({ sectionKey, index, row, deanData, setDeanData }) {
   const value = deanData[sectionKey]?.[index]?.dean ?? row.dean ?? "";
 
   const update = (nextValue) => {
-    setDeanData((prev) => {
+    preserveScrollAfterStateUpdate(() => setDeanData((prev) => {
       const baseRows = Array.isArray(prev[sectionKey]) ? prev[sectionKey] : [];
       const updatedRows = [...baseRows];
       updatedRows[index] = { ...(updatedRows[index] || row), dean: nextValue };
       return { ...prev, [sectionKey]: updatedRows };
-    });
+    }));
   };
 
   return <DeanInput val={value} max={DEAN_ROW_MAX[sectionKey]?.(row) || DEAN_SECTION_MAX[sectionKey]} onChange={update} />;
@@ -1101,11 +1117,59 @@ function DeanInnovativeScoreCell({ approval, deanData, setDeanData }) {
     <DeanInput
       val={value}
       max={10}
-      onChange={(nextValue) => setDeanData((prev) => ({
-        ...prev,
-        innovativeTeaching: { ...(prev.innovativeTeaching || {}), dean: nextValue },
-      }))}
+      onChange={(nextValue) => preserveScrollAfterStateUpdate(() => setDeanData((prev) => ({
+          ...prev,
+          innovativeTeaching: { ...(prev.innovativeTeaching || {}), dean: nextValue },
+        })))}
     />
+  );
+}
+
+const DeanReviewTableContext = createContext(null);
+
+function ReviewTable({ title, accent = "#4c1d95", sectionKey, columns, docPrefix, rows: sectionRows }) {
+  const ctx = useContext(DeanReviewTableContext);
+  if (!ctx || ctx.approval.sectionApplicability?.[sectionKey] === "notApplicable") return null;
+  const dataRows = sectionRows || ctx.rows(sectionKey);
+  const hasDocs = Boolean(docPrefix);
+  const totalColumns = 1 + columns.length + (hasDocs ? 1 : 0) + 2;
+
+  return (
+    <SC title={title} accent={accent}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={T}>
+          <thead>
+            <tr>
+              <th style={TH}>SN</th>
+              {columns.map((column) => <th key={column.label} style={TH}>{column.label}</th>)}
+              {hasDocs && <th style={TH}>View Docs</th>}
+              {ctx.scoreHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.length ? dataRows.map((row, index) => (
+              <tr key={`${sectionKey}-${index}`} style={index % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{index + 1}</td>
+                {columns.map((column) => (
+                  <td key={column.label} style={column.center ? TDC : TD}>
+                    {ctx.cell(column.render(row), column.center)}
+                  </td>
+                ))}
+                {hasDocs && <td style={TDV}><ViewDocsCell docKey={`${docPrefix}-${index}`} docs={ctx.docs} /></td>}
+                <td style={TDS}>{ctx.cell(sectionKey === "research" ? researchGuidanceScore(row).toFixed(1) : row.score, true)}</td>
+                <td style={TDS_DEAN}><DeanScoreCell sectionKey={sectionKey} index={index} row={row} deanData={ctx.deanData} setDeanData={ctx.setDeanData} /></td>
+              </tr>
+            )) : (
+              <tr>
+                <td style={{ ...TDC, color: "#94a3b8", fontStyle: "italic" }} colSpan={totalColumns}>
+                  No submitted rows for this table.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </SC>
   );
 }
 
@@ -1121,57 +1185,8 @@ function DeanReviewScoreForm({ approval, deanData, setDeanData }) {
     </>
   );
 
-  const ScoreCells = ({ sectionKey, row, index }) => (
-    <>
-      <td style={TDS}>{cell(sectionKey === "research" ? researchGuidanceScore(row).toFixed(1) : row.score, true)}</td>
-      <td style={TDS_DEAN}><DeanScoreCell sectionKey={sectionKey} index={index} row={row} deanData={deanData} setDeanData={setDeanData} /></td>
-    </>
-  );
-
-  const ReviewTable = ({ title, accent = "#4c1d95", sectionKey, columns, docPrefix, rows: sectionRows }) => {
-    const dataRows = sectionRows || rows(sectionKey);
-    const hasDocs = Boolean(docPrefix);
-    const totalColumns = 1 + columns.length + (hasDocs ? 1 : 0) + 2;
-
-    return (
-      <SC title={title} accent={accent}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={T}>
-            <thead>
-              <tr>
-                <th style={TH}>SN</th>
-                {columns.map((column) => <th key={column.label} style={TH}>{column.label}</th>)}
-                {hasDocs && <th style={TH}>View Docs</th>}
-                {scoreHeaders}
-              </tr>
-            </thead>
-            <tbody>
-              {dataRows.length ? dataRows.map((row, index) => (
-                <tr key={`${sectionKey}-${index}`} style={index % 2 ? { background: "#f8fafc" } : {}}>
-                  <td style={TDC}>{index + 1}</td>
-                  {columns.map((column) => (
-                    <td key={column.label} style={column.center ? TDC : TD}>
-                      {cell(column.render(row), column.center)}
-                    </td>
-                  ))}
-                  {hasDocs && <td style={TDV}><ViewDocsCell docKey={`${docPrefix}-${index}`} docs={docs} /></td>}
-                  <ScoreCells sectionKey={sectionKey} row={row} index={index} />
-                </tr>
-              )) : (
-                <tr>
-                  <td style={{ ...TDC, color: "#94a3b8", fontStyle: "italic" }} colSpan={totalColumns}>
-                    No submitted rows for this table.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </SC>
-    );
-  };
-
   return (
+    <DeanReviewTableContext.Provider value={{ approval, deanData, docs, rows, scoreHeaders, setDeanData, cell }}>
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       <div style={{ background: "linear-gradient(90deg,#4c1d95,#7c3aed)", color: "#ede9fe", borderRadius: 8, padding: "10px 16px", marginBottom: 14, fontSize: 12 }}>
         <strong>Dean Review Mode</strong> - Faculty self-scores are read-only. Only the Dean score column is editable.
@@ -1494,6 +1509,7 @@ function DeanReviewScoreForm({ approval, deanData, setDeanData }) {
         ]}
       />
     </div>
+    </DeanReviewTableContext.Provider>
   );
 }
 
@@ -1658,13 +1674,7 @@ export default function DeanDashboard() {
   const setLec = (i, k, v) => setLectures((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [courseFile, setCourseFile] = useState([{ course: "", title: "", details: "", score: "", hod: "", director: "" }]);
-  const setCF = (i, k, v) => setCourseFile((p) => p.map((r, j) => {
-    if (j !== i) return r;
-    const next = { ...r, [k]: v };
-    return ["course", "title", "details"].includes(k)
-      ? { ...next, score: courseFileRowScore(next) ? String(courseFileRowScore(next)) : "" }
-      : next;
-  }));
+  const setCF = (i, k, v) => setCourseFile((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const [innovScore, setInnovScore] = useState("");
   const [innovDetails, setInnovDetails] = useState("");
   const [projects, setProjects] = useState([
@@ -2083,12 +2093,14 @@ export default function DeanDashboard() {
       </tr>
     </table>
 
+    ${sectionApplicability.projects !== "notApplicable" ? `
     <!-- A4 -->
     <h3>A4: Projects</h3>
     <table>
       <tr><th>Project Type</th><th>Score</th></tr>
       ${projects.map(p => `<tr><td>${p.label || "&nbsp;"}</td><td class="center">${clampScore(p.score, projectGuidanceRowMax(p)) || "&nbsp;"}</td></tr>`).join('')}
     </table>
+    ` : ""}
 
     <!-- A5 -->
     <h3>A5: Qualification Enhancement</h3>
@@ -2171,11 +2183,13 @@ export default function DeanDashboard() {
       ${ict.map(i => `<tr><td>${i.title || "&nbsp;"}</td><td>${i.desc || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
     </table>
 
+    ${sectionApplicability.research !== "notApplicable" ? `
     <h3>B4(a). Research Guidance</h3>
     <table>
       <tr><th>Degree</th><th>Name</th><th>Thesis</th><th>Score</th></tr>
       ${research.map(r => `<tr><td>${r.degree || "&nbsp;"}</td><td>${r.name || "&nbsp;"}</td><td>${r.thesis || "&nbsp;"}</td><td class="center">${researchGuidanceScore(r).toFixed(1)}</td></tr>`).join('')}
     </table>
+    ` : ""}
 
     <h3>B4(b). Ongoing & Completed Research / Consultancy Internal Projects (Max 15)</h3>
     <table>
@@ -2413,17 +2427,26 @@ export default function DeanDashboard() {
       return;
     }
 
+    const submitterProfile = profileFromsessionStorage();
+    const workflowError = workflowValidationError(submitterProfile);
+    if (workflowError) {
+      alert(workflowError);
+      return;
+    }
+
     const confirmSubmit = window.confirm("Are you sure you want to submit your appraisal? This will save your data to the database.");
     if (!confirmSubmit) return;
 
     setSubmitting(true);
     try {
-      await saveAppraisal({
+      await submitAppraisal({
         facultyEmail: userEmail,
         academicYear: info.ay,
         totals: { partATotal, partBTotal, grandTotal },
         form: buildSelfDraftForm(),
         docs,
+        submitterProfile,
+        activeProfile: submitterProfile,
       });
 
       setAppraisalLocked(true);
@@ -2642,7 +2665,6 @@ export default function DeanDashboard() {
                         <th style={TH}>Course / Paper</th>
                         <th style={TH}>Title</th>
                         <th style={TH}>Details</th>
-                        <th style={TH}>Participation</th>
                         <th style={TH}>Attachment</th>
                         <th style={TH}>View Docs</th>
                         <th style={TH}>Score</th>
@@ -2657,7 +2679,7 @@ export default function DeanDashboard() {
                     <td style={TD}><TI val={r.details} onChange={(v) => setCF(i, "details", v)} /></td>
                     <td style={TD}><DocCell id={`courseFile-${i}`} docs={docs} setDocs={setDocs} /></td>
                     <td style={TD}><ViewCell id={`courseFile-${i}`} docs={docs} /></td>
-                    <td style={TDS}><RO val={courseFileRowScore(r) ? String(courseFileRowScore(r)) : ""} center /></td>
+                    <td style={TDS}><TI val={r.score} onChange={(v) => setCF(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.courseFileRow)))} numeric max={SCORE_LIMITS.courseFileRow} center /></td>
                    </tr>
                  ))}
                       <tr style={{ background: "#eff6ff" }}>
@@ -2726,6 +2748,7 @@ export default function DeanDashboard() {
                       </label>
                     ))}
                   </div>
+                  {sectionApplicability.projects !== "notApplicable" && (<>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -2752,7 +2775,8 @@ export default function DeanDashboard() {
                       </tr>
                     </tbody>
                   </table>
-                  {sectionApplicability.projects !== "notApplicable" && <RowBtns onAdd={() => setProjects((p) => [...p, { label: "", score: "" }])} onDel={() => setProjects((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={projects.length > 1} />}
+                  <RowBtns onAdd={() => setProjects((p) => [...p, { label: "", score: "" }])} onDel={() => setProjects((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={projects.length > 1} />
+                  </>)}
                 </div>
 
                 {/* A5. Qualifications */}
@@ -3135,6 +3159,7 @@ export default function DeanDashboard() {
                       </label>
                     ))}
                   </div>
+                  {sectionApplicability.research !== "notApplicable" && (<>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -3176,7 +3201,8 @@ export default function DeanDashboard() {
                       </tr>
                     </tbody>
                   </table>
-                  {sectionApplicability.research !== "notApplicable" && <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />}
+                  <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />
+                  </>)}
                 </div>
 
                 {/* B4(b). Research / Consultancy Internal Projects */}
@@ -3653,10 +3679,16 @@ export default function DeanDashboard() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
               {filtered.map(faculty => {
                 const g = grade(faculty.grandTotal || 350, 620);
+                const courseFilePartA = Array.isArray(faculty.courseFile)
+                  ? (() => {
+                      const filled = faculty.courseFile.filter(row => String(row?.score ?? "").trim() !== "");
+                      return filled.length ? filled.reduce((total, row) => total + courseFileRowScore(row), 0) / filled.length : 0;
+                    })()
+                  : n(faculty.courseFile?.score);
                 const facPartA = [
                   ...(faculty.lectures || []).map(r => n(r.score)),
-                  n(faculty.courseFile?.score), n(faculty.innovScore),
-                  ...(faculty.projects || []).map(r => n(r.score)),
+                  courseFilePartA, n(faculty.innovScore),
+                  ...(faculty.sectionApplicability?.projects === "notApplicable" ? [] : (faculty.projects || []).map(r => n(r.score))),
                   ...(faculty.quals || []).map(r => n(r.score)),
                   ...(faculty.feedback || []).map(r => n(r.score)),
                   ...(faculty.deptActs || []).map(r => n(r.score)),
@@ -3717,8 +3749,8 @@ export default function DeanDashboard() {
                             const form = data?.payload?.form || data?.form || {};
                             const docs = data?.payload?.docs || data?.docs || {};
                             setReviewingApproval({ ...faculty, ...form, docs });
-                          } catch {
-                            setReviewingApproval(faculty);
+                          } catch (err) {
+                            alert(`Unable to open submitted form.\n\n${err.message}`);
                           } finally {
                             setReviewLoading(null);
                           }

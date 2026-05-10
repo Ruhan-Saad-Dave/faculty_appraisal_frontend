@@ -483,18 +483,22 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
       <SC title="A2. Course File (Max 20)" accent="#6366f1">
         <table style={T}>
           <thead><tr>
+            <th style={{ ...TH, width: 30 }}>SN</th>
             <th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th>
             <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
           </tr></thead>
           <tbody>
-            <tr>
-              <td style={TD}><RO val={courseFile?.course} /></td>
-              <td style={TD}><RO val={courseFile?.title} /></td>
-              <td style={TDC}><RO val={courseFile?.details} center /></td>
-              <td style={TDV}><ViewDocsCell docKey="cf-0" docs={docs} /></td>
-              <td style={TDS}><RO val={courseFile?.score} center /></td>
-              <td style={TDS_HOD}><HodInput val={get("courseFile", null, "hod")} onChange={v => set("courseFile", null, "hod", v)} max={SCORE_LIMITS.courseFileRow} /></td>
-            </tr>
+            {rows(courseFile).map((r, i) => (
+              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+                <td style={TDC}>{i + 1}</td>
+                <td style={TD}><RO val={r.course} /></td>
+                <td style={TD}><RO val={r.title} /></td>
+                <td style={TDC}><RO val={r.details} center /></td>
+                <td style={TDV}><ViewDocsCell docKey={`courseFile-${i}`} docs={docs} /></td>
+                <td style={TDS}><RO val={courseFileRowScore(r) ? String(courseFileRowScore(r)) : ""} center /></td>
+                <td style={TDS_HOD}><HodInput val={get("courseFile", i, "hod")} onChange={v => set("courseFile", i, "hod", v)} max={SCORE_LIMITS.courseFileRow} /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </SC>
@@ -516,7 +520,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
       </SC>
 
       {/* A4: Projects */}
-      <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
+      {faculty.sectionApplicability?.projects !== "notApplicable" && <SC title="A4. Projects (Max 10)" accent="#8b5cf6">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Project Type</th>
@@ -534,7 +538,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
             ))}
           </tbody>
         </table>
-      </SC>
+      </SC>}
 
       {/* A5: Qualification */}
       <SC title="A5. Qualification Enhancement (Max 10)" accent="#8b5cf6">
@@ -774,7 +778,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
       </SC>
 
       {/* B4: Research Guidance */}
-      <SC title="B4(a). Research Guidance - PhD / PG (Max 30)" accent="#059669">
+      {faculty.sectionApplicability?.research !== "notApplicable" && <SC title="B4(a). Research Guidance - PhD / PG (Max 30)" accent="#059669">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Degree</th><th style={TH}>Student Name</th><th style={TH}>Status</th>
@@ -794,7 +798,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData }) {
             ))}
           </tbody>
         </table>
-      </SC>
+      </SC>}
 
       <SC title="B4(b). Research / Consultancy Internal Projects (Max 15)" accent="#059669">
         <div style={{ overflowX: "auto" }}>
@@ -1046,9 +1050,13 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const getS = (key) => n(hodData[key] ?? faculty[key]);
 
     const lec = (faculty.lectures || []).reduce((a, _, i) => a + get("lectures", i, "hod"), 0);
-    const cf = get("courseFile", null, "hod");
+    const cfRows = Array.isArray(faculty.courseFile) ? faculty.courseFile : (faculty.courseFile ? [faculty.courseFile] : []);
+    const filledCfRows = cfRows.filter((row, i) => get("courseFile", i, "hod") > 0 || row?.course || row?.title || row?.details);
+    const cf = filledCfRows.length
+      ? clampScore(cfRows.reduce((a, _, i) => a + clampScore(get("courseFile", i, "hod"), SCORE_LIMITS.courseFileRow), 0) / filledCfRows.length, 20)
+      : 0;
     const innov = getS("innovHod");
-    const proj = (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
+    const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
     const qual = (faculty.quals || []).reduce((a, _, i) => a + get("quals", i, "hod"), 0);
     const fb = (faculty.feedback || []).reduce((a, _, i) => a + get("feedback", i, "hod"), 0);
     const dept = (faculty.deptActs || []).reduce((a, _, i) => a + get("deptActs", i, "hod"), 0);
@@ -1061,7 +1069,7 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const jour = (faculty.journals || []).reduce((a, _, i) => a + get("journals", i, "hod"), 0);
     const bk = (faculty.books || []).reduce((a, _, i) => a + get("books", i, "hod"), 0);
     const ictT = (faculty.ict || []).reduce((a, _, i) => a + get("ict", i, "hod"), 0);
-    const res = (faculty.research || []).reduce((a, _, i) => a + get("research", i, "hod"), 0);
+    const res = faculty.sectionApplicability?.research === "notApplicable" ? 0 : (faculty.research || []).reduce((a, _, i) => a + get("research", i, "hod"), 0);
     const resProjects = clampScore((faculty.projects2 || []).reduce((a, _, i) => a + get("projects2", i, "hod"), 0), SCORE_LIMITS.researchInternalProjects);
     const externalResProjects = clampScore((faculty.externalProjects || []).reduce((a, _, i) => a + get("externalProjects", i, "hod"), 0), SCORE_LIMITS.researchExternalProjects);
     const pat = (faculty.patents || []).reduce((a, _, i) => a + get("patents", i, "hod"), 0);
@@ -1755,12 +1763,14 @@ export default function HODDashboard() {
       ${innovRows.map(row => `<tr><td>${row.method || "&nbsp;"}</td><td>${row.details || "&nbsp;"}</td><td class="center">${row.score || "&nbsp;"}</td></tr>`).join('')}
     </table>
 
+    ${sectionApplicability.projects !== "notApplicable" ? `
     <!-- A4 -->
     <h3>A4: Projects</h3>
     <table>
       <tr><th>Project Type</th><th>Score</th></tr>
       ${projects.map(p => `<tr><td>${p.label || "&nbsp;"}</td><td class="center">${clampScore(p.score, projectGuidanceRowMax(p)) || "&nbsp;"}</td></tr>`).join('')}
     </table>
+    ` : ""}
 
     <!-- A5 -->
     <h3>A5: Qualification Enhancement</h3>
@@ -1843,11 +1853,13 @@ export default function HODDashboard() {
       ${ict.map(i => `<tr><td>${i.title || "&nbsp;"}</td><td>${i.desc || "&nbsp;"}</td><td class="center">${i.score || "&nbsp;"}</td></tr>`).join('')}
     </table>
 
+    ${sectionApplicability.research !== "notApplicable" ? `
     <h3>B4(a). Research Guidance</h3>
     <table>
       <tr><th>Degree</th><th>Name</th><th>Thesis</th><th>Score</th></tr>
       ${research.map(r => `<tr><td>${r.degree || "&nbsp;"}</td><td>${r.name || "&nbsp;"}</td><td>${r.thesis || "&nbsp;"}</td><td class="center">${researchGuidanceScore(r).toFixed(1)}</td></tr>`).join('')}
     </table>
+    ` : ""}
 
     <h3>B4(b). Ongoing & Completed Research / Consultancy Internal Projects (Max 15)</h3>
     <table>
@@ -2556,6 +2568,7 @@ export default function HODDashboard() {
                       </label>
                     ))}
                   </div>
+                  {sectionApplicability.research !== "notApplicable" && (<>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -2597,7 +2610,8 @@ export default function HODDashboard() {
                       </tr>
                     </tbody>
                   </table>
-                  {sectionApplicability.research !== "notApplicable" && <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />}
+                  <RowBtns onAdd={() => setResearch((p) => [...p, { degree: "PhD", name: "", thesis: "", score: "" }])} onDel={() => setResearch((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={research.length > 1} />
+                  </>)}
                 </div>
 
                 {/* B4(b). Research / Consultancy Internal Projects */}

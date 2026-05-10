@@ -29,6 +29,7 @@ const normalizeText = normalizeHierarchyText;
 
 export const normalizeRoleForWorkflow = (role) => {
   const value = normalizeText(role);
+  if (value === "admin" || value === "administrator") return "admin";
   if (value === "vice chancellor" || value === "vice chancelor" || value === "vc") return "vc";
   const nonTeachingRole = normalizeNonTeachingRole(value, "");
   if (nonTeachingRole) return nonTeachingRole;
@@ -92,6 +93,11 @@ export const getReviewChain = (profile = {}) => {
 
 export const visiblePreviousReviewRoles = (reviewerRole, subjectProfile = {}) => {
   const role = normalizeRoleForWorkflow(reviewerRole);
+  if (role === "admin") {
+    return getSchoolKey(subjectProfile.school) === "CISR"
+      ? ["center_head"]
+      : ["hod", "director", "dean"];
+  }
   if (role !== "vc") return [];
 
   const chain = getReviewChain(subjectProfile);

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { fetchSavedAppraisal } from "../services/appraisalPersistence";
 import { fetchNonTeachingQueueForRole, expectedPendingStatus, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
-import { SOCIETY_LABELS, ACR_LABELS, MAX_SCORES, APP_INFO } from "../constants/formConfig";
+import { MAX_SCORES, APP_INFO } from "../constants/formConfig";
 
-import { DEAN_TRACKS, UNIVERSITY_SCHOOLS } from "../constants/universityHierarchy";
+import { DEAN_TRACKS, UNIVERSITY_SCHOOLS, normalizeHierarchyText } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
 import { getSchoolKey, reviewedStatusFor, profileFromsessionStorage, visiblePreviousReviewRoles } from "../utils/hierarchy";
 import { openFullFormReport } from "../utils/fullFormReport";
@@ -194,8 +195,12 @@ const vcChainProfileFor = (person = {}, personMode = "faculty") => ({
   appraisal_role: person.appraisalRole || personMode,
 });
 
-const vcPreviousRolesFor = (person = {}, personMode = "faculty") =>
-  visiblePreviousReviewRoles("vc", vcChainProfileFor(person, personMode));
+const vcPreviousRolesFor = (person = {}, personMode = "faculty") => {
+  const profile = vcChainProfileFor(person, personMode);
+  if (getSchoolKey(profile.school) === "CISR") return ["center_head"];
+  if (profile.appraisal_role !== "vc") return ["hod", "director", "dean"];
+  return visiblePreviousReviewRoles("vc", profile);
+};
 
 const vcRoleMeta = (role) => VC_CHAIN_ROLE_META[role] || {
   label: `${role} Score`,
@@ -301,7 +306,6 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
   };
   const getS = (key) => vcData[key] ?? person[key] ?? "";
   const { docs } = person;
-  const courseFileRow = Array.isArray(person.courseFile) ? (person.courseFile[0] || {}) : (person.courseFile || {});
   const rows = (arr) => arr && arr.length > 0 ? arr : [{}];
   const vcRowMax = (section, row = {}) => ({
     courseFile: SCORE_LIMITS.courseFileRow,
@@ -312,7 +316,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
     training: SCORE_LIMITS.fdpRow,
   }[section] || (section === "projects" ? projectGuidanceRowMax(row) : section === "research" ? researchGuidanceRowMax(row) : undefined));
 
-  const ScoreHeaders = () => (
+  const renderScoreHeaders = () => (
     <>
       <th style={TH}>{selfScoreLabel}</th>
       {reviewRoles.map((role) => {
@@ -323,7 +327,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
     </>
   );
 
-  const ScoreCells = ({ r, section, i }) => {
+  const renderScoreCells = (r, section, i) => {
     const maxForRow = vcRowMax(section, r);
     const displayScore = (value) => maxForRow ? clampScore(value, maxForRow) : value;
     return (
@@ -371,14 +375,14 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
           <table style={T}><thead><tr>
             <th style={TH}>SN</th><th style={TH}>Semester</th><th style={TH}>Course</th>
             <th style={TH}>Classes (as per course structure)</th><th style={TH}>Classes Actually Conducted</th><th style={TH}>Docs</th>
-            <ScoreHeaders />
+            {renderScoreHeaders()}
           </tr></thead>
           <tbody>{rows(person.lectures).map((r, i) => (
             <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
               <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.sem} /></td><td style={TD}><RO val={r.code} /></td>
               <td style={TDC}><RO val={r.planned} center /></td><td style={TDC}><RO val={r.conducted} center /></td>
               <td style={TDV}><ViewDocsCell docKey={`lec-${i}`} docs={docs} /></td>
-              <ScoreCells r={r} section="lectures" i={i} />
+              {renderScoreCells(r, "lectures", i)}
             </tr>
           ))}</tbody></table>
         </div>
@@ -387,23 +391,26 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       {/* A2 Course File */}
       <SC title="A2. Course File (Max 20)" accent="#7c3aed">
         <table style={T}><thead><tr>
-          <th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th><th style={TH}>Docs</th>
-          <ScoreHeaders />
+          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th><th style={TH}>Docs</th>
+          {renderScoreHeaders()}
         </tr></thead>
-        <tbody><tr>
-          <td style={TD}><RO val={courseFileRow.course} /></td>
-          <td style={TD}><RO val={courseFileRow.title} /></td>
-          <td style={TDC}><RO val={courseFileRow.details} center /></td>
-          <td style={TDV}><ViewDocsCell docKey="cf-0" docs={docs} /></td>
-          <ScoreCells r={courseFileRow} section="courseFile" i={null} />
-        </tr></tbody></table>
+        <tbody>{rows(person.courseFile).map((r, i) => (
+          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+            <td style={TDC}>{i + 1}</td>
+            <td style={TD}><RO val={r.course} /></td>
+            <td style={TD}><RO val={r.title} /></td>
+            <td style={TDC}><RO val={r.details} center /></td>
+            <td style={TDV}><ViewDocsCell docKey={`courseFile-${i}`} docs={docs} /></td>
+            {renderScoreCells(r, "courseFile", i)}
+          </tr>
+        ))}</tbody></table>
       </SC>
 
       {/* A3 Innovative */}
       <SC title="A3. Innovative Teaching-Learning (Max 10)" accent="#7c3aed">
         <table style={T}><thead><tr>
           <th style={TH}>Method</th>
-          <ScoreHeaders />
+          {renderScoreHeaders()}
         </tr></thead>
         <tbody><tr>
           <td style={TD}>Innovative / participatory teaching methods used</td>
@@ -420,18 +427,18 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       {[
         ["A4. Projects (Max 10)", "projects", "proj"],
         ["A5. Qualification Enhancement (Max 10)", "quals", "qual"],
-      ].map(([title, key, docPfx]) => (
+      ].filter(([, key]) => key !== "projects" || person.sectionApplicability?.projects !== "notApplicable").map(([title, key, docPfx]) => (
         <SC key={key} title={title} accent="#7c3aed">
           <table style={T}><thead><tr>
             <th style={TH}>SN</th><th style={TH}>Description</th><th style={TH}>Docs</th>
-            <ScoreHeaders />
+            {renderScoreHeaders()}
           </tr></thead>
           <tbody>{rows(person[key]).map((r, i) => (
             <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
               <td style={TDC}>{i + 1}</td>
               <td style={TD}><RO val={r.label} /></td>
               <td style={TDV}><ViewDocsCell docKey={`${docPfx}-${i}`} docs={docs} /></td>
-              <ScoreCells r={r} section={key} i={i} />
+              {renderScoreCells(r, key, i)}
             </tr>
           ))}</tbody></table>
         </SC>
@@ -441,14 +448,14 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       <SC title="B. Student Feedback (Max 10)" accent="#7c3aed">
         <table style={T}><thead><tr>
           <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>First Feedback</th><th style={TH}>Second Feedback</th><th style={TH}>Average</th>
-          <ScoreHeaders />
+          {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.feedback).map((r, i) => (
           <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
             <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.code} /></td>
             <td style={TDC}><RO val={r.fb1} center /></td><td style={TDC}><RO val={r.fb2} center /></td>
             <td style={{ ...TDC, fontWeight: 700, color: "#0ea5e9" }}>{r.fb1 && r.fb2 ? ((n(r.fb1) + n(r.fb2)) / 2).toFixed(2) : "—"}</td>
-            <ScoreCells r={r} section="feedback" i={i} />
+            {renderScoreCells(r, "feedback", i)}
           </tr>
         ))}</tbody></table>
       </SC>
@@ -465,14 +472,14 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
             <th style={TH}>SN</th>
             {cols.map(c => <th key={c} style={TH}>{c}</th>)}
             <th style={TH}>Docs</th>
-            <ScoreHeaders />
+            {renderScoreHeaders()}
           </tr></thead>
           <tbody>{rows(person[key]).map((r, i) => (
             <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
               <td style={TDC}>{i + 1}</td>
               {fields.map(f => <td key={f} style={TD}><RO val={r[f]} /></td>)}
               <td style={TDV}><ViewDocsCell docKey={`${docPfx}-${i}`} docs={docs} /></td>
-              <ScoreCells r={r} section={key} i={i} />
+              {renderScoreCells(r, key, i)}
             </tr>
           ))}</tbody></table>
         </SC>
@@ -482,13 +489,13 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       <SC title="G. Annual Confidential Report (Max 25)" accent="#ef4444">
         <table style={T}><thead><tr>
           <th style={TH}>SN</th><th style={TH}>Parameter</th>
-          <ScoreHeaders />
+          {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.acr).map((r, i) => (
           <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
             <td style={TDC}>{i + 1}</td>
             <td style={TD}><RO val={r.label} /></td>
-            <ScoreCells r={r} section="acr" i={i} />
+            {renderScoreCells(r, "acr", i)}
           </tr>
         ))}</tbody></table>
       </SC>
@@ -500,14 +507,14 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
         <div style={{ overflowX: "auto" }}><table style={T}><thead><tr>
           <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Journal</th>
           <th style={TH}>ISSN</th><th style={TH}>Index</th><th style={TH}>Docs</th>
-          <ScoreHeaders />
+          {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.journals).map((r, i) => (
           <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
             <td style={TDC}>{i + 1}</td><td style={TD}><RO val={r.title} /></td><td style={TD}><RO val={r.journal} /></td>
             <td style={TDC}><RO val={r.issn} center /></td><td style={TDC}><RO val={r.index} center /></td>
             <td style={TDV}><ViewDocsCell docKey={`jour-${i}`} docs={docs} /></td>
-            <ScoreCells r={r} section="journals" i={i} />
+            {renderScoreCells(r, "journals", i)}
           </tr>
         ))}</tbody></table></div>
       </SC>
@@ -538,12 +545,12 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
           render: (r) => [r.program, r.duration, r.org] },
         { title: "B8(b). Industrial Training (Max 10)", key: "training", docPfx: "train",
           render: (r) => [r.company, r.duration, r.nature] },
-      ].map(({ title, key, docPfx, render }) => (
+      ].filter(({ key }) => key !== "research" || person.sectionApplicability?.research !== "notApplicable").map(({ title, key, docPfx, render }) => (
         <SC key={key} title={title} accent="#7c3aed">
           <div style={{ overflowX: "auto" }}><table style={T}><thead>
             <tr>
               <th style={TH}>SN</th><th style={TH}>Details</th><th style={TH}>Docs</th>
-              <ScoreHeaders />
+              {renderScoreHeaders()}
             </tr>
           </thead>
           <tbody>{rows(person[key]).map((r, i) => {
@@ -557,7 +564,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
                   ))}
                 </td>
                 <td style={TDV}><ViewDocsCell docKey={`${docPfx}-${i}`} docs={docs} /></td>
-                <ScoreCells r={r} section={key} i={i} />
+                {renderScoreCells(r, key, i)}
               </tr>
             );
           })}</tbody></table></div>
@@ -578,7 +585,6 @@ function calcVCScore(person, vcData) {
     const source = person[section];
     return idx === null ? n(Array.isArray(source) ? source[0]?.[field] : source?.[field]) : n(source?.[idx]?.[field]);
   };
-  const getS = (key) => n(vcData[key] ?? person[key]);
   const sectionMax = { lectures: 50, courseFile: 20, projects: 10, quals: 10, feedback: 10, deptActs: 20, uniActs: 30, society: 10, industry: 5, acr: 25, journals: 120, books: 50, ict: 20, research: 30, projects2: SCORE_LIMITS.researchInternalProjects, externalProjects: SCORE_LIMITS.researchExternalProjects, patents: 40, awards: 10, confs: 30, proposals: 10, products: 10, fdps: 10, training: 10 };
   const rowMax = { courseFile: () => SCORE_LIMITS.courseFileRow, projects: projectGuidanceRowMax, quals: () => SCORE_LIMITS.qualificationRow, feedback: () => 10, society: () => SCORE_LIMITS.societyRow, research: researchGuidanceRowMax, fdps: () => SCORE_LIMITS.fdpRow, training: () => SCORE_LIMITS.fdpRow };
   const sum = (arr, s, f) => clampScore((arr || []).reduce((a, row, i) => {
@@ -587,14 +593,14 @@ function calcVCScore(person, vcData) {
   }, 0), sectionMax[s] || 0);
 
   const partA = sum(person.lectures, "lectures", "vc") + sum(person.courseFile, "courseFile", "vc") +
-    clampScore(vcData.innovVc ?? vcData.innovVC ?? person.innovVc, 10) + sum(person.projects, "projects", "vc") +
+    clampScore(vcData.innovVc ?? vcData.innovVC ?? person.innovVc, 10) + (person.sectionApplicability?.projects === "notApplicable" ? 0 : sum(person.projects, "projects", "vc")) +
     sum(person.quals, "quals", "vc") + sum(person.feedback, "feedback", "vc") +
     sum(person.deptActs, "deptActs", "vc") + sum(person.uniActs, "uniActs", "vc") +
     sum(person.society, "society", "vc") + sum(person.industry, "industry", "vc") +
     sum(person.acr, "acr", "vc");
 
   const partB = sum(person.journals, "journals", "vc") + sum(person.books, "books", "vc") +
-    sum(person.ict, "ict", "vc") + sum(person.research, "research", "vc") +
+    sum(person.ict, "ict", "vc") + (person.sectionApplicability?.research === "notApplicable" ? 0 : sum(person.research, "research", "vc")) +
     sum(person.projects2, "projects2", "vc") + sum(person.externalProjects, "externalProjects", "vc") + sum(person.patents, "patents", "vc") + sum(person.awards, "awards", "vc") +
     sum(person.confs, "confs", "vc") + sum(person.proposals, "proposals", "vc") + sum(person.products, "products", "vc") +
     sum(person.fdps, "fdps", "vc") + sum(person.training || [], "training", "vc");
@@ -817,7 +823,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 
 
 // ─── Person Card ──────────────────────────────────────────────────────────────
-function PersonCard({ person, role, onReview, schoolColor }) {
+function PersonCard({ person, role, onReview, schoolColor, loading = false }) {
   const personMode = role === "Director" ? "director" : role === "HOD" ? "hod" : role === "Dean" ? "dean" : role === "Center Head" ? "center_head" : "faculty";
   const previousRoles = vcPreviousRolesFor(person, personMode);
   const vcTotal = n(person.vcTotal);
@@ -890,9 +896,9 @@ function PersonCard({ person, role, onReview, schoolColor }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
         <div style={{ fontSize: 9, color: "#94a3b8" }}>Submitted: {person.submittedOn}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => onReview(person, personMode)}
-            style={{ fontSize: 11, padding: "6px 14px", background: isVcReviewed(person) ? "#1e293b" : "#4c1d95", color: isVcReviewed(person) ? "#e2e8f0" : "#ede9fe", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
-            {isVcReviewed(person) ? "View Review" : "Review"}
+          <button onClick={() => onReview(person, personMode)} disabled={loading}
+            style={{ fontSize: 11, padding: "6px 14px", background: loading ? "#94a3b8" : isVcReviewed(person) ? "#1e293b" : "#4c1d95", color: isVcReviewed(person) ? "#e2e8f0" : "#ede9fe", border: "none", borderRadius: 6, cursor: loading ? "wait" : "pointer", fontWeight: 700, fontFamily: "Georgia, serif" }}>
+            {loading ? "Opening..." : isVcReviewed(person) ? "View Review" : "Review"}
           </button>
         </div>
       </div>
@@ -901,7 +907,7 @@ function PersonCard({ person, role, onReview, schoolColor }) {
 }
 
 // ─── School Panel ─────────────────────────────────────────────────────────────
-function SchoolPanel({ school, deanList, dirList, hodList, centerHeadList = [], facList, onReview }) {
+function SchoolPanel({ school, deanList, dirList, hodList, centerHeadList = [], facList, onReview, reviewLoading = null }) {
   const schoolDeans    = deanList.filter(d => d.schoolId === school.id);
   const schoolDirs     = dirList.filter(d => d.schoolId === school.id);
   const schoolHods     = hodList.filter(h => h.schoolId === school.id);
@@ -950,7 +956,7 @@ function SchoolPanel({ school, deanList, dirList, hodList, centerHeadList = [], 
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
           {allPeople.map(({ person, role }) => (
-            <PersonCard key={`${role}-${person.id}`} person={person} role={role} onReview={onReview} schoolColor={school.color} />
+            <PersonCard key={`${role}-${person.id}`} person={person} role={role} onReview={onReview} schoolColor={school.color} loading={reviewLoading === (person.id || person.email)} />
           ))}
         </div>
       )}
@@ -1070,20 +1076,48 @@ const toVcSchool = (school) => {
   };
 };
 
+const DIVISION_SCHOOLS = {
+  engineering: {
+    id: "engineering",
+    code: "DEAN-ENGG",
+    name: "Dean of Engineering",
+    label: "Engineering Division",
+    color: "#4c1d95",
+    icon: "DE",
+    hasHods: false,
+  },
+  non_engineering: {
+    id: "non_engineering",
+    code: "DEAN-NENG",
+    name: "Dean of Non-Engineering",
+    label: "Non-Engineering Division",
+    color: "#7c2d12",
+    icon: "DN",
+    hasHods: false,
+  },
+};
+
 const HIERARCHY_SCHOOLS = {
   engg: UNIVERSITY_SCHOOLS
     .filter((school) => school.deanTrack === DEAN_TRACKS.ENGINEERING)
-    .map(toVcSchool),
+    .map(toVcSchool)
+    .concat(DIVISION_SCHOOLS.engineering),
   "non-engg": UNIVERSITY_SCHOOLS
     .filter((school) => school.deanTrack === DEAN_TRACKS.NON_ENGINEERING)
-    .map(toVcSchool),
+    .map(toVcSchool)
+    .concat(DIVISION_SCHOOLS.non_engineering),
   cisr: UNIVERSITY_SCHOOLS
     .filter((school) => school.deanTrack === DEAN_TRACKS.DIRECT_VC)
     .map(toVcSchool),
 };
 
 const schoolIdForPerson = (person = {}) => {
-  const schoolKey = getSchoolKey(person.school || person.info?.school || "");
+  const schoolValue = person.school || person.info?.school || "";
+  const normalizedSchool = normalizeHierarchyText(schoolValue);
+  if (normalizedSchool === "engineering") return "engineering";
+  if (normalizedSchool === "non engineering" || normalizedSchool === "nonengineering") return "non_engineering";
+
+  const schoolKey = getSchoolKey(schoolValue);
   return schoolKey ? schoolKey.toLowerCase() : "";
 };
 
@@ -1097,6 +1131,7 @@ export default function VCDashboard() {
   const [deanTypeFilter, setDeanTypeFilter] = useState("engg");
   const [activeSchoolId, setActiveSchoolId] = useState("socsea");
   const [reviewing, setReviewing] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [deanList, setDeanList] = useState([]);
   const [dirList, setDirList] = useState([]);
@@ -1112,7 +1147,12 @@ export default function VCDashboard() {
         const items = await fetchReviewQueueForRole({
           reviewerRole: "vc",
           reviewerProfile: { ...profileFromsessionStorage(), appraisal_role: "vc" },
-          schoolValues: UNIVERSITY_SCHOOLS.flatMap((school) => [school.code, school.name, school.label]),
+          schoolValues: [
+            ...UNIVERSITY_SCHOOLS.flatMap((school) => [school.code, school.name, school.label]),
+            "CioD",
+            DEAN_TRACKS.ENGINEERING,
+            DEAN_TRACKS.NON_ENGINEERING,
+          ],
         });
         let nonTeachingItems = [];
         try {
@@ -1184,6 +1224,27 @@ export default function VCDashboard() {
     setReviewing(null);
   };
   const switchSchool = (schoolId) => { setActiveSchoolId(schoolId); setReviewing(null); };
+
+  const openTeachingReview = async (person, personMode) => {
+    const academicYear = person.academicYear || person.academic_year || person.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
+    setReviewLoading(person.id || person.email);
+    try {
+      const data = await fetchSavedAppraisal({
+        facultyEmail: person.email,
+        academicYear,
+      });
+      const form = data?.payload?.form || data?.form || {};
+      const docs = data?.payload?.docs || data?.docs || {};
+      setReviewing({
+        person: { ...person, ...form, docs, academicYear, academic_year: academicYear },
+        personMode,
+      });
+    } catch (err) {
+      alert(`Unable to open submitted form.\n\n${err.message}`);
+    } finally {
+      setReviewLoading(null);
+    }
+  };
 
   const getSchoolPending = (school) => {
     const all = [
@@ -1366,7 +1427,8 @@ export default function VCDashboard() {
                 hodList={hodList}
                 centerHeadList={centerHeadList}
                 facList={facList}
-                onReview={(person, personMode) => setReviewing({ person, personMode })}
+                onReview={openTeachingReview}
+                reviewLoading={reviewLoading}
               />
             ) : null}
           </>
