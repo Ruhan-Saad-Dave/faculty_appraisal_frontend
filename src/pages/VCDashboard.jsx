@@ -1156,7 +1156,10 @@ export default function VCDashboard() {
         });
         let nonTeachingItems = [];
         try {
-          nonTeachingItems = await fetchNonTeachingQueueForRole({ reviewerRole: "vc" });
+          nonTeachingItems = await fetchNonTeachingQueueForRole({
+            reviewerRole: "vc",
+            academicYear: APP_INFO.DEFAULT_AY,
+          });
         } catch (nonTeachingErr) {
           console.warn("Could not load VC non-teaching review queue:", nonTeachingErr.message);
         }

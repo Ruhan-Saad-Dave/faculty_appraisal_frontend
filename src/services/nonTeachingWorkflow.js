@@ -552,14 +552,13 @@ const nonTeachingReachedReviewer = (item = {}, reviewerRole) => {
 
 export const fetchNonTeachingQueueForRole = async ({
   reviewerRole,
-  academicYear: ay,
+  academicYear: ay = APP_INFO.DEFAULT_AY,
 } = {}) => {
   const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
   if (!role || role === "non_teaching_staff") return [];
 
   try {
-    const params = {};
-    if (ay) params.academic_year = ay;
+    const params = { academic_year: academicYear(ay) };
 
     const items = await api.get("/non-teaching/subordinates", { params });
     return (items || [])

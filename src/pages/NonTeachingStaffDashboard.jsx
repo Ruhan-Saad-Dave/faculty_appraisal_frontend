@@ -878,18 +878,24 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const loadQueue = async () => {
     setLoading(true);
+    setLoadError("");
     try {
-      const queue = await fetchNonTeachingQueueForRole({ reviewerRole });
+      const queue = await fetchNonTeachingQueueForRole({
+        reviewerRole,
+        academicYear: APP_INFO.DEFAULT_AY,
+      });
       setItems(queue);
       if (selectedId && !queue.some((item) => item.id === selectedId)) {
         setSelectedId("");
       }
     } catch (err) {
       console.error("Could not load non-teaching queue:", err);
+      setLoadError(err.message || "Could not load non-teaching review queue.");
       setItems([]);
     } finally {
       setLoading(false);
@@ -937,6 +943,8 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
           {tab === "review" && (
             loading ? (
               <div style={{ color: "#64748b", fontSize: 11, padding: "10px 4px" }}>Loading queue...</div>
+            ) : loadError ? (
+              <div style={{ color: "#fecaca", background: "#7f1d1d", border: "1px solid #991b1b", borderRadius: 8, fontSize: 11, padding: "10px 11px", lineHeight: 1.45 }}>{loadError}</div>
             ) : items.length === 0 ? (
               <div style={{ color: "#64748b", fontSize: 11, padding: "10px 4px" }}>No appraisals in your queue.</div>
             ) : items.map((item) => (
@@ -953,6 +961,10 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
       <main style={{ flex: 1, minWidth: 0, marginLeft: 244, padding: "22px 26px", overflowX: "auto" }}>
         {tab === "self" ? (
           <NonTeachingAppraisalForm role={reviewerRole} embedded />
+        ) : loadError ? (
+          <div style={{ color: "#991b1b", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 10, padding: "16px 18px", fontSize: 13, marginTop: 28 }}>
+            Unable to load the review queue. {loadError}
+          </div>
         ) : !selected ? (
           <div style={{ color: "#64748b", fontSize: 14, marginTop: 40, textAlign: "center" }}>
             {items.length === 0 ? "No submitted appraisals to review." : "Select an appraisal from the queue."}
