@@ -382,6 +382,19 @@ const aliasKeys = (rows, mapping) =>
     return out;
   });
 
+const REVIEW_SCORE_ALIASES = {
+  hod_score: "hod",
+  hodScore: "hod",
+  center_head_score: "hod",
+  centerHeadScore: "hod",
+  director_score: "director",
+  directorScore: "director",
+  dean_score: "dean",
+  deanScore: "dean",
+  vc_score: "vc",
+  vcScore: "vc",
+};
+
 const normalizeFetchedForm = (form = {}) => {
   const normalized = { ...form };
   const lectures = normalized.lectures || normalized.teaching_process || normalized.teachingProcess;
@@ -409,8 +422,26 @@ const normalizeFetchedForm = (form = {}) => {
   if (normalized.society) {
     normalized.society = aliasKeys(normalized.society, { activity: "label" });
   }
-  if (normalized.journals) {
-    normalized.journals = aliasKeys(normalized.journals, { indexing: "index" });
+  const journals = normalized.journals ||
+    normalized.journal_publications ||
+    normalized.journalPublications ||
+    normalized.research_papers ||
+    normalized.researchPapers ||
+    normalized.journal_publication ||
+    normalized.journalPublication;
+  if (journals) {
+    normalized.journals = aliasKeys(journals, {
+      indexing: "index",
+      index_name: "index",
+      indexName: "index",
+      journal_name: "journal",
+      journalName: "journal",
+      paper_title: "title",
+      paperTitle: "title",
+      issn_no: "issn",
+      issnNo: "issn",
+      ...REVIEW_SCORE_ALIASES,
+    });
   }
   if (normalized.books) {
     normalized.books = aliasKeys(normalized.books, {
