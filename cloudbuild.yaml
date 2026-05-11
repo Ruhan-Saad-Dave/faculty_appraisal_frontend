@@ -1,0 +1,33 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - VITE_API_BASE_URL=${_VITE_API_BASE_URL}
+      - -t
+      - gcr.io/$PROJECT_ID/$_SERVICE_NAME
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/$_SERVICE_NAME
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_SERVICE_NAME
+      - --image=gcr.io/$PROJECT_ID/$_SERVICE_NAME
+      - --region=$_REGION
+      - --platform=managed
+      - --allow-unauthenticated
+
+substitutions:
+  _SERVICE_NAME: faculty-appraisal-frontend
+  _REGION: asia-south1
+  _VITE_API_BASE_URL: https://faculty-appraisal-git-376777978967.asia-south1.run.app/api/v1
+
+images:
+  - gcr.io/$PROJECT_ID/$_SERVICE_NAME
