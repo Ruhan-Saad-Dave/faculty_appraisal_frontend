@@ -12,7 +12,7 @@ import { openFullFormReport } from "../utils/fullFormReport";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
 import { NonTeachingAuthorityReviewPanel } from "./NonTeachingStaffDashboard";
-import { SCORE_LIMITS, clampScore, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore } from "../utils/appraisalFormUtils";
+import { SCORE_LIMITS, clampScore, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, societySelectionForRow } from "../utils/appraisalFormUtils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -526,7 +526,6 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       {[
         ["C. Departmental Activities (Max 20)", "deptActs", "#f59e0b", ["Activity", "Nature"], ["activity", "nature"], "dept"],
         ["D. University Activities (Max 30)", "uniActs", "#f59e0b", ["Activity", "Nature"], ["activity", "nature"], "uni"],
-        ["E. Contribution to Society (Max 10)", "society", "#10b981", ["Activity", "Details"], ["label", "details"], "soc"],
         ["F. Industry Connect (Max 5)", "industry", "#10b981", ["Industry", "Details"], ["name", "details"], "ind"],
       ].map(([title, key, accent2, cols, fields, docPfx]) => (
         <SC key={key} title={title} accent={accent2}>
@@ -546,6 +545,24 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
           ))}</tbody></table>
         </SC>
       ))}
+
+      {/* E. Contribution to Society */}
+      <SC title="E. Contribution to Society (Max 10, Max 5 per row)" accent="#10b981">
+        <table style={T}><thead><tr>
+          <th style={TH}>SN</th><th style={TH}>Activity</th><th style={TH}>Yes/No</th><th style={TH}>Details</th><th style={TH}>Docs</th>
+          {renderScoreHeaders()}
+        </tr></thead>
+        <tbody>{rows(person.society).map((r, i) => (
+          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+            <td style={TDC}>{i + 1}</td>
+            <td style={TD}><RO val={r.label} /></td>
+            <td style={TDC}><RO val={societySelectionForRow(r) || "No"} center /></td>
+            <td style={TD}><RO val={r.details} /></td>
+            <td style={TDV}><ViewDocsCell docKey={`soc-${i}`} docs={docs} /></td>
+            {renderScoreCells(r, "society", i)}
+          </tr>
+        ))}</tbody></table>
+      </SC>
 
       {/* G ACR */}
       <SC title="G. Annual Confidential Report (Max 25)" accent="#ef4444">

@@ -1668,8 +1668,6 @@ export default function NonEngineeringDeanDashboard() {
 
   const [lectures, setLectures] = useState([
     { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
-    { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
-    { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
   ]);
   const setLec = (i, k, v) => setLectures((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
@@ -1678,10 +1676,7 @@ export default function NonEngineeringDeanDashboard() {
   const [innovScore, setInnovScore] = useState("");
   const [innovDetails, setInnovDetails] = useState("");
   const [projects, setProjects] = useState([
-    { label: "Project guided (3/batch)", score: "", hod: "", director: "" },
-    { label: "Industrial collaboration / Sponsorship (Max 5)", score: "", hod: "", director: "" },
-    { label: "Award received (Max 5 marks)", score: "", hod: "", director: "" },
-    { label: "Project outcome: events/publications (Max 5)", score: "", hod: "", director: "" },
+    { label: "", score: "", hod: "", director: "" },
   ]);
   const setProj = (i, k, v) => setProjects((p) => p.map((r, j) => {
     if (j !== i) return r;
@@ -1690,68 +1685,57 @@ export default function NonEngineeringDeanDashboard() {
   }));
 
   const [quals, setQuals] = useState([
-    { label: "Higher Qualification achieved (5 Marks)", score: "", hod: "", director: "" },
-    { label: "Add-on Qualification / Certification (Max 5)", score: "", hod: "", director: "" },
+    { label: "", score: "", hod: "", director: "" },
   ]);
   const setQual = (i, k, v) => setQuals((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [feedback, setFeedback] = useState([
-    { code: "", fb1: "", fb2: "", score: "", hod: "", director: "" },
-    { code: "", fb1: "", fb2: "", score: "", hod: "", director: "" },
     { code: "", fb1: "", fb2: "", score: "", hod: "", director: "" },
   ]);
   const setFb = (i, k, v) => setFeedback((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [deptActs, setDeptActs] = useState([
     { activity: "", nature: "", score: "", hod: "", director: "" },
-    { activity: "", nature: "", score: "", hod: "", director: "" },
-    { activity: "", nature: "", score: "", hod: "", director: "" },
   ]);
   const setDept = (i, k, v) => setDeptActs((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [uniActs, setUniActs] = useState([
     { activity: "", nature: "", score: "", hod: "", director: "" },
-    { activity: "", nature: "", score: "", hod: "", director: "" },
-    { activity: "", nature: "", score: "", hod: "", director: "" },
   ]);
   const setUni = (i, k, v) => setUniActs((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
-  const societyLabels = ["Induction Program", "Unnat Bharat Abhiyan", "Yoga Classes", "Blood Donation", "Techno Social activities", "NSS", "Social visits", "Project of Social Impact", "Any other activity"];
-  const [society, setSociety] = useState(societyLabels.map((l) => ({ label: l, details: "", score: "", hod: "", director: "" })));
+  const [society, setSociety] = useState([
+    { label: "", details: "", score: "", hod: "", director: "" },
+  ]);
   const setSoc = (i, k, v) => setSociety((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [industry, setIndustry] = useState([
     { name: "", details: "", score: "", hod: "", director: "" },
-    { name: "", details: "", score: "", hod: "", director: "" },
   ]);
   const setInd = (i, k, v) => setIndustry((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
-  const acrLabels = ["Self-motivation and Proactiveness", "Punctuality", "Target based work", "Effectiveness", "Obedience"];
-  const [acr, setAcr] = useState(acrLabels.map((l) => ({ label: l, hod: "", director: "" })));
+  const [acr, setAcr] = useState([
+    { label: "", hod: "", director: "" },
+  ]);
   const setAcrRow = (i, k, v) => setAcr((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [journals, setJournals] = useState([
-    { title: "", journal: "", issn: "", index: "", score: "", hod: "", director: "" },
-    { title: "", journal: "", issn: "", index: "", score: "", hod: "", director: "" },
     { title: "", journal: "", issn: "", index: "", score: "", hod: "", director: "" },
   ]);
   const setJour = (i, k, v) => setJournals((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [books, setBooks] = useState([
     { title: "", book: "", issn: "", pub: "", coauth: "", first: "", score: "", hod: "", director: "" },
-    { title: "", book: "", issn: "", pub: "", coauth: "", first: "", score: "", hod: "", director: "" },
   ]);
   const setBook = (i, k, v) => setBooks((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [ict, setIct] = useState([
     { title: "", desc: "", type: "", quad: "", score: "", hod: "", director: "" },
-    { title: "", desc: "", type: "", quad: "", score: "", hod: "", director: "" },
   ]);
   const setIctRow = (i, k, v) => setIct((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [research, setResearch] = useState([
-    { degree: "PhD", name: "", thesis: "", score: "", hod: "", director: "" },
-    { degree: "PhD", name: "", thesis: "", score: "", hod: "", director: "" },
+    { degree: "", name: "", thesis: "", score: "", hod: "", director: "" },
   ]);
   const setRes = (i, k, v) => setResearch((p) => p.map((r, j) => {
     if (j !== i) return r;
@@ -1763,55 +1747,45 @@ export default function NonEngineeringDeanDashboard() {
 
   const [projects2, setProjects2] = useState([
     { title: "", agency: "", date: "", amount: "", role: "", status: "", score: "", hod: "" },
-    { title: "", agency: "", date: "", amount: "", role: "", status: "", score: "", hod: "" },
   ]);
   const setPrj2 = (i, k, v) => setProjects2((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [externalProjects, setExternalProjects] = useState([
-    { title: "", agency: "", date: "", amount: "", role: "", status: "", score: "", hod: "" },
     { title: "", agency: "", date: "", amount: "", role: "", status: "", score: "", hod: "" },
   ]);
   const setExtPrj = (i, k, v) => setExternalProjects((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [patents, setPatents] = useState([
     { title: "", type: "", date: "", status: "", fileNo: "", score: "", hod: "", director: "" },
-    { title: "", type: "", date: "", status: "", fileNo: "", score: "", hod: "", director: "" },
   ]);
   const setPat = (i, k, v) => setPatents((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [awards, setAwards] = useState([
-    { title: "", date: "", agency: "", level: "", score: "", hod: "", director: "" },
     { title: "", date: "", agency: "", level: "", score: "", hod: "", director: "" },
   ]);
   const setAwd = (i, k, v) => setAwards((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [confs, setConfs] = useState([
     { title: "", type: "", org: "", level: "", score: "", hod: "", director: "" },
-    { title: "", type: "", org: "", level: "", score: "", hod: "", director: "" },
-    { title: "", type: "", org: "", level: "", score: "", hod: "", director: "" },
   ]);
   const setConf = (i, k, v) => setConfs((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [proposals, setProposals] = useState([
-    { title: "", duration: "", agency: "", amount: "", score: "", hod: "", director: "" },
     { title: "", duration: "", agency: "", amount: "", score: "", hod: "", director: "" },
   ]);
   const setProp = (i, k, v) => setProposals((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [products, setProducts] = useState([
     { details: "", usage: "", score: "", hod: "", director: "" },
-    { details: "", usage: "", score: "", hod: "", director: "" },
   ]);
   const setProd = (i, k, v) => setProducts((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [fdps, setFdps] = useState([
     { program: "", duration: "", org: "", score: "", hod: "", director: "" },
-    { program: "", duration: "", org: "", score: "", hod: "", director: "" },
   ]);
   const setFdp = (i, k, v) => setFdps((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
 
   const [training, setTraining] = useState([
-    { company: "", duration: "", nature: "", score: "", hod: "", director: "" },
     { company: "", duration: "", nature: "", score: "", hod: "", director: "" },
   ]);
   const setTrain = (i, k, v) => setTraining((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
@@ -2937,26 +2911,25 @@ export default function NonEngineeringDeanDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {society.map((r, i) => (
-                        <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
+                      {society.map((r, i) => {
+                        const socLocked = societySelectionForRow(r) !== "Yes";
+                        return (
+                        <tr key={i} style={socLocked ? { background: "#f1f5f9", opacity: 0.65 } : i % 2 === 1 ? { background: "#f8fafc" } : {}}>
                           <td style={TDC}>{i + 1}</td>
-                          <td style={TD}><TI val={r.label} onChange={(v) => setSoc(i, "label", v)} /></td>
+                          <td style={TD}><TI val={r.label} onChange={(v) => setSoc(i, "label", v)} readOnly={socLocked} /></td>
                           <td style={TDC}>
-                            <label style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#334155" }}>
-                              <input
-                                type="checkbox"
-                                checked={societySelectionForRow(r) === "Yes"}
-                                onChange={(event) => setSociety((rows) => rows.map((row, rowIndex) => rowIndex === i ? { ...row, participated: event.target.checked ? "Yes" : "No", score: event.target.checked ? String(societyRowScore({ participated: "Yes" })) : "0" } : row))}
-                              />
-                              {societySelectionForRow(r) === "Yes" ? "Yes" : "No"}
-                            </label>
+                            <select value={societySelectionForRow(r) || "No"} onChange={(e) => setSociety((rows) => rows.map((row, ri) => ri === i ? { ...row, participated: e.target.value, score: e.target.value === "No" ? "0" : row.score } : row))} style={{ fontSize: 12, padding: "4px 6px", borderRadius: 4, border: "1px solid #cbd5e1", fontFamily: "Georgia, serif" }}>
+                              <option value="No">No</option>
+                              <option value="Yes">Yes</option>
+                            </select>
                           </td>
-                          <td style={TD}><TI val={r.details} onChange={(v) => setSoc(i, "details", v)} /></td>
-                          <td style={TD}><DocCell id={`soc-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><TI val={r.details} onChange={(v) => setSoc(i, "details", v)} readOnly={socLocked} /></td>
+                          <td style={TD}><DocCell id={`soc-${i}`} docs={docs} setDocs={setDocs} readOnly={socLocked} /></td>
                           <td style={TD}><ViewCell id={`soc-${i}`} docs={docs} /></td>
-                          <td style={TDS}><RO val={String(societyRowScore(r))} center /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setSoc(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.societyRow)))} numeric max={SCORE_LIMITS.societyRow} center readOnly={socLocked} /></td>
                         </tr>
-                      ))}
+                        );
+                      })}
                       <tr style={{ background: "#eff6ff" }}>
                         <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total Score (Max 10)</td>
                         <td style={{ ...TDS, fontWeight: "bold" }}>{societyScore.toFixed(1)}</td>

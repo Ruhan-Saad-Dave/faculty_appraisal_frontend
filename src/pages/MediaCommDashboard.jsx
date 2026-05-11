@@ -92,20 +92,16 @@ const emptyMediaForm = () => ({
   innovDetails: "",
   innovScore: "",
   projects: [
-    { label: "Project guided (3/batch)", score: "" },
-    { label: "Industrial collaboration / Sponsorship", score: "" },
-    { label: "Award received", score: "" },
-    { label: "Project outcome: events/publications", score: "" },
+    { label: "", score: "" },
   ],
   quals: [
-    { label: "Higher Qualification achieved", score: "" },
-    { label: "Add-on Qualification / Certification", score: "" },
+    { label: "", score: "" },
   ],
   feedback: [{ code: "", fb1: "", fb2: "", score: "" }],
   deptActs: [{ activity: "", nature: "", score: "" }],
   uniActs: [{ activity: "", nature: "", score: "" }],
-  society: SOCIETY_LABELS.map((label) => ({ label, details: "", participated: "", score: "" })),
-  acr: ACR_LABELS.map((label) => ({ label, score: "" })),
+  society: [{ label: "", details: "", participated: "", score: "" }],
+  acr: [{ label: "", score: "" }],
   journals: [{ title: "", journal: "", issn: "", index: "", score: "" }],
   popularWritings: [{ media: "", film: "", score: "" }],
   books: [{ title: "", book: "", isbn: "", publisher: "", coAuthors: "", first: "", score: "" }],
@@ -132,7 +128,7 @@ const PART_A_SECTIONS = [
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
   { key: "deptActs", title: "Departmental / School Activities", max: 20, doc: "dept", fields: [["activity", "Activity"], ["nature", "Nature"]] },
   { key: "uniActs", title: "University Level Activities", max: 30, doc: "uni", fields: [["activity", "Activity"], ["nature", "Nature"]] },
-  { key: "society", title: "Contribution to Society", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, autoScore: true, fields: [["label", "Activity", true], ["details", "Details"], ["participated", "Participation"]] },
+  { key: "society", title: "Contribution to Society", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity", true], ["details", "Details"], ["participated", "Participation"]] },
   { key: "acr", title: "Annual Confidential Report - School Level", max: 25, doc: "acr", fields: [["label", "Parameter", true]], selfReadOnlyScore: true },
 ];
 
@@ -391,7 +387,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
         const rowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
         const nextValue = key === "date" ? maskDateDDMMYYYY(value) : key === "score" ? clampScore(value, rowMax) : value;
         const nextRow = { ...row, [key]: nextValue };
-        if (section.key === "society" && key === "participated") return { ...nextRow, score: nextValue ? String(societyRowScore({ participated: nextValue })) : "" };
+        if (section.key === "society" && key === "participated") return { ...nextRow, score: nextValue === "No" || !nextValue ? "0" : row.score };
         if (section.key === "research" && ["degree", "name", "thesis"].includes(key)) return { ...nextRow, score: researchGuidanceScore(nextRow) ? String(researchGuidanceScore(nextRow)) : "" };
         return nextRow;
       }),
@@ -461,8 +457,10 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${section.key}-${index}`}>
+            {rows.map((row, index) => {
+              const socRowLocked = section.key === "society" && societySelectionForRow(row) !== "Yes";
+              return (
+              <tr key={`${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
                 <td style={tdCenter}>{index + 1}</td>
                 {section.fields.map(([key, , readOnlyField]) => (
                   <td key={key} style={tdStyle}>
@@ -502,7 +500,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </select>
                     ) : (
                       <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key)} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked} onChange={(value) => updateRow(index, key, value)} />
+                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key)} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated")} onChange={(value) => updateRow(index, key, value)} />
                         {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
                           <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
                             {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
@@ -516,14 +514,14 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                   </td>
                 ))}
                 {section.key === "feedback" && <td style={tdCenter}>{feedbackAverage(row).toFixed(2)}</td>}
-                {section.key !== "courseFile" && <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked} /></td>}
+                {section.key !== "courseFile" && <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked || socRowLocked} /></td>}
                 <td style={tdCenter}>
                   {mode === "self"
                     ? section.key === "feedback"
                       ? <RO value={feedbackRowScore(row, section.max).toFixed(1)} center />
                       : section.autoScore
                         ? <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />
-                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked} onChange={(value) => updateRow(index, "score", value)} />
+                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
                     : <RO value={section.key === "research" ? researchGuidanceScore(row).toFixed(1) : rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
                 </td>
                 {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={row[role]} center /></td>)}
@@ -533,7 +531,8 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

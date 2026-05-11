@@ -13,7 +13,7 @@ export const scoreRemaining = (earned, maxScore) =>
   Math.max(0, toNumber(maxScore) - clampScore(earned, maxScore));
 
 export const SCORE_LIMITS = {
-  courseFileRow: 2,
+  courseFileRow: 20,
   innovativeRow: 2,
   qualificationRow: 5,
   feedbackAverage: 100,
@@ -112,7 +112,7 @@ export const societySelectionForRow = (row = {}) => {
 };
 
 export const societyRowScore = (row = {}) =>
-  normalizedText(societySelectionForRow(row)) === "yes" ? SCORE_LIMITS.societyRow : 0;
+  clampScore(toNumber(row.score), SCORE_LIMITS.societyRow);
 
 export const effectiveMaxScore = (baseMax, applicability = {}, sections = []) =>
   Math.max(
@@ -211,7 +211,7 @@ export const normalizeAutoScores = (form = {}) => ({
     return {
       ...row,
       participated: selection,
-      score: selection ? String(societyRowScore({ participated: selection })) : "",
+      score: normalizedText(selection) === "yes" ? String(clampScore(toNumber(row.score), SCORE_LIMITS.societyRow)) : "0",
     };
   }),
   research: (form.research || []).map((row) => ({
