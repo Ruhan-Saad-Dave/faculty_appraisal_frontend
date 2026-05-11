@@ -27,7 +27,10 @@ export const changePassword = async (currentPassword, newPassword) => {
 };
 
 export const forgotPassword = async (email) => {
-  return await api.post("/auth/forgot-password", { email });
+  return await api.post("/auth/forgot-password", {
+    email,
+    redirect_url: `${window.location.origin}/reset-password`,
+  });
 };
 
 export const resetPassword = async (token, newPassword) => {
