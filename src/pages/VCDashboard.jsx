@@ -289,7 +289,7 @@ const vcReviewSummaryFrom = (...sources) => {
 const VC_REVIEW_ARRAY_KEYS = ["lectures", "courseFile", "projects", "quals", "feedback", "deptActs", "uniActs", "society", "industry", "acr", "journals", "books", "ict", "research", "projects2", "externalProjects", "patents", "awards", "confs", "proposals", "products", "fdps", "training"];
 const VC_REPORT_PART_A_SECTIONS = [
   { key: "lectures", title: "A(i). Lectures / Tutorials / Practicals", max: 50, doc: "lec", fields: [["sem", "Semester"], ["code", "Course Code / Name"], ["planned", "Classes (as per course structure)"], ["conducted", "Classes Actually Conducted"]] },
-  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", fields: [["course", "Course / Paper"], ["title", "Title"], ["details", "Details"]] },
+  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", fields: [["course", "Course / Paper"], ["title", "Year"], ["details", "Availability as per IQAC format"]] },
   { key: "projects", title: "A(iv). Project Guidance", max: 10, doc: "proj", fields: [["label", "Project Category"]] },
   { key: "quals", title: "A(v). Qualification Enhancement", max: 10, doc: "qual", fields: [["label", "Category"]] },
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
@@ -454,7 +454,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       {/* A2 Course File */}
       <SC title="A2. Course File (Max 20)" accent="#7c3aed">
         <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th><th style={TH}>Docs</th>
+          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Year</th><th style={TH}>Availability as per IQAC format</th>
           {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.courseFile).map((r, i) => (
@@ -463,7 +463,6 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
             <td style={TD}><RO val={r.course} /></td>
             <td style={TD}><RO val={r.title} /></td>
             <td style={TDC}><RO val={r.details} center /></td>
-            <td style={TDV}><ViewDocsCell docKey={`courseFile-${i}`} docs={docs} /></td>
             {renderScoreCells(r, "courseFile", i)}
           </tr>
         ))}</tbody></table>

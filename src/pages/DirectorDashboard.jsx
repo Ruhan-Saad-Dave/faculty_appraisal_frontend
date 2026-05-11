@@ -387,8 +387,8 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData }
         <table style={T}>
           <thead><tr>
             <th style={{ ...TH, width: 30 }}>SN</th>
-            <th style={TH}>Course</th><th style={TH}>Title</th><th style={TH}>Details</th>
-            <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_DIR}>Director Score</th>
+            <th style={TH}>Course</th><th style={TH}>Year</th><th style={TH}>Availability as per IQAC format</th>
+            <th style={TH}>Faculty Score</th><th style={TH_DIR}>Director Score</th>
           </tr></thead>
           <tbody>
             {rows(courseFile).map((r, i) => (
@@ -397,7 +397,6 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData }
                 <td style={TD}><RO val={r.course} /></td>
                 <td style={TD}><RO val={r.title} /></td>
                 <td style={TDC}><RO val={r.details} center /></td>
-                <td style={TDV}><ViewDocsCell docKey={`courseFile-${i}`} docs={docs} /></td>
                 <td style={TDS}><RO val={courseFileRowScore(r) ? String(courseFileRowScore(r)) : ""} center /></td>
                 <td style={TDS_DIR}><DirInput val={getDir("courseFile", i, "dir")} onChange={v => setDir("courseFile", i, "dir", v)} max={SCORE_LIMITS.courseFileRow} /></td>
               </tr>
@@ -2170,10 +2169,8 @@ export default function DirectorDashboard() {
                       <tr>
                         <th style={{ ...TH, width: 30 }}>SN</th>
                         <th style={TH}>Course / Paper</th>
-                        <th style={TH}>Title</th>
-                        <th style={TH}>Details</th>
-                        <th style={TH}>Attachment</th>
-                        <th style={TH}>View Docs</th>
+                        <th style={TH}>Year</th>
+                        <th style={TH}>Availability as per IQAC format</th>
                         <th style={TH}>Score</th>
                       </tr>
                     </thead>
@@ -2183,14 +2180,19 @@ export default function DirectorDashboard() {
                     <td style={TDC}>{i + 1}</td>
                     <td style={TD}><TI val={r.course} onChange={(v) => setCF(i, "course", v)} /></td>
                     <td style={TD}><TI val={r.title} onChange={(v) => setCF(i, "title", v)} textOnly /></td>
-                    <td style={TD}><TI val={r.details} onChange={(v) => setCF(i, "details", v)} /></td>
-                    <td style={TD}><DocCell id={`courseFile-${i}`} docs={docs} setDocs={setDocs} /></td>
-                    <td style={TD}><ViewCell id={`courseFile-${i}`} docs={docs} /></td>
+                    <td style={TD}>
+                      <select value={r.details} onChange={(e) => setCF(i, "details", e.target.value)} style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "Georgia, serif", fontSize: 11 }}>
+                        <option value="">Select</option>
+                        <option value="1.Available">1.Available</option>
+                        <option value="2.Partially Available">2.Partially Available</option>
+                        <option value="3.Not Available">3.Not Available</option>
+                      </select>
+                    </td>
                     <td style={TDS}><TI val={r.score} onChange={(v) => setCF(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.courseFileRow)))} numeric max={SCORE_LIMITS.courseFileRow} center /></td>
                    </tr>
                  ))}
                       <tr style={{ background: "#eff6ff" }}>
-                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total Score (Max 20)</td>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={4}>Total Score (Max 20)</td>
                         <td style={{ ...TDS, fontWeight: "bold", color: "#1e3a5f" }}>{courseFileScore.toFixed(1)}</td>
                       </tr>
                   </tbody>

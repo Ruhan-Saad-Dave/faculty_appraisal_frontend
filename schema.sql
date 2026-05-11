@@ -122,7 +122,7 @@ create table public.course_files (
   row_no integer,
   course text,
   title text,
-  details text,
+  details text check (details is null or details in ('1.Available', '2.Partially Available', '3.Not Available')),
   score numeric not null default 0,
   hod_score numeric,
   director_score numeric,
@@ -854,11 +854,14 @@ create table if not exists public.appraisal_config (
 
 create index if not exists idx_appraisal_config_academic_year on public.appraisal_config (academic_year);
 
--- announcements: admin-managed notices shown to all users
+-- announcements: admin-managed notices shown to users; audience scopes who sees each notice
 create table if not exists public.announcements (
     id          serial primary key,
     title       varchar(200) not null,
     body        varchar(5000) not null,
+    audience    varchar(50)  not null default 'all' check (
+                  audience in ('all', 'faculty', 'hod', 'dean', 'non_teaching_staff')
+                ),
     is_active   boolean not null default true,
     created_by  varchar,
     created_at  timestamptz not null default now(),
@@ -866,6 +869,19 @@ create table if not exists public.announcements (
 );
 
 create index if not exists idx_announcements_is_active on public.announcements (is_active);
+
+-- module_config: single-row table persisting the Section Controls toggles from the admin panel
+create table if not exists public.module_config (
+    id                       integer primary key default 1,
+    appraisal_module_enabled boolean not null default true,
+    self_appraisal_enabled   boolean not null default true,
+    peer_review_enabled      boolean not null default false,
+    updated_at               timestamptz not null default now()
+);
+
+insert into public.module_config (id, appraisal_module_enabled, self_appraisal_enabled, peer_review_enabled)
+values (1, true, true, false)
+on conflict (id) do nothing;
 
 -- password_reset_tokens: stores hashed one-time tokens for the forgot-password flow.
 -- The backend generates a random token, emails the raw value, and stores only its hash here.
@@ -891,6 +907,12 @@ begin
     select schemaname, tablename
     from pg_tables
     where schemaname = 'public'
+      and exists (
+        select 1 from information_schema.columns
+        where table_schema = 'public'
+          and table_name = tablename
+          and column_name = 'updated_at'
+      )
   loop
     execute format(
       'create trigger %I before update on %I.%I for each row execute function public.set_updated_at()',

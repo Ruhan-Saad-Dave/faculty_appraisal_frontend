@@ -126,7 +126,7 @@ const cloneRows = (rows) => JSON.parse(JSON.stringify(rows || []));
 
 const PART_A_SECTIONS = [
   { key: "lectures", title: "A(i). Lectures / Tutorials / Practicals", max: 50, doc: "lec", fields: [["sem", "Semester"], ["code", "Course Code / Name"], ["planned", "Planned"], ["conducted", "Conducted"]] },
-  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", rowMax: SCORE_LIMITS.courseFileRow, fields: [["course", "Course / Paper"], ["title", "Title"], ["details", "Details"]] },
+  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", rowMax: SCORE_LIMITS.courseFileRow, fields: [["course", "Course / Paper"], ["title", "Year"], ["details", "Availability as per IQAC format"]] },
   { key: "projects", title: "A(iv). Project Guidance", max: 10, doc: "proj", rowMax: projectGuidanceRowMax, fields: [["label", "Project Category", true]] },
   { key: "quals", title: "A(v). Qualification Enhancement", max: 10, doc: "qual", rowMax: SCORE_LIMITS.qualificationRow, fields: [["label", "Category", true]] },
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
@@ -454,7 +454,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
               <th style={thStyle}>SN</th>
               {section.fields.map(([, label]) => <th key={label} style={thStyle}>{label}</th>)}
               {section.key === "feedback" && <th style={thStyle}>Average</th>}
-              <th style={thStyle}>Documents</th>
+              {section.key !== "courseFile" && <th style={thStyle}>Documents</th>}
               <th style={thStyle}>Faculty Score</th>
               {mode === "review" && previousRoles.map((role) => <th key={role} style={thStyle}>{roleLabel(role)} Score</th>)}
               {mode === "review" && <th style={thStyle}>{roleLabel(currentRole)} Score</th>}
@@ -488,6 +488,18 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                         <option value="PhD">PhD</option>
                         <option value="PG">PG</option>
                       </select>
+                    ) : section.key === "courseFile" && key === "details" ? (
+                      <select
+                        value={row[key] || ""}
+                        disabled={!editableSelf || notApplicable || selfLocked}
+                        onChange={(event) => updateRow(index, key, event.target.value)}
+                        style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "Georgia, serif", fontSize: 11 }}
+                      >
+                        <option value="">Select</option>
+                        <option value="1.Available">1.Available</option>
+                        <option value="2.Partially Available">2.Partially Available</option>
+                        <option value="3.Not Available">3.Not Available</option>
+                      </select>
                     ) : (
                       <>
                         <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key)} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked} onChange={(value) => updateRow(index, key, value)} />
@@ -504,7 +516,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                   </td>
                 ))}
                 {section.key === "feedback" && <td style={tdCenter}>{feedbackAverage(row).toFixed(2)}</td>}
-                <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked} /></td>
+                {section.key !== "courseFile" && <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked} /></td>}
                 <td style={tdCenter}>
                   {mode === "self"
                     ? section.key === "feedback"
