@@ -408,6 +408,8 @@ const REVIEW_SECTION_KEY_ALIASES = {
   course_file: "courseFile",
   courseFiles: "courseFile",
   course_files: "courseFile",
+  projects_guided: "projects",
+  projectsGuided: "projects",
   qualification_enhancement: "quals",
   qualificationEnhancement: "quals",
   qualifications: "quals",
@@ -421,38 +423,57 @@ const REVIEW_SECTION_KEY_ALIASES = {
   university_activities: "uniActs",
   universityActivities: "uniActs",
   uni_acts: "uniActs",
+  social_contributions: "society",
+  socialContributions: "society",
   contribution_to_society: "society",
   contributionToSociety: "society",
   industry_connect: "industry",
   industryConnect: "industry",
+  acr_scores: "acr",
+  acrScores: "acr",
   annual_confidential_report: "acr",
   annualConfidentialReport: "acr",
+  journal_publication: "journals",
+  journalPublication: "journals",
   journal_publications: "journals",
   journalPublications: "journals",
   research_papers: "journals",
   researchPapers: "journals",
   research_papers_journal_publications: "journals",
   researchPapersJournalPublications: "journals",
+  popular_writings: "popularWritings",
+  popularWritings: "popularWritings",
+  book_publications: "books",
+  bookPublications: "books",
   book_chapters: "books",
   bookChapters: "books",
   books_book_chapters: "books",
   booksBookChapters: "books",
+  ict_pedagogy: "ict",
+  ictPedagogy: "ict",
   e_content: "ict",
   eContent: "ict",
   ict_e_content: "ict",
   ictEContent: "ict",
   research_guidance: "research",
   researchGuidance: "research",
+  research_projects: "projects2",
+  researchProjects: "projects2",
   internal_projects: "projects2",
   internalProjects: "projects2",
   consultancy_internal_projects: "projects2",
   consultancyInternalProjects: "projects2",
+  external_research_projects: "externalProjects",
+  externalResearchProjects: "externalProjects",
   external_projects: "externalProjects",
   external_projects_consultancy: "externalProjects",
   externalProjectsConsultancy: "externalProjects",
+  ipr_records: "ipr",
+  iprRecords: "ipr",
+  awards: "awards",
+  conferences: "confs",
   invited_lectures: "confs",
   invitedLectures: "confs",
-  conferences: "confs",
   research_proposals: "proposals",
   researchProposals: "proposals",
   submitted_research_proposals: "proposals",
@@ -461,6 +482,8 @@ const REVIEW_SECTION_KEY_ALIASES = {
   productsDeveloped: "products",
   fdp_workshops: "fdps",
   fdpWorkshops: "fdps",
+  self_development: "fdps",
+  selfDevelopment: "fdps",
   industrial_training: "training",
   industrialTraining: "training",
 };
@@ -523,10 +546,38 @@ const aliasKeys = (rows, mapping) =>
   (rows || []).map((row) => {
     const out = { ...row };
     Object.entries(mapping).forEach(([from, to]) => {
-      if (out[to] == null && out[from] != null) out[to] = out[from];
+      const targets = Array.isArray(to) ? to : [to];
+      targets.forEach((target) => {
+        if (out[target] == null && out[from] != null) out[target] = out[from];
+      });
     });
     return out;
   });
+
+const ROW_SOURCE_IGNORE_KEYS = new Set([
+  "id", "_id", "faculty_email", "academic_year", "form_family", "section_title", "max_marks",
+  "row_no", "created_at", "updated_at", "score", "hod", "director", "dean", "vc",
+  "hod_score", "director_score", "dean_score", "vc_score",
+]);
+
+const rowHasDisplayData = (row = {}) =>
+  Object.entries(row || {}).some(([key, value]) =>
+    !ROW_SOURCE_IGNORE_KEYS.has(key) &&
+    value !== undefined &&
+    value !== null &&
+    String(value).trim() !== ""
+  );
+
+const firstArraySource = (source = {}, keys = []) => {
+  const arrays = keys.map((key) => source?.[key]).filter(Array.isArray);
+  return arrays.find((rows) => rows.some(rowHasDisplayData)) || arrays[0] || null;
+};
+
+const normalizeSectionRows = (normalized, targetKey, sourceKeys = [], mapping = {}) => {
+  const rows = firstArraySource(normalized, [targetKey, ...sourceKeys]);
+  if (rows) normalized[targetKey] = aliasKeys(rows, mapping);
+  return normalized[targetKey];
+};
 
 const REVIEW_SCORE_ALIASES = {
   hod_score: "hod",
@@ -549,6 +600,203 @@ const REVIEW_SCORE_ALIASES = {
   vcScore: "vc",
   vc_marks: "vc",
   vcMarks: "vc",
+};
+
+const LECTURE_ROW_ALIASES = {
+  sem: "sem",
+  semester: "sem",
+  semester_name: "sem",
+  semesterName: "sem",
+  course_code: "code",
+  courseCode: "code",
+  course_name: "code",
+  courseName: "code",
+  course_title: "code",
+  courseTitle: "code",
+  planned_classes: "planned",
+  plannedClasses: "planned",
+  classes_as_per_course_structure: "planned",
+  classesAsPerCourseStructure: "planned",
+  class_planned: "planned",
+  classPlanned: "planned",
+  total_classes: "planned",
+  totalClasses: "planned",
+  conducted_classes: "conducted",
+  conductedClasses: "conducted",
+  classes_actually_conducted: "conducted",
+  classesActuallyConducted: "conducted",
+  actual_classes: "conducted",
+  actualClasses: "conducted",
+  class_conducted: "conducted",
+  classConducted: "conducted",
+};
+
+const COURSE_FILE_ROW_ALIASES = {
+  course_name: "course",
+  courseName: "course",
+  course_paper: "course",
+  coursePaper: "course",
+  paper: "course",
+  year: "title",
+  program_semester: "title",
+  programSemester: "title",
+  availability: "details",
+  iqac_format: "details",
+  iqacFormat: "details",
+  availability_iqac: "details",
+  availabilityIqac: "details",
+  availability_as_per_iqac_format: "details",
+  availabilityAsPerIqacFormat: "details",
+};
+
+const LABEL_ROW_ALIASES = {
+  category: "label",
+  project_category: "label",
+  projectCategory: "label",
+  qualification: "label",
+  qualification_category: "label",
+  qualificationCategory: "label",
+  attribute: "label",
+};
+
+const FEEDBACK_ROW_ALIASES = {
+  course_code: "code",
+  courseCode: "code",
+  course_name: "code",
+  courseName: "code",
+  feedback_1: "fb1",
+  feedback1: "fb1",
+  first_feedback: "fb1",
+  firstFeedback: "fb1",
+  feedback_2: "fb2",
+  feedback2: "fb2",
+  second_feedback: "fb2",
+  secondFeedback: "fb2",
+};
+
+const SOCIETY_ROW_ALIASES = {
+  activity: "label",
+  society_activity: "label",
+  societyActivity: "label",
+  status: "participated",
+  participation: "participated",
+  yes_no: "participated",
+  yesNo: "participated",
+};
+
+const JOURNAL_ROW_ALIASES = {
+  indexing: "index",
+  index_name: "index",
+  indexName: "index",
+  journal_name: "journal",
+  journalName: "journal",
+  paper_title: "title",
+  paperTitle: "title",
+  issn_no: "issn",
+  issnNo: "issn",
+  ...REVIEW_SCORE_ALIASES,
+};
+
+const BOOK_ROW_ALIASES = {
+  publisher: ["pub", "publisher"],
+  pub: ["pub", "publisher"],
+  coauthor: ["coauth", "coAuthors"],
+  co_author: ["coauth", "coAuthors"],
+  coAuthor: ["coauth", "coAuthors"],
+  coauth: ["coauth", "coAuthors"],
+  coAuthors: ["coauth", "coAuthors"],
+  first_author: "first",
+  firstAuthor: "first",
+};
+
+const ICT_ROW_ALIASES = {
+  description: "desc",
+  short_description: "desc",
+  shortDescription: "desc",
+  quadrant: "quad",
+  quadrants: "quad",
+};
+
+const RESEARCH_ROW_ALIASES = {
+  student_name: "name",
+  studentName: "name",
+};
+
+const RESEARCH_PROJECT_ROW_ALIASES = {
+  sanction_date: "date",
+  sanctionDate: "date",
+  project_date: "date",
+  projectDate: "date",
+  project_status: "status",
+  projectStatus: "status",
+};
+
+const IPR_ROW_ALIASES = {
+  ipr_date: "date",
+  iprDate: "date",
+  ipr_status: "status",
+  iprStatus: "status",
+  file_no: "fileNo",
+  fileNo: "fileNo",
+};
+
+const PATENT_ROW_ALIASES = {
+  patent_date: "date",
+  patentDate: "date",
+  patent_status: "status",
+  patentStatus: "status",
+  file_no: "fileNo",
+  fileNo: "fileNo",
+};
+
+const AWARD_ROW_ALIASES = {
+  award_date: "date",
+  awardDate: "date",
+};
+
+const CONF_ROW_ALIASES = {
+  organization: "org",
+  organisation: "org",
+  organizer: "org",
+  organiser: "org",
+};
+
+const PRODUCT_ROW_ALIASES = {
+  usage: ["usage", "used"],
+  used: ["usage", "used"],
+  product_details: "details",
+  productDetails: "details",
+};
+
+const FDP_ROW_ALIASES = {
+  organization: "org",
+  organisation: "org",
+  organizer: "org",
+  organiser: "org",
+};
+
+const POPULAR_WRITING_ROW_ALIASES = {
+  newspaper_magazine_website: "media",
+  newspaperMagazineWebsite: "media",
+  media_name: "media",
+  mediaName: "media",
+  film_documentary: "film",
+  filmDocumentary: "film",
+};
+
+const INDUSTRY_ROW_ALIASES = {
+  industry_name: "name",
+  industryName: "name",
+  company: "name",
+  organization: "name",
+};
+
+const INNOVATIVE_ROW_ALIASES = {
+  methods_used: "method",
+  methodsUsed: "method",
+  method_used: "method",
+  methodUsed: "method",
+  description: "details",
 };
 
 const normalizeReviewScoreAliasesOnRows = (normalized) => {
@@ -587,131 +835,211 @@ const normalizeInnovativeReviewScoreAliases = (normalized) => {
 };
 
 const normalizeFetchedForm = (form = {}) => {
+  if (!form || typeof form !== "object") return form;
   const normalized = { ...form };
-  const lectures = normalized.lectures || normalized.teaching_process || normalized.teachingProcess;
-  if (lectures) {
-    normalized.lectures = aliasKeys(lectures, {
-      sem: "sem",
-      semester: "sem",
-      semester_name: "sem",
-      semesterName: "sem",
-      course_code: "code",
-      courseCode: "code",
-      course_name: "code",
-      courseName: "code",
-      course_title: "code",
-      courseTitle: "code",
-      planned_classes: "planned",
-      plannedClasses: "planned",
-      classes_as_per_course_structure: "planned",
-      classesAsPerCourseStructure: "planned",
-      class_planned: "planned",
-      classPlanned: "planned",
-      total_classes: "planned",
-      totalClasses: "planned",
-      conducted_classes: "conducted",
-      conductedClasses: "conducted",
-      classes_actually_conducted: "conducted",
-      classesActuallyConducted: "conducted",
-      actual_classes: "conducted",
-      actualClasses: "conducted",
-      class_conducted: "conducted",
-      classConducted: "conducted",
-    });
+
+  normalizeSectionRows(normalized, "lectures", [
+    "teaching_process",
+    "teachingProcess",
+    "lectures_tutorials_practicals",
+    "lecturesTutorialsPracticals",
+  ], LECTURE_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "courseFile", [
+    "course_file",
+    "courseFiles",
+    "course_files",
+  ], COURSE_FILE_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "projects", [
+    "projects_guided",
+    "projectsGuided",
+  ], LABEL_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "quals", [
+    "qualification_enhancement",
+    "qualificationEnhancement",
+    "qualifications",
+  ], LABEL_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "feedback", [
+    "student_feedback",
+    "studentFeedback",
+  ], FEEDBACK_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "deptActs", [
+    "department_activities",
+    "departmentActivities",
+    "departmental_activities",
+    "departmentalActivities",
+    "dept_acts",
+  ]);
+
+  normalizeSectionRows(normalized, "uniActs", [
+    "university_activities",
+    "universityActivities",
+    "uni_acts",
+  ]);
+
+  normalizeSectionRows(normalized, "society", [
+    "social_contributions",
+    "socialContributions",
+    "contribution_to_society",
+    "contributionToSociety",
+  ], SOCIETY_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "industry", [
+    "industry_connect",
+    "industryConnect",
+  ], INDUSTRY_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "acr", [
+    "acr_scores",
+    "acrScores",
+    "annual_confidential_report",
+    "annualConfidentialReport",
+  ], LABEL_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "journals", [
+    "journal_publications",
+    "journalPublications",
+    "research_papers",
+    "researchPapers",
+    "research_papers_journal_publications",
+    "researchPapersJournalPublications",
+    "journal_publication",
+    "journalPublication",
+  ], JOURNAL_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "popularWritings", [
+    "popular_writings",
+    "popularWritings",
+  ], POPULAR_WRITING_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "books", [
+    "book_publications",
+    "bookPublications",
+    "book_chapters",
+    "bookChapters",
+    "books_book_chapters",
+    "booksBookChapters",
+  ], BOOK_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "ict", [
+    "ict_pedagogy",
+    "ictPedagogy",
+    "e_content",
+    "eContent",
+    "ict_e_content",
+    "ictEContent",
+  ], ICT_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "research", [
+    "research_guidance",
+    "researchGuidance",
+  ], RESEARCH_ROW_ALIASES);
+
+  const standardProjectRows = normalizeSectionRows(normalized, "projects2", [
+    "research_projects",
+    "researchProjects",
+    "internal_projects",
+    "internalProjects",
+    "consultancy_internal_projects",
+    "consultancyInternalProjects",
+  ], RESEARCH_PROJECT_ROW_ALIASES);
+  const internalProjectRows = normalizeSectionRows(normalized, "internalProjects", [
+    "research_projects",
+    "researchProjects",
+    "projects2",
+    "internal_projects",
+    "consultancy_internal_projects",
+    "consultancyInternalProjects",
+  ], RESEARCH_PROJECT_ROW_ALIASES);
+  if (!Array.isArray(normalized.projects2) && internalProjectRows) {
+    normalized.projects2 = aliasKeys(internalProjectRows, RESEARCH_PROJECT_ROW_ALIASES);
   }
-  if (normalized.feedback) {
-    normalized.feedback = aliasKeys(normalized.feedback, {
-      course_code: "code",
-      courseCode: "code",
-      feedback_1: "fb1",
-      feedback1: "fb1",
-      feedback_2: "fb2",
-      feedback2: "fb2",
-    });
+  if (!Array.isArray(normalized.internalProjects) && standardProjectRows) {
+    normalized.internalProjects = aliasKeys(standardProjectRows, RESEARCH_PROJECT_ROW_ALIASES);
   }
-  if (normalized.society) {
-    normalized.society = aliasKeys(normalized.society, { activity: "label" });
+
+  normalizeSectionRows(normalized, "externalProjects", [
+    "external_research_projects",
+    "externalResearchProjects",
+    "external_projects",
+    "external_projects_consultancy",
+    "externalProjectsConsultancy",
+  ], RESEARCH_PROJECT_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "ipr", [
+    "ipr_records",
+    "iprRecords",
+  ], IPR_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "patents", [
+    "patent_records",
+    "patentRecords",
+  ], PATENT_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "awards", [
+    "research_awards",
+    "researchAwards",
+  ], AWARD_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "confs", [
+    "conferences",
+    "invited_lectures",
+    "invitedLectures",
+  ], CONF_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "proposals", [
+    "research_proposals",
+    "researchProposals",
+    "submitted_research_proposals",
+    "submittedResearchProposals",
+  ]);
+
+  normalizeSectionRows(normalized, "products", [
+    "products_developed",
+    "productsDeveloped",
+  ], PRODUCT_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "fdps", [
+    "self_development",
+    "selfDevelopment",
+    "fdp_workshops",
+    "fdpWorkshops",
+  ], FDP_ROW_ALIASES);
+
+  normalizeSectionRows(normalized, "training", [
+    "industrial_training",
+    "industrialTraining",
+  ]);
+
+  const innovRows = normalizeSectionRows(normalized, "innovRows", [
+    "innovativeTeachingRows",
+    "innovative_teaching_rows",
+  ], INNOVATIVE_ROW_ALIASES);
+  const innovativeTeaching = normalized.innovativeTeaching || normalized.innovative_teaching;
+  if (innovativeTeaching && typeof innovativeTeaching === "object" && !Array.isArray(innovativeTeaching)) {
+    if (normalized.innovDetails == null && innovativeTeaching.details != null) {
+      normalized.innovDetails = innovativeTeaching.details;
+    }
+    if (normalized.innovScore == null && innovativeTeaching.score != null) {
+      normalized.innovScore = innovativeTeaching.score;
+    }
+    if (!innovRows) {
+      normalized.innovRows = [{
+        method: innovativeTeaching.method || innovativeTeaching.methods_used || innovativeTeaching.details || "",
+        details: innovativeTeaching.details || "",
+        score: innovativeTeaching.score ?? "",
+        hod: innovativeTeaching.hod ?? innovativeTeaching.hod_score,
+        director: innovativeTeaching.director ?? innovativeTeaching.director_score,
+        dean: innovativeTeaching.dean ?? innovativeTeaching.dean_score,
+        vc: innovativeTeaching.vc ?? innovativeTeaching.vc_score,
+      }];
+    }
   }
-  const journals = normalized.journals ||
-    normalized.journal_publications ||
-    normalized.journalPublications ||
-    normalized.research_papers ||
-    normalized.researchPapers ||
-    normalized.journal_publication ||
-    normalized.journalPublication;
-  if (journals) {
-    normalized.journals = aliasKeys(journals, {
-      indexing: "index",
-      index_name: "index",
-      indexName: "index",
-      journal_name: "journal",
-      journalName: "journal",
-      paper_title: "title",
-      paperTitle: "title",
-      issn_no: "issn",
-      issnNo: "issn",
-      ...REVIEW_SCORE_ALIASES,
-    });
-  }
-  if (normalized.books) {
-    normalized.books = aliasKeys(normalized.books, {
-      publisher: "pub",
-      coauthor: "coauth",
-      co_author: "coauth",
-      first_author: "first",
-      firstAuthor: "first",
-    });
-  }
-  if (normalized.ict) {
-    normalized.ict = aliasKeys(normalized.ict, {
-      description: "desc",
-      quadrant: "quad",
-    });
-  }
-  if (normalized.research) {
-    normalized.research = aliasKeys(normalized.research, {
-      student_name: "name",
-      studentName: "name",
-    });
-  }
-  if (normalized.projects2) {
-    normalized.projects2 = aliasKeys(normalized.projects2, {
-      sanction_date: "date",
-      sanctionDate: "date",
-      project_status: "status",
-      projectStatus: "status",
-    });
-  }
-  if (normalized.externalProjects) {
-    normalized.externalProjects = aliasKeys(normalized.externalProjects, {
-      sanction_date: "date",
-      sanctionDate: "date",
-      project_status: "status",
-      projectStatus: "status",
-    });
-  }
-  if (normalized.patents) {
-    normalized.patents = aliasKeys(normalized.patents, {
-      patent_date: "date",
-      patentDate: "date",
-      patent_status: "status",
-      patentStatus: "status",
-      file_no: "fileNo",
-      fileNo: "fileNo",
-    });
-  }
-  if (normalized.awards) {
-    normalized.awards = aliasKeys(normalized.awards, {
-      award_date: "date",
-      awardDate: "date",
-    });
-  }
-  if (normalized.confs) {
-    normalized.confs = aliasKeys(normalized.confs, { organization: "org" });
-  }
-  if (normalized.fdps) {
-    normalized.fdps = aliasKeys(normalized.fdps, { organization: "org" });
-  }
+
   return normalizeInnovativeReviewScoreAliases(normalizeReviewScoreAliasesOnRows(normalized));
 };
 
@@ -738,35 +1066,57 @@ const renameKeys = (rows, mapping) =>
     return out;
   });
 
-const mapFormForSubmit = (form) => ({
-  ...form,
-  lectures: renameKeys(form.lectures, {
-    sem: "semester", code: "course_code",
-    planned: "planned_classes", conducted: "conducted_classes",
-  }),
-  feedback: renameKeys(form.feedback, {
-    code: "course_code", fb1: "feedback_1", fb2: "feedback_2",
-  }),
-  society: renameKeys(form.society, { label: "activity" }),
-  journals: renameKeys(form.journals, { index: "indexing" }),
-  books: renameKeys(form.books, {
-    pub: "publisher", coauth: "coauthor", first: "first_author",
-  }),
-  ict: renameKeys(form.ict, { desc: "description", quad: "quadrant" }),
-  research: renameKeys(form.research, { name: "student_name" }),
-  projects2: renameKeys(form.projects2, {
-    date: "sanction_date", status: "project_status",
-  }),
-  externalProjects: renameKeys(form.externalProjects, {
-    date: "sanction_date", status: "project_status",
-  }),
-  patents: renameKeys(form.patents, {
-    date: "patent_date", status: "patent_status", fileNo: "file_no",
-  }),
-  awards: renameKeys(form.awards, { date: "award_date" }),
-  confs: renameKeys(form.confs, { org: "organization" }),
-  fdps: renameKeys(form.fdps, { org: "organization" }),
-});
+const dropKeys = (rows, keys = []) =>
+  (rows || []).map((row) => {
+    const out = { ...row };
+    keys.forEach((key) => { delete out[key]; });
+    return out;
+  });
+
+const isMediaOrDesignForm = (form = {}) =>
+  Array.isArray(form.popularWritings) || Array.isArray(form.ipr);
+
+const mapFormForSubmit = (form = {}) => {
+  const mediaOrDesign = isMediaOrDesignForm(form);
+  const books = mediaOrDesign
+    ? dropKeys(renameKeys(form.books, { coAuthors: "coauthor", first: "first_author" }), ["pub", "coauth"])
+    : dropKeys(renameKeys(form.books, { pub: "publisher", coauth: "coauthor", first: "first_author" }), ["coAuthors"]);
+
+  return {
+    ...form,
+    lectures: renameKeys(form.lectures, {
+      sem: "semester", code: "course_code",
+      planned: "planned_classes", conducted: "conducted_classes",
+    }),
+    feedback: renameKeys(form.feedback, {
+      code: "course_code", fb1: "feedback_1", fb2: "feedback_2",
+    }),
+    society: renameKeys(form.society, { label: "activity", participated: "status" }),
+    journals: renameKeys(form.journals, { index: "indexing" }),
+    books,
+    ict: renameKeys(form.ict, { desc: "description", quad: "quadrant" }),
+    research: renameKeys(form.research, { name: "student_name" }),
+    projects2: renameKeys(form.projects2, {
+      date: "sanction_date", status: "project_status",
+    }),
+    internalProjects: renameKeys(form.internalProjects, {
+      date: "sanction_date", status: "project_status",
+    }),
+    externalProjects: renameKeys(form.externalProjects, {
+      date: "sanction_date", status: "project_status",
+    }),
+    ipr: renameKeys(form.ipr, {
+      date: "ipr_date", status: "ipr_status", fileNo: "file_no",
+    }),
+    patents: renameKeys(form.patents, {
+      date: "patent_date", status: "patent_status", fileNo: "file_no",
+    }),
+    awards: renameKeys(form.awards, { date: "award_date" }),
+    confs: renameKeys(form.confs, { org: "organization" }),
+    products: mediaOrDesign ? renameKeys(form.products, { used: "usage" }) : dropKeys(form.products, ["used"]),
+    fdps: renameKeys(form.fdps, { org: "organization" }),
+  };
+};
 
 export const submitAppraisal = async ({
   facultyEmail,
@@ -811,7 +1161,7 @@ export const submitAppraisal = async ({
 export const sectionRowsFromSnapshot = (snapshotPayload) => {
   const form = snapshotFormFromPayload(snapshotPayload);
   if (!form) return {};
-  return form;
+  return normalizeFetchedForm(form);
 };
 
 export const saveAppraisal = saveAppraisalDraftSection;
