@@ -10,6 +10,7 @@ import { openFullFormReport } from "../utils/fullFormReport";
 import {
   INNOVATIVE_METHODS,
   SCORE_LIMITS,
+  averageSectionScore,
   clearDraft,
   clampScore,
   courseFileRowScore,
@@ -28,6 +29,7 @@ import {
   projectGuidanceRowMax,
   researchGuidanceRowMax,
   researchGuidanceScore,
+  rowHasAnyValue,
   saveDraft,
   scoreSectionRows,
   scoreRemaining,
@@ -116,13 +118,13 @@ const cloneRows = (rows) => JSON.parse(JSON.stringify(rows || []));
 
 const PART_A_SECTIONS = [
   { key: "lectures", title: "A(i). Lectures / Tutorials / Practicals", max: 50, doc: "lec", fields: [["sem", "Semester"], ["code", "Course Code / Name"], ["planned", "Planned"], ["conducted", "Conducted"]] },
-  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", rowMax: SCORE_LIMITS.courseFileRow, fields: [["course", "Course / Paper"], ["title", "Year"], ["details", "Availability as per IQAC format"]] },
-  { key: "projects", title: "A(iv). Project Guidance", max: 10, doc: "proj", rowMax: projectGuidanceRowMax, fields: [["label", "Project Category", true]] },
+  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", rowMax: SCORE_LIMITS.courseFileRow, fields: [["course", "Course / Paper"], ["title", "Program & Semester"], ["details", "Availability as per IQAC format"]] },
+  { key: "projects", title: "A(iv). Project Guidance", max: 10, doc: "proj", rowMax: projectGuidanceRowMax, fields: [["label", "Project Category"]] },
   { key: "quals", title: "A(v). Qualification Enhancement", max: 10, doc: "qual", rowMax: SCORE_LIMITS.qualificationRow, fields: [["label", "Category"]] },
-  { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
+  { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback (%)"], ["fb2", "Second Feedback (%)"]] },
   { key: "deptActs", title: "Departmental / School Activities", max: 20, doc: "dept", fields: [["activity", "Activity"], ["nature", "Nature"]] },
   { key: "uniActs", title: "University Level Activities", max: 30, doc: "uni", fields: [["activity", "Activity"], ["nature", "Nature"]] },
-  { key: "society", title: "Contribution to Society", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity", true], ["details", "Details"], ["participated", "Participation"]] },
+  { key: "society", title: "Contribution to Society", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity"], ["details", "Details"], ["participated", "Participation"]] },
   { key: "acr", title: "(xi) Annual Confidential Report (ACR) - Max 25 marks", max: 25, doc: "acr", fields: [["label", "Attribute", true]], selfReadOnlyScore: true },
 ];
 
@@ -131,7 +133,7 @@ const PART_B_SECTIONS = [
   { key: "popularWritings", title: "B1(ii). Popular Writings, Film & Documentary", max: 40, doc: "pop", fields: [["media", "Newspaper / Magazine / Website"], ["film", "Film / Documentary"]] },
   { key: "books", title: "B2. Articles / Chapters in Books", max: 60, doc: "book", fields: [["title", "Title"], ["book", "Book & Publisher"], ["isbn", "ISBN"], ["publisher", "Type"], ["coAuthors", "Co-authors"], ["first", "First Author?"]] },
   { key: "ict", title: "B3. ICT Mediated Teaching-Learning Pedagogy / New Curricula", max: 30, doc: "ict", fields: [["title", "Title"], ["desc", "Short Description"], ["type", "Type / Link"], ["quad", "Quadrants"]] },
-  { key: "research", title: "B4(a). Research Guidance - PhD / PG", max: 30, doc: "res", rowMax: researchGuidanceRowMax, autoScore: true, fields: [["degree", "Degree"], ["name", "Student Name"], ["thesis", "Thesis / Status"]] },
+  { key: "research", title: "B4(a). Research Guidance - PhD / PG", max: 30, doc: "res", rowMax: researchGuidanceRowMax, fields: [["degree", "Degree"], ["name", "Student Name"], ["thesis", "Thesis / Status"]] },
   { key: "internalProjects", title: "B4(b). Internal Research Projects", max: 15, doc: "int", fields: [["title", "Title"], ["agency", "Funding Agency"], ["date", "Sanction Date"], ["amount", "Amount"], ["role", "Role"], ["status", "Status"]] },
   { key: "externalProjects", title: "B4(c). External Research Projects", max: 30, doc: "ext", fields: [["title", "Title"], ["agency", "Funding Agency"], ["date", "Sanction Date"], ["amount", "Amount"], ["role", "Role"], ["status", "Status"]] },
   { key: "awards", title: "B4(d). Research Awards", max: 10, doc: "awd", fields: [["title", "Title"], ["date", "Date"], ["agency", "Agency"], ["level", "Level"]] },
@@ -155,8 +157,10 @@ const calculateMediaTotals = (form, scoreKey = "score") => {
   const applicability = form.sectionApplicability || {};
   const maxScores = getMediaEffectiveMaxScores(form);
   const rowSum = (key, max) => applicability[key] === "notApplicable" ? 0 : scoreSectionRows(key, form[key] || [], max, scoreKey);
+  const lecturesScore = applicability["lectures"] === "notApplicable" ? 0 : averageSectionScore(form.lectures || [], 50, scoreKey);
+  const courseFileScore = applicability["courseFile"] === "notApplicable" ? 0 : averageSectionScore(form.courseFile || [], 20, scoreKey);
   const partA = clampScore(
-    rowSum("lectures", 50) + rowSum("courseFile", 20) + (scoreKey === "score" && Array.isArray(form.innovRows) ? clampScore(form.innovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10) : scoreKey === "score" ? innovativeTeachingScore(form.innovDetails, form.innovScore, 10) : clampScore(form[scoreKeyForInnov(scoreKey)], 10)) +
+    lecturesScore + courseFileScore + (scoreKey === "score" && Array.isArray(form.innovRows) ? clampScore(form.innovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10) : scoreKey === "score" ? innovativeTeachingScore(form.innovDetails, form.innovScore, 10) : clampScore(form[scoreKeyForInnov(scoreKey)], 10)) +
     rowSum("projects", 10) + rowSum("quals", 10) + (scoreKey === "score" ? feedbackSectionScore(form.feedback, 10) : rowSum("feedback", 10)) +
     rowSum("deptActs", 20) + rowSum("uniActs", 30) + rowSum("society", 10) + rowSum("acr", 25),
     maxScores.partA,
@@ -289,7 +293,7 @@ function TI({ value, onChange, readOnly = false, center = false, type = "text", 
 }
 
 const NUMERIC_KEYS = new Set(["planned", "conducted", "fb1", "fb2", "amount"]);
-const TEXT_ONLY_KEYS = new Set(["title", "code", "course", "name", "degree", "thesis", "agency", "role", "status", "type", "level", "activity", "nature", "journal", "book", "publisher", "org", "program", "company", "desc", "coAuthors", "media", "film", "used"]);
+const TEXT_ONLY_KEYS = new Set(["title", "course", "name", "degree", "thesis", "agency", "role", "status", "type", "level", "activity", "nature", "journal", "book", "publisher", "org", "program", "company", "desc", "coAuthors", "media", "film", "used"]);
 
 function RO({ value, center = false }) {
   return <span style={{ display: "block", minHeight: 18, color: value ? "#1e293b" : "#94a3b8", fontSize: 11, textAlign: center ? "center" : "left" }}>{value || "-"}</span>;
@@ -385,7 +389,9 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
   const notApplicable = applicability[section.key] === "notApplicable";
   const selfLocked = mode === "self" && section.key === "acr";
   const canToggleApplicability = editableSelf && ["projects", "research"].includes(section.key);
-  const earned = notApplicable ? 0 : scoreSectionRows(section.key, rows, section.max);
+  const earned = notApplicable ? 0 : (section.key === "lectures" || section.key === "courseFile")
+    ? averageSectionScore(rows, section.max)
+    : scoreSectionRows(section.key, rows, section.max);
 
   if (section.key === "acr" && mode === "self") {
     const acrRows = createAcrRows(rows);
@@ -433,7 +439,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
   const rowSelfScore = (row) => {
     if (section.key === "feedback") return feedbackRowScore(row, section.max);
     if (section.key === "courseFile") return courseFileRowScore(row);
-    if (section.key === "research") return researchGuidanceScore(row);
+    if (section.key === "research") return String(row.score ?? "").trim() !== "" ? clampScore(row.score, researchGuidanceRowMax(row)) : researchGuidanceScore(row);
     if (section.key === "society") return societyRowScore(row);
     return clampScore(row.score, section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max);
   };
@@ -447,6 +453,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
         const nextValue = key === "date" ? maskDateDDMMYYYY(value) : key === "score" ? clampScore(value, rowMax) : value;
         const nextRow = { ...row, [key]: nextValue };
         if (section.key === "society" && key === "participated") return { ...nextRow, score: nextValue === "No" || !nextValue ? "0" : row.score };
+        if (section.key === "society" && key === "score" && n(nextValue) > 0 && !nextRow.participated) return { ...nextRow, participated: "Yes" };
         if (section.key === "research" && ["degree", "name", "thesis"].includes(key)) return { ...nextRow, score: researchGuidanceScore(nextRow) ? String(researchGuidanceScore(nextRow)) : "" };
         return nextRow;
       }),
@@ -482,7 +489,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
 
   const addRow = () => {
     const blank = Object.fromEntries(section.fields.map(([key]) => [key, ""]));
-    setForm((prev) => ({ ...prev, [section.key]: [...(prev[section.key] || []), { ...blank, score: "" }] }));
+    setForm((prev) => ({ ...prev, [section.key]: [...(prev[section.key] || []), { ...blank, score: "", _id: Date.now() + Math.random() }] }));
   };
 
   const deleteRow = () => {
@@ -519,7 +526,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
             {rows.map((row, index) => {
               const socRowLocked = section.key === "society" && societySelectionForRow(row) !== "Yes";
               return (
-              <tr key={`${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
+              <tr key={row._id ?? `${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
                 <td style={tdCenter}>{index + 1}</td>
                 {section.fields.map(([key, , readOnlyField]) => (
                   <td key={key} style={tdStyle}>
@@ -559,7 +566,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </select>
                     ) : (
                       <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : (section.key === "courseFile" && key === "title") ? "integer" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated")} onChange={(value) => updateRow(index, key, value)} />
+                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : (section.key === "courseFile" && key === "title") ? "integer" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated" && !(section.key === "society" && (key === "label" || key === "details")))} onChange={(value) => updateRow(index, key, value)} />
                         {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
                           <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
                             {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
@@ -578,10 +585,8 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                   {mode === "self"
                     ? section.key === "feedback"
                       ? <RO value={feedbackRowScore(row, section.max).toFixed(1)} center />
-                      : section.autoScore
-                        ? <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />
-                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
-                    : <RO value={section.key === "research" ? researchGuidanceScore(row).toFixed(1) : rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
+                      : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || (section.key === "society" && societySelectionForRow(row) === "No")} onChange={(value) => updateRow(index, "score", value)} />
+                    : <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
                 </td>
                 {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={row[role]} center /></td>)}
                 {mode === "review" && (
@@ -611,24 +616,38 @@ function InnovativeSection({ form, setForm, docs, setDocs, mode, locked, reviewe
   const editableSelf = mode === "self" && !locked;
   const reviewLocked = mode === "review" && locked;
   const updateReview = (value) => setReviewData((prev) => ({ ...prev, innovativeTeaching: { ...(prev.innovativeTeaching || {}), [reviewerRole]: value === "" ? "" : String(clampScore(value, 10)) } }));
-  const hasInnovRows = (form.innovRows || []).some((row) => ["method", "details", "score"].some((field) => String(row?.[field] ?? "").trim() !== ""));
-  const visibleInnovRows = hasInnovRows ? form.innovRows : [{ method: form.innovDetails, details: form.innovDetails, score: form.innovScore }];
-  const facultyScore = hasInnovRows
-    ? clampScore(visibleInnovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10)
-    : innovativeTeachingScore(form.innovDetails, form.innovScore, 10);
+  const visibleInnovRows = (form.innovRows || []).length > 0
+    ? form.innovRows
+    : [{ method: form.innovDetails, details: form.innovDetails, score: form.innovScore }];
+  const facultyScore = clampScore(
+    visibleInnovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0),
+    10,
+  );
   const updateSelfRow = (index, field, value) => {
-    const baseRows = hasInnovRows ? visibleInnovRows : [{ method: form.innovDetails, details: form.innovDetails, score: form.innovScore }];
-    const nextRows = baseRows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row);
-    const nextScore = clampScore(nextRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10);
+    setForm((prev) => {
+      const baseRows = (prev.innovRows || []).length > 0
+        ? prev.innovRows
+        : [{ method: prev.innovDetails, details: prev.innovDetails, score: prev.innovScore }];
+      const nextRows = baseRows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row));
+      const nextScore = clampScore(nextRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10);
+      return {
+        ...prev,
+        innovRows: nextRows,
+        innovDetails: nextRows.map((row) => row.method).filter(Boolean).join(", "),
+        innovScore: String(nextScore),
+      };
+    });
+  };
+  const addInnovRow = () =>
     setForm((prev) => ({
       ...prev,
-      innovRows: nextRows,
-      innovDetails: nextRows.map((row) => row.method).filter(Boolean).join(", "),
-      innovScore: String(nextScore),
+      innovRows: [...(prev.innovRows || []), { method: "", details: "", score: "" }],
     }));
-  };
-  const addInnovRow = () => setForm((prev) => ({ ...prev, innovRows: [...visibleInnovRows, { method: "", details: "", score: "" }] }));
-  const deleteInnovRow = () => setForm((prev) => ({ ...prev, innovRows: visibleInnovRows.length > 1 ? visibleInnovRows.slice(0, -1) : visibleInnovRows }));
+  const deleteInnovRow = () =>
+    setForm((prev) => ({
+      ...prev,
+      innovRows: (prev.innovRows || []).length > 1 ? (prev.innovRows || []).slice(0, -1) : (prev.innovRows || []),
+    }));
 
   return (
     <SectionShell title="(iii) Innovative Teaching-Learning Methodologies - Max 10 marks" max={10} earned={facultyScore}>
