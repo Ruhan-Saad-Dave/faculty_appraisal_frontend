@@ -197,7 +197,9 @@ export const scoreSectionRows = (sectionKey, rows = [], maxScore, scoreKey = "sc
 
 export const normalizeAutoScores = (form = {}) => ({
   ...form,
-  innovScore: String(innovativeTeachingScore(form.innovDetails, form.innovScore, 10)),
+  innovScore: String(Array.isArray(form.innovRows)
+    ? clampScore(form.innovRows.reduce((total, row) => total + clampScore(row?.score, SCORE_LIMITS.innovativeRow), 0), 10)
+    : innovativeTeachingScore(form.innovDetails, form.innovScore, 10)),
   courseFile: (form.courseFile || []).map((row) => ({
     ...row,
     score: courseFileRowScore(row) ? String(courseFileRowScore(row)) : "",

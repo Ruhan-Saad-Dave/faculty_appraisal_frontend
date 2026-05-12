@@ -1383,7 +1383,7 @@ export default function HODDashboard() {
   // -- Computed scores for HOD appraisal --
   const totalLecScore = averageSectionScore(lectures, 50);
   const courseFileScore = courseFileAverageScore(courseFile, 20);
-  const innovTotal = clampScore(innovRows.reduce((s, r) => s + clampScore(r.score, 2), 0), 10);
+  const innovTotal = clampScore(innovRows.reduce((s, r) => s + clampScore(r.score, SCORE_LIMITS.innovativeRow), 0), 10);
   const innovScoreComputed = String(innovTotal);
   const projectTotal = sectionApplicability.projects === "notApplicable" ? 0 : sumSectionScore(projects, 10, "score", projectGuidanceRowMax);
   const qualTotal = sumSectionScore(quals, 10, "score", SCORE_LIMITS.qualificationRow);
@@ -1424,13 +1424,6 @@ export default function HODDashboard() {
     return { label: "Needs Improvement", color: "#ef4444" };
   };
   const g = gradeFunc();
-  const selectedInnovMethods = innovativeSelectionsFromDetails(innovDetails);
-  const handleInnovMethodToggle = (method) => {
-    const nextDetails = toggleInnovativeMethod(innovDetails, method);
-    setInnovDetails(nextDetails);
-    setInnovScore(String(innovativeTeachingScore(nextDetails, "", 10)));
-  };
-
   const [submitting, setSubmitting] = useState(false);
   const [accuracyConfirmed, setAccuracyConfirmed] = useState(false);
 
@@ -1518,7 +1511,7 @@ export default function HODDashboard() {
   };
 
   const selfDraftKey = draftKeyFor({ family: "standard-teaching", email: sessionStorage.getItem("username") || "", academicYear: info.ay });
-  const buildSelfDraftForm = () => normalizeAutoScores({ info, lectures, courseFile, innovDetails, innovScore: innovScoreComputed, innovRows, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, sectionApplicability, sectionSaveStatus });
+  const buildSelfDraftForm = () => normalizeAutoScores({ info, lectures, courseFile, innovDetails: innovRows.map((row) => row.method).filter(Boolean).join(", "), innovScore: innovScoreComputed, innovRows, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, sectionApplicability, sectionSaveStatus });
 
   useEffect(() => {
     if (appraisalLocked) return;
@@ -2126,7 +2119,7 @@ export default function HODDashboard() {
                           <td style={TD}><TI val={r.details} onChange={(v) => setInnov(i, "details", v)} /></td>
                           <td style={TD}><DocCell id={`innov-${i}`} docs={docs} setDocs={setDocs} /></td>
                           <td style={TD}><ViewCell id={`innov-${i}`} docs={docs} /></td>
-                          <td style={TDS}><TI val={r.score} onChange={(v) => setInnov(i, "score", v === "" ? "" : String(clampScore(v, 2)))} numeric max={2} center /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setInnov(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.innovativeRow)))} numeric max={SCORE_LIMITS.innovativeRow} center /></td>
                         </tr>
                       ))}
                       <tr style={{ background: "#eff6ff" }}>

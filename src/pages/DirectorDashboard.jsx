@@ -1243,6 +1243,8 @@ export default function DirectorDashboard() {
   const setCF = (i, k, v) => setCourseFile((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const [innovScore, setInnovScore] = useState("");
   const [innovDetails, setInnovDetails] = useState("");
+  const [innovRows, setInnovRows] = useState([{ method: "", details: "", score: "" }]);
+  const setInnov = (i, k, v) => setInnovRows((p) => p.map((r, j) => j === i ? { ...r, [k]: v } : r));
   const [projects, setProjects] = useState([
     { label: "", score: "", hod: "", director: "" },
   ]);
@@ -1377,6 +1379,7 @@ export default function DirectorDashboard() {
             setters: {
               setLectures,
               setCourseFile,
+              setInnovRows,
               setInnovDetails,
               setInnovScore,
               setProjects,
@@ -1421,7 +1424,12 @@ export default function DirectorDashboard() {
   // ── Computed scores for HOD appraisal ──
   const totalLecScore = sumSectionScore(lectures, 50);
   const courseFileScore = clampScore(courseFile.reduce((total, row) => total + courseFileRowScore(row), 0), 20);
-  const innovTotal = innovativeTeachingScore(innovDetails, innovScore, 10);
+  const hasInnovRows = innovRows.some((row) => ["method", "details", "score"].some((field) => String(row?.[field] ?? "").trim() !== ""));
+  const visibleInnovRows = hasInnovRows ? innovRows : [{ method: innovDetails, details: innovDetails, score: innovScore }];
+  const innovTotal = hasInnovRows
+    ? clampScore(innovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10)
+    : innovativeTeachingScore(innovDetails, innovScore, 10);
+  const innovScoreComputed = String(innovTotal);
   const projectTotal = sectionApplicability.projects === "notApplicable" ? 0 : sumSectionScore(projects, 10, "score", projectGuidanceRowMax);
   const qualTotal = sumSectionScore(quals, 10, "score", SCORE_LIMITS.qualificationRow);
   const teachingRaw = totalLecScore + courseFileScore + innovTotal + projectTotal + qualTotal;
@@ -1461,13 +1469,6 @@ export default function DirectorDashboard() {
     return { label: "Needs Improvement", color: "#ef4444" };
   };
   const g = gradeFunc();
-  const selectedInnovMethods = innovativeSelectionsFromDetails(innovDetails);
-  const handleInnovMethodToggle = (method) => {
-    const nextDetails = toggleInnovativeMethod(innovDetails, method);
-    setInnovDetails(nextDetails);
-    setInnovScore(String(innovativeTeachingScore(nextDetails, "", 10)));
-  };
-
   const isDirectorPending = (item) => {
     const s = item.status || "";
     return s === "pending_director" || s === "Pending Review" || s === "pending_hod" ||
@@ -1485,8 +1486,8 @@ export default function DirectorDashboard() {
 
   const navItems = [
     { id: "myAppraisal", icon: "👤", label: "My Appraisal", sub: "View your self-appraisal form" },
-    { id: "facultyApprovals", icon: "🎓", label: "Faculty Approvals", sub: `${facultyPendingCount} awaiting review`, badge: facultyPendingCount },
-    { id: "hodApprovals", icon: "👥", label: "HOD Approvals", sub: `${hodPendingCount} awaiting review`, badge: hodPendingCount },
+    { id: "facultyApprovals", icon: "🎓", label: "Faculty's Appraisal", sub: `${facultyPendingCount} awaiting review`, badge: facultyPendingCount },
+    { id: "hodApprovals", icon: "👥", label: "HOD's Appraisal", sub: `${hodPendingCount} awaiting review`, badge: hodPendingCount },
     { id: "guidelines", icon: "📋", label: "Guidelines", sub: "Faculty appraisal guidelines AY 2025-26" },
   ];
   const [submitting, setSubmitting] = useState(false);
@@ -1517,15 +1518,13 @@ export default function DirectorDashboard() {
       { label: "B8(a). FDP / Workshops", rows: fdps, fields: ["program", "duration", "org", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 10 },
       { label: "B8(b). Industrial Training", rows: training, fields: ["company", "duration", "nature", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 10 },
     ];
-    sections.push({ label: "A(iii). Innovative Teaching Methods", rows: [{ details: innovDetails, score: innovScore }], fields: ["details"], docKey: "innov" });
+    sections.push({ label: "A(iii). Innovative Teaching Methods", rows: visibleInnovRows, fields: ["method", "details", "score"], docKey: (_row, index) => index === 0 ? "innov" : `innov-${index}`, rowMax: SCORE_LIMITS.innovativeRow, maxScore: 10 });
     const errors = validateCompleteRows(sections, docs);
     [...projects2, ...externalProjects].forEach((row, index) => {
       if (row.date && !isValidDDMMYYYY(row.date)) {
         errors.push(`B4 project row ${index + 1}: date must be DD/MM/YYYY.`);
       }
     });
-    if (innovDetails && !innovScore) errors.push("A(iii). Innovative Teaching Methods: score is required.");
-    if (innovScore && !innovDetails) errors.push("A(iii). Innovative Teaching Methods: details are required.");
     if (errors.length) {
       alert(errors.join("\n"));
       return false;
@@ -1559,11 +1558,9 @@ export default function DirectorDashboard() {
       { label: "B8(a). FDP / Workshops", rows: fdps, fields: ["program", "duration", "org", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 10 },
       { label: "B8(b). Industrial Training", rows: training, fields: ["company", "duration", "nature", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 10 },
     ];
-    if (section === "partA") partASections.push({ label: "A(iii). Innovative Teaching Methods", rows: [{ details: innovDetails, score: innovScore }], fields: ["details"], docKey: "innov" });
+    if (section === "partA") partASections.push({ label: "A(iii). Innovative Teaching Methods", rows: visibleInnovRows, fields: ["method", "details", "score"], docKey: (_row, index) => index === 0 ? "innov" : `innov-${index}`, rowMax: SCORE_LIMITS.innovativeRow, maxScore: 10 });
     const errors = validateCompleteRows(section === "partA" ? partASections : partBSections, docs);
     if (section === "partA") {
-      if (innovDetails && !innovScore) errors.push("A(iii). Innovative Teaching Methods: score is required.");
-      if (innovScore && !innovDetails) errors.push("A(iii). Innovative Teaching Methods: details are required.");
     } else {
       [...projects2, ...externalProjects].forEach((row, index) => {
         if (row.date && !isValidDDMMYYYY(row.date)) errors.push(`B4 project row ${index + 1}: date must be DD/MM/YYYY.`);
@@ -1586,7 +1583,7 @@ export default function DirectorDashboard() {
 
   const selfDraftKey = draftKeyFor({ family: "standard-teaching", email: sessionStorage.getItem("username") || "", academicYear: info.ay });
   const buildSelfDraftForm = () => normalizeAutoScores({
-    info, lectures, courseFile, innovDetails, innovScore, projects, quals, feedback,
+    info, lectures, courseFile, innovDetails: visibleInnovRows.map((row) => row.method).filter(Boolean).join(", "), innovScore: innovScoreComputed, innovRows: visibleInnovRows, projects, quals, feedback,
     deptActs, uniActs, society, industry, acr, journals, books, ict, research,
     projects2, externalProjects, patents, awards, confs, proposals, products, fdps,
     training, sectionApplicability, sectionSaveStatus,
@@ -1602,6 +1599,7 @@ export default function DirectorDashboard() {
     if (Array.isArray(form.courseFile)) setCourseFile(form.courseFile);
     if (typeof form.innovDetails === "string") setInnovDetails(form.innovDetails);
     if (form.innovScore !== undefined) setInnovScore(form.innovScore);
+    if (Array.isArray(form.innovRows)) setInnovRows(form.innovRows);
     if (Array.isArray(form.projects)) setProjects(form.projects);
     if (Array.isArray(form.quals)) setQuals(form.quals);
     if (Array.isArray(form.feedback)) setFeedback(form.feedback);
@@ -1634,7 +1632,7 @@ export default function DirectorDashboard() {
       saveDraft(selfDraftKey, { form: buildSelfDraftForm(), docs });
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [selfDraftKey, appraisalLocked, info, lectures, courseFile, innovDetails, innovScore, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, sectionApplicability, sectionSaveStatus, docs]);
+  }, [selfDraftKey, appraisalLocked, info, lectures, courseFile, innovDetails, innovScore, innovRows, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, sectionApplicability, sectionSaveStatus, docs]);
   const handleSubmitAppraisal = async () => {
     if (appraisalLocked) {
       alert("This appraisal has already been submitted and locked.");
@@ -2191,7 +2189,7 @@ export default function DirectorDashboard() {
 
                 {/* A3. Innovative Teaching */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(iii) Innovative Teaching-Learning Methodologies — Max 10 marks</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>(iii) Innovative Teaching-Learning Methodologies - Max 10 marks</div>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -2204,36 +2202,23 @@ export default function DirectorDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td style={TDC}>1</td>
-                        <td style={{ ...TD, minWidth: 220 }}>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {INNOVATIVE_METHODS.map((method) => {
-                              const selected = selectedInnovMethods.includes(method);
-                              return (
-                                <button
-                                  key={method}
-                                  type="button"
-                                  onClick={() => handleInnovMethodToggle(method)}
-                                  style={{ border: selected ? "1px solid #4f46e5" : "1px solid #cbd5e1", background: selected ? "#eef2ff" : "#fff", color: selected ? "#3730a3" : "#334155", borderRadius: 5, padding: "5px 7px", fontSize: 10, fontWeight: 700, cursor: "pointer" }}
-                                >
-                                  {method}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </td>
-                        <td style={TD}><TI val={innovDetails} onChange={setInnovDetails} /></td>
-                        <td style={TD}><DocCell id="innov" docs={docs} setDocs={setDocs} /></td>
-                        <td style={TD}><ViewCell id="innov" docs={docs} /></td>
-                        <td style={TDS}><RO val={innovTotal.toFixed(1)} center /></td>
-                      </tr>
+                      {visibleInnovRows.map((r, i) => (
+                        <tr key={i}>
+                          <td style={TDC}>{i + 1}</td>
+                          <td style={TD}><TI val={r.method} onChange={(v) => setInnov(i, "method", v)} /></td>
+                          <td style={TD}><TI val={r.details} onChange={(v) => setInnov(i, "details", v)} /></td>
+                          <td style={TD}><DocCell id={i === 0 ? "innov" : `innov-${i}`} docs={docs} setDocs={setDocs} /></td>
+                          <td style={TD}><ViewCell id={i === 0 ? "innov" : `innov-${i}`} docs={docs} /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => setInnov(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.innovativeRow)))} numeric max={SCORE_LIMITS.innovativeRow} center /></td>
+                        </tr>
+                      ))}
                       <tr style={{ background: "#eff6ff" }}>
                         <td style={{ ...TDC, fontWeight: "bold" }} colSpan={5}>Total Score (Max 10)</td>
                         <td style={{ ...TDS, fontWeight: "bold" }}>{innovTotal.toFixed(1)}</td>
                       </tr>
                     </tbody>
                   </table>
+                  <RowBtns onAdd={() => setInnovRows((p) => [...(hasInnovRows ? p : visibleInnovRows), { method: "", details: "", score: "" }])} onDel={() => setInnovRows((p) => p.length > 1 ? p.slice(0, -1) : p)} canDel={visibleInnovRows.length > 1} />
                 </div>
 
                 {/* A4. Projects */}
@@ -3107,7 +3092,7 @@ export default function DirectorDashboard() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>
-                  {activeMainTab === "facultyApprovals" ? "Faculty Approvals" : "HOD Approvals"}
+                  {activeMainTab === "facultyApprovals" ? "Faculty's Appraisal" : "HOD's Appraisal"}
                 </h1>
                 <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} · AY {APP_INFO.DEFAULT_AY}</p>
               </div>

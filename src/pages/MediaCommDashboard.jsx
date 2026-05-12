@@ -84,6 +84,7 @@ const emptyMediaForm = () => ({
   courseFile: [{ course: "", title: "", details: "", score: "" }],
   innovDetails: "",
   innovScore: "",
+  innovRows: [{ method: "", details: "", score: "" }],
   projects: [
     { label: "", score: "" },
   ],
@@ -155,7 +156,7 @@ const calculateMediaTotals = (form, scoreKey = "score") => {
   const maxScores = getMediaEffectiveMaxScores(form);
   const rowSum = (key, max) => applicability[key] === "notApplicable" ? 0 : scoreSectionRows(key, form[key] || [], max, scoreKey);
   const partA = clampScore(
-    rowSum("lectures", 50) + rowSum("courseFile", 20) + (scoreKey === "score" ? innovativeTeachingScore(form.innovDetails, form.innovScore, 10) : clampScore(form[scoreKeyForInnov(scoreKey)], 10)) +
+    rowSum("lectures", 50) + rowSum("courseFile", 20) + (scoreKey === "score" && Array.isArray(form.innovRows) ? clampScore(form.innovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10) : scoreKey === "score" ? innovativeTeachingScore(form.innovDetails, form.innovScore, 10) : clampScore(form[scoreKeyForInnov(scoreKey)], 10)) +
     rowSum("projects", 10) + rowSum("quals", 10) + (scoreKey === "score" ? feedbackSectionScore(form.feedback, 10) : rowSum("feedback", 10)) +
     rowSum("deptActs", 20) + rowSum("uniActs", 30) + rowSum("society", 10) + rowSum("acr", 25),
     maxScores.partA,
@@ -214,8 +215,17 @@ const validateMediaBeforeSubmit = (form, docs = {}, sectionView = "all") => {
   });
 
   if (sectionView !== "partB") {
-    if (form.innovDetails && !form.innovScore) errors.push("A(iii). Innovative Teaching Methods: score is required.");
-    if (form.innovScore && !form.innovDetails) errors.push("A(iii). Innovative Teaching Methods: details are required.");
+    const innovRows = Array.isArray(form.innovRows) && form.innovRows.length
+      ? form.innovRows
+      : [{ method: form.innovDetails, details: form.innovDetails, score: form.innovScore }];
+    errors.push(...validateCompleteRows([{
+      label: "A(iii). Innovative Teaching Methods",
+      rows: innovRows,
+      fields: ["method", "details", "score"],
+      docPrefix: "innov",
+      rowMax: SCORE_LIMITS.innovativeRow,
+      maxScore: 10,
+    }], docs));
   }
 
   return errors;
@@ -601,54 +611,67 @@ function InnovativeSection({ form, setForm, docs, setDocs, mode, locked, reviewe
   const editableSelf = mode === "self" && !locked;
   const reviewLocked = mode === "review" && locked;
   const updateReview = (value) => setReviewData((prev) => ({ ...prev, innovativeTeaching: { ...(prev.innovativeTeaching || {}), [reviewerRole]: value === "" ? "" : String(clampScore(value, 10)) } }));
-  const selectedMethods = innovativeSelectionsFromDetails(form.innovDetails);
-  const toggleMethod = (method) => {
-    const nextDetails = toggleInnovativeMethod(form.innovDetails, method);
+  const hasInnovRows = (form.innovRows || []).some((row) => ["method", "details", "score"].some((field) => String(row?.[field] ?? "").trim() !== ""));
+  const visibleInnovRows = hasInnovRows ? form.innovRows : [{ method: form.innovDetails, details: form.innovDetails, score: form.innovScore }];
+  const facultyScore = hasInnovRows
+    ? clampScore(visibleInnovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10)
+    : innovativeTeachingScore(form.innovDetails, form.innovScore, 10);
+  const updateSelfRow = (index, field, value) => {
+    const baseRows = hasInnovRows ? visibleInnovRows : [{ method: form.innovDetails, details: form.innovDetails, score: form.innovScore }];
+    const nextRows = baseRows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row);
+    const nextScore = clampScore(nextRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10);
     setForm((prev) => ({
       ...prev,
-      innovDetails: nextDetails,
-      innovScore: String(innovativeTeachingScore(nextDetails, "", 10)),
+      innovRows: nextRows,
+      innovDetails: nextRows.map((row) => row.method).filter(Boolean).join(", "),
+      innovScore: String(nextScore),
     }));
   };
-  const facultyScore = innovativeTeachingScore(form.innovDetails, form.innovScore, 10);
+  const addInnovRow = () => setForm((prev) => ({ ...prev, innovRows: [...visibleInnovRows, { method: "", details: "", score: "" }] }));
+  const deleteInnovRow = () => setForm((prev) => ({ ...prev, innovRows: visibleInnovRows.length > 1 ? visibleInnovRows.slice(0, -1) : visibleInnovRows }));
 
   return (
-    <SectionShell title="A(iii). Innovative Teaching Methods" max={10} earned={facultyScore}>
+    <SectionShell title="(iii) Innovative Teaching-Learning Methodologies - Max 10 marks" max={10} earned={facultyScore}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
         <thead>
           <tr>
+            <th style={{ ...thStyle, width: 42 }}>SN</th>
             <th style={thStyle}>Methods Used</th>
             <th style={thStyle}>Details</th>
-            <th style={thStyle}>Documents</th>
-            <th style={thStyle}>Faculty Score</th>
+            <th style={thStyle}>Attachment</th>
+            <th style={thStyle}>View Docs</th>
+            <th style={thStyle}>{mode === "self" ? "Score" : "Faculty Score"}</th>
             {mode === "review" && previousRoles.map((role) => <th key={role} style={thStyle}>{roleLabel(role)} Score</th>)}
             {mode === "review" && <th style={thStyle}>{roleLabel(reviewerRole)} Score</th>}
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style={tdStyle}>
-              {mode === "self" ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {INNOVATIVE_METHODS.map((method) => {
-                    const selected = selectedMethods.includes(method);
-                    return (
-                      <button key={method} type="button" disabled={!editableSelf} onClick={() => toggleMethod(method)} style={{ border: selected ? "1px solid #b45309" : "1px solid #cbd5e1", background: selected ? "#fffbeb" : "#fff", color: selected ? "#92400e" : "#334155", borderRadius: 5, padding: "5px 7px", fontSize: 10, fontWeight: 800, cursor: editableSelf ? "pointer" : "not-allowed" }}>
-                        {method}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : <RO value={form.innovDetails} />}
-            </td>
-            <td style={tdStyle}>{mode === "self" ? <TI value={form.innovDetails} textOnly readOnly={!editableSelf} onChange={(value) => setForm((prev) => ({ ...prev, innovDetails: value }))} /> : <RO value={form.innovDetails} />}</td>
-            <td style={tdStyle}><DocCell id="innov-0" docs={docs} setDocs={setDocs} readOnly={!editableSelf} /></td>
-            <td style={tdCenter}>{mode === "self" ? <RO value={facultyScore.toFixed(1)} center /> : <RO value={form.innovScore} center />}</td>
-            {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={form[scoreKeyForInnov(role)]} center /></td>)}
-            {mode === "review" && <td style={tdCenter}><TI type="number" center max={10} readOnly={reviewLocked} value={reviewData.innovativeTeaching?.[reviewerRole] ?? form[currentScore] ?? ""} onChange={updateReview} /></td>}
+          {visibleInnovRows.map((row, index) => (
+            <tr key={index}>
+              <td style={tdCenter}>{index + 1}</td>
+              <td style={tdStyle}>{mode === "self" ? <TI value={row.method} textOnly readOnly={!editableSelf} onChange={(value) => updateSelfRow(index, "method", value)} /> : <RO value={row.method || form.innovDetails} />}</td>
+              <td style={tdStyle}>{mode === "self" ? <TI value={row.details} textOnly readOnly={!editableSelf} onChange={(value) => updateSelfRow(index, "details", value)} /> : <RO value={row.details} />}</td>
+              <td style={tdStyle}><DocCell id={`innov-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf} /></td>
+              <td style={tdStyle}><DocCell id={`innov-${index}`} docs={docs} setDocs={setDocs} readOnly /></td>
+              <td style={tdCenter}>{mode === "self" ? <TI type="number" center max={SCORE_LIMITS.innovativeRow} readOnly={!editableSelf} value={row.score} onChange={(value) => updateSelfRow(index, "score", value)} /> : <RO value={row.score || form.innovScore} center />}</td>
+              {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={form[scoreKeyForInnov(role)]} center /></td>)}
+              {mode === "review" && <td style={tdCenter}><TI type="number" center max={10} readOnly={reviewLocked} value={reviewData.innovativeTeaching?.[reviewerRole] ?? form[currentScore] ?? ""} onChange={updateReview} /></td>}
+            </tr>
+          ))}
+          <tr style={{ background: "#eff6ff" }}>
+            <td style={{ ...tdCenter, fontWeight: 800 }} colSpan={5}>Total Score (Max 10)</td>
+            <td style={{ ...tdCenter, fontWeight: 800 }}>{facultyScore.toFixed(1)}</td>
+            {mode === "review" && previousRoles.map((role) => <td key={role} style={{ ...tdCenter, fontWeight: 800 }}><RO value={form[scoreKeyForInnov(role)]} center /></td>)}
+            {mode === "review" && <td style={{ ...tdCenter, fontWeight: 800 }}><RO value={reviewData.innovativeTeaching?.[reviewerRole] ?? form[currentScore]} center /></td>}
           </tr>
         </tbody>
       </table>
+      {mode === "self" && !locked && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button type="button" onClick={addInnovRow} style={smallButton("#0f766e")}>Add Row</button>
+          <button type="button" onClick={deleteInnovRow} disabled={visibleInnovRows.length <= 1} style={smallButton(visibleInnovRows.length <= 1 ? "#94a3b8" : "#ef4444")}>Delete Last</button>
+        </div>
+      )}
     </SectionShell>
   );
 }
@@ -911,6 +934,7 @@ export default function MediaCommDashboard({ fixedRole }) {
     ...ALL_ARRAY_KEYS.map((key) => [`set${titleCase(key)}`, (value) => setForm((prev) => ({ ...prev, [key]: key === "acr" ? createAcrRows(value) : value }))]),
     ["setInnovDetails", (value) => setForm((prev) => ({ ...prev, innovDetails: value }))],
     ["setInnovScore", (value) => setForm((prev) => ({ ...prev, innovScore: value }))],
+    ["setInnovRows", (value) => setForm((prev) => ({ ...prev, innovRows: value }))],
     ["setInnovHod", (value) => setForm((prev) => ({ ...prev, innovHod: value }))],
     ["setInnovDirector", (value) => setForm((prev) => ({ ...prev, innovDirector: value }))],
     ["setInnovDean", (value) => setForm((prev) => ({ ...prev, innovDean: value }))],
