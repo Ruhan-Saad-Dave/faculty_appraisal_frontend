@@ -333,7 +333,7 @@ const buildVcSectionScores = (person, vcData) => {
 
 // ─── VC Review Form ───────────────────────────────────────────────────────────
 // personMode: "dean" | "director" | "hod" | "faculty"
-function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
+function VCReviewForm({ person, vcData, setVcData, personMode = "director", sectionView = "partA" }) {
   const reviewRoles = vcPreviousRolesFor(person, personMode);
   const selfScoreLabel = personMode === "faculty" ? "Faculty Score" : "Self Score";
 
@@ -430,6 +430,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
         </table>
       </SC>
 
+      {sectionView === "partA" && (<>
       <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#dbeafe", padding: "8px 14px", borderRadius: 6, marginBottom: 10 }}>PART A — Teaching &amp; Academic Activities</div>
 
       {/* A1 Lectures */}
@@ -586,6 +587,8 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
         ))}</tbody></table>
       </SC>
 
+      </>)}
+      {sectionView === "partB" && (<>
       <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#ede9fe", padding: "8px 14px", borderRadius: 6, marginBottom: 10 }}>PART B — Research &amp; Academic Contributions</div>
 
       {/* B1 Journals */}
@@ -656,6 +659,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
           })}</tbody></table></div>
         </SC>
       ))}
+      </>)}
     </div>
   );
 }
@@ -700,7 +704,7 @@ function calcVCScore(person, vcData) {
 function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false }) {
   const [vcData, setVcData] = useState({});
   const [remarks, setRemarks] = useState(person.vcRemarks || "");
-  const [tab, setTab] = useState("form");
+  const [sectionView, setSectionView] = useState("partA");
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const reviewLocked = readOnly || isVcReviewed(person);
 
@@ -798,23 +802,23 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Section switcher */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-        {[["form", "📋 Review Form"], ["remarks", "✏️ Remarks & Submit"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#4c1d95" : "#e2e8f0", color: tab === id ? "#ddd6fe" : "#475569" }}>
+        {[["partA", "Part A"], ["partB", "Part B"], ["summary", "Summary"]].map(([id, label]) => (
+          <button key={id} onClick={() => setSectionView(id)}
+            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: sectionView === id ? "#4c1d95" : "#e2e8f0", color: sectionView === id ? "#ddd6fe" : "#475569" }}>
             {label}
           </button>
         ))}
       </div>
 
-      {tab === "form" && (
+      {(sectionView === "partA" || sectionView === "partB") && (
         <fieldset disabled={reviewLocked} style={{ border: "none", padding: 0, margin: 0 }}>
-          <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} />
+          <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} sectionView={sectionView} />
         </fieldset>
       )}
 
-      {tab === "remarks" && (
+      {sectionView === "summary" && (
         <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
           <h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>{reviewLocked ? "VC Submitted Review" : "VC Remarks &amp; Final Submission"}</h3>
 

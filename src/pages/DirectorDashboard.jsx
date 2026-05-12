@@ -275,7 +275,7 @@ const buildDirectorSectionScores = (faculty, dirData) => {
 };
 
 // ─── Faculty Form in HOD Review Mode ─────────────────────────────────────────
-function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData }) {
+function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData, sectionView = "partA" }) {
   const set = (section, idx, field, val) => {
     setHodData(prev => {
       const updated = { ...prev };
@@ -361,6 +361,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData }
         </table>
       </SC>
 
+      {sectionView === "partA" && (<>
       {/* ── PART A ── */}
       <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#dbeafe", padding: "8px 14px", borderRadius: 6, marginBottom: 10, letterSpacing: 0.3 }}>PART A — Teaching & Academic Activities</div>
 
@@ -607,6 +608,8 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData }
         </table>
       </SC>
 
+      </>)}
+      {sectionView === "partB" && (<>
       {/* ── PART B ── */}
       <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#ede9fe", padding: "8px 14px", borderRadius: 6, marginBottom: 10, letterSpacing: 0.3 }}>PART B — Research & Academic Contributions</div>
 
@@ -934,6 +937,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData }
           </tbody>
         </table>
       </SC>
+      </>)}
     </div>
   );
 }
@@ -944,7 +948,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
   const [dirData, setDirData] = useState({});
   const [hodRemarks] = useState(faculty.hodRemarks || "");
   const [dirRemarks, setDirRemarks] = useState(faculty.directorRemarks || "");
-  const [tab, setTab] = useState("form");
+  const [sectionView, setSectionView] = useState("partA");
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const reviewLocked = readOnly || faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "");
 
@@ -1098,23 +1102,23 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
         </div>
       </div>
 
-      {/* Tab switcher */}
+      {/* Section switcher */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-        {[["form", "📋 Review Form"], ["remarks", "✏️ Remarks & Submit"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#312e81" : "#e2e8f0", color: tab === id ? "#e0e7ff" : "#475569" }}>
+        {[["partA", "Part A"], ["partB", "Part B"], ["summary", "Summary"]].map(([id, label]) => (
+          <button key={id} onClick={() => setSectionView(id)}
+            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: sectionView === id ? "#312e81" : "#e2e8f0", color: sectionView === id ? "#e0e7ff" : "#475569" }}>
             {label}
           </button>
         ))}
       </div>
 
-      {tab === "form" && (
+      {(sectionView === "partA" || sectionView === "partB") && (
         <fieldset disabled={reviewLocked} style={{ border: "none", padding: 0, margin: 0 }}>
-          <FacultyReviewForm faculty={faculty} hodData={hodData} setHodData={setHodData} dirData={dirData} setDirData={setDirData} />
+          <FacultyReviewForm faculty={faculty} hodData={hodData} setHodData={setHodData} dirData={dirData} setDirData={setDirData} sectionView={sectionView} />
         </fieldset>
       )}
 
-      {tab === "remarks" && (
+      {sectionView === "summary" && (
         <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
           <h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>{reviewLocked ? "Director Submitted Review" : "Director Remarks & Final Submission"}</h3>
 
@@ -1577,8 +1581,6 @@ export default function DirectorDashboard() {
   const isMyAppraisalSectionOpen = (_section) => true;
 
   const handleMyAppraisalSectionChange = (section) => {
-    if (hodAppraisalTab === "partA" && section !== "partA" && !validateSelfAppraisalSectionRows("partA")) return;
-    if (hodAppraisalTab === "partB" && section === "summary" && !validateSelfAppraisalSectionRows("partB")) return;
     setHodAppraisalTab(section);
   };
 

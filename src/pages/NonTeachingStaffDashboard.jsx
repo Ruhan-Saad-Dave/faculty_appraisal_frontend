@@ -817,7 +817,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
         {[
           ["partA", "Part A"],
           ["partB", "Part B"],
-          ["remarks", "Remarks & Submit"],
+          ["remarks", "Summary"],
         ].map(([id, label]) => (
           <button key={id} type="button" onClick={() => setTab(id)} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", cursor: "pointer", fontFamily: "Georgia, serif", fontWeight: 800 }}>
             {label}

@@ -1196,20 +1196,6 @@ export default function MediaCommDashboard({ fixedRole }) {
   const isSelfSectionOpen = (_section) => true;
 
   const handleSelfSectionChange = (section) => {
-    if (selfSectionView === "partA" && section !== "partA") {
-      const validationErrors = validateMediaBeforeSubmit(form, docs, "partA");
-      if (validationErrors.length) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-    }
-    if (selfSectionView === "partB" && section === "summary") {
-      const validationErrors = validateMediaBeforeSubmit(form, docs, "partB");
-      if (validationErrors.length) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-    }
     setSelfSectionView(section);
   };
 

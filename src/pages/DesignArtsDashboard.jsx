@@ -1031,20 +1031,6 @@ export default function DesignArtsDashboard({ fixedRole }) {
   const isSelfSectionOpen = (_section) => true;
 
   const handleSelfSectionChange = (section) => {
-    if (selfSectionView === "partA" && section !== "partA") {
-      const validationErrors = validateDesignArtsBeforeSubmit(form, docs, "partA");
-      if (validationErrors.length) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-    }
-    if (selfSectionView === "partB" && section === "summary") {
-      const validationErrors = validateDesignArtsBeforeSubmit(form, docs, "partB");
-      if (validationErrors.length) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-    }
     setSelfSectionView(section);
   };
 
