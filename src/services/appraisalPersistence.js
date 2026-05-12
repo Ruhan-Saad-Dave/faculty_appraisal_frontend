@@ -38,6 +38,8 @@ const SNAPSHOT_SETTERS = {
   products: "setProducts",
   fdps: "setFdps",
   training: "setTraining",
+  sectionApplicability: "setSectionApplicability",
+  sectionSaveStatus: "setSectionSaveStatus",
 };
 
 const snapshotFormFromPayload = (payload) => {
@@ -86,7 +88,7 @@ export const saveAppraisalDraftSection = async ({
   if (!facultyEmail) throw new Error("Please login again before saving. Your email was not found in this session.");
   if (!academicYear) throw new Error("Academic year is required before saving.");
 
-  await api.put("/appraisal/snapshot", {
+  return api.put("/appraisal/snapshot", {
     academic_year: academicYear,
     payload: {
       form: { ...form, sectionSaveStatus },
@@ -640,6 +642,14 @@ const COURSE_FILE_ROW_ALIASES = {
   year: "title",
   program_semester: "title",
   programSemester: "title",
+  program_and_semester: "title",
+  programAndSemester: "title",
+  "program_&_semester": "title",
+  "program & semester": "title",
+  Program_Semester: "title",
+  ProgramAndSemester: "title",
+  "Program & Semester": "title",
+  "Program and Semester": "title",
   availability: "details",
   iqac_format: "details",
   iqacFormat: "details",

@@ -395,28 +395,3 @@ export const scoreSummaryText = (earned, maxScore) => ({
   max: toNumber(maxScore),
   remaining: scoreRemaining(earned, maxScore),
 });
-
-export const draftKeyFor = ({ family = "teaching", email = "", academicYear = "" }) =>
-  `appraisal-draft:${family}:${String(email).toLowerCase()}:${academicYear}`;
-
-export const loadDraft = (key) => {
-  if (!key) return null;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-export const saveDraft = (key, payload) => {
-  if (!key) return;
-  localStorage.setItem(key, JSON.stringify({
-    ...payload,
-    savedAt: new Date().toISOString(),
-  }));
-};
-
-export const clearDraft = (key) => {
-  if (key) localStorage.removeItem(key);
-};

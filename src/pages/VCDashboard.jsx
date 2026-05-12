@@ -289,7 +289,7 @@ const vcReviewSummaryFrom = (...sources) => {
 const VC_REVIEW_ARRAY_KEYS = ["lectures", "courseFile", "projects", "quals", "feedback", "deptActs", "uniActs", "society", "industry", "acr", "journals", "books", "ict", "research", "projects2", "externalProjects", "patents", "awards", "confs", "proposals", "products", "fdps", "training"];
 const VC_REPORT_PART_A_SECTIONS = [
   { key: "lectures", title: "A(i). Lectures / Tutorials / Practicals", max: 50, doc: "lec", fields: [["sem", "Semester"], ["code", "Course Code / Name"], ["planned", "Classes (as per course structure)"], ["conducted", "Classes Actually Conducted"]] },
-  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", fields: [["course", "Course / Paper"], ["title", "Year"], ["details", "Availability as per IQAC format"]] },
+  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", fields: [["course", "Course / Paper"], ["title", "Program & Semester"], ["details", "Availability as per IQAC format"]] },
   { key: "projects", title: "A(iv). Project Guidance", max: 10, doc: "proj", fields: [["label", "Project Category"]] },
   { key: "quals", title: "A(v). Qualification Enhancement", max: 10, doc: "qual", fields: [["label", "Category"]] },
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
@@ -455,7 +455,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director", sect
       {/* A2 Course File */}
       <SC title="A2. Course File (Max 20)" accent="#7c3aed">
         <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Year</th><th style={TH}>Availability as per IQAC format</th>
+          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Program & Semester</th><th style={TH}>Availability as per IQAC format</th>
           {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.courseFile).map((r, i) => (
@@ -805,7 +805,12 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
       {/* Section switcher */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         {[["partA", "Part A"], ["partB", "Part B"], ["summary", "Summary"]].map(([id, label]) => (
-          <button key={id} onClick={() => setSectionView(id)}
+          <button key={id} onClick={() => {
+            setSectionView(id);
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            });
+          }}
             style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: sectionView === id ? "#4c1d95" : "#e2e8f0", color: sectionView === id ? "#ddd6fe" : "#475569" }}>
             {label}
           </button>

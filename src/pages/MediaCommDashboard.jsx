@@ -11,10 +11,8 @@ import {
   INNOVATIVE_METHODS,
   SCORE_LIMITS,
   averageSectionScore,
-  clearDraft,
   clampScore,
   courseFileRowScore,
-  draftKeyFor,
   effectiveMaxScore,
   feedbackAverage,
   feedbackRowScore,
@@ -23,16 +21,13 @@ import {
   innovativeTeachingScore,
   isAllowedAttachmentFile,
   isValidDDMMYYYY,
-  loadDraft,
   maskDateDDMMYYYY,
   normalizeAutoScores,
   projectGuidanceRowMax,
   researchGuidanceRowMax,
   researchGuidanceScore,
   rowHasAnyValue,
-  saveDraft,
   scoreSectionRows,
-  scoreRemaining,
   societyRowScore,
   societySelectionForRow,
   sumSectionScore,
@@ -365,17 +360,11 @@ function DocCell({ id, docs, setDocs, readOnly }) {
   );
 }
 
-function SectionShell({ title, max, earned = 0, children, accent = ACCENT, showScoreSummary = true }) {
+function SectionShell({ title, children, accent = ACCENT }) {
   return (
     <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`, borderRadius: 8, overflow: "hidden", marginBottom: 14 }}>
       <div style={{ padding: "10px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div style={{ fontWeight: 800, color: accent, fontSize: 13 }}>{title}</div>
-        {showScoreSummary && (
-          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, textAlign: "right" }}>
-            <div>Earned Score: {clampScore(earned, max).toFixed(1)} / {max}</div>
-            <div>Remaining Credits: {scoreRemaining(earned, max).toFixed(1)}</div>
-          </div>
-        )}
       </div>
       <div style={{ padding: 12 }}>{children}</div>
     </section>
@@ -395,6 +384,16 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
   const earned = notApplicable ? 0 : (section.key === "lectures" || section.key === "courseFile")
     ? averageSectionScore(rows, section.max)
     : scoreSectionRows(section.key, rows, section.max);
+  const totalLabel = ["lectures", "courseFile", "feedback"].includes(section.key)
+    ? `Average Score (Max ${section.max})`
+    : `Total Score (Max ${section.max})`;
+  const totalLabelColSpan = 1 + section.fields.length + (section.key === "feedback" ? 1 : 0) + (section.key !== "courseFile" ? 1 : 0);
+  const sectionTotalScore = (sourceRows = rows, scoreKey = "score") => {
+    if (notApplicable) return 0;
+    if (section.key === "lectures" || section.key === "courseFile") return averageSectionScore(sourceRows, section.max, scoreKey);
+    if (section.key === "feedback" && scoreKey === "score") return feedbackSectionScore(sourceRows, section.max);
+    return scoreSectionRows(section.key, sourceRows, section.max, scoreKey);
+  };
 
   if (section.key === "acr" && mode === "self") {
     const acrRows = createAcrRows(rows);
@@ -569,7 +568,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </select>
                     ) : (
                       <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : (section.key === "courseFile" && key === "title") ? "integer" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated" && !(section.key === "society" && (key === "label" || key === "details")))} onChange={(value) => updateRow(index, key, value)} />
+                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated" && !(section.key === "society" && (key === "label" || key === "details")))} onChange={(value) => updateRow(index, key, value)} />
                         {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
                           <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
                             {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
@@ -600,6 +599,20 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
               </tr>
               );
             })}
+            <tr style={{ background: "#eff6ff" }}>
+              <td style={{ ...tdCenter, fontWeight: "bold" }} colSpan={totalLabelColSpan}>{totalLabel}</td>
+              <td style={{ ...tdCenter, fontWeight: "bold" }}>{earned.toFixed(1)}</td>
+              {mode === "review" && previousRoles.map((role) => (
+                <td key={role} style={{ ...tdCenter, fontWeight: "bold" }}>
+                  {sectionTotalScore(rows, role).toFixed(1)}
+                </td>
+              ))}
+              {mode === "review" && (
+                <td style={{ ...tdCenter, fontWeight: "bold" }}>
+                  {sectionTotalScore(reviewRows.length ? reviewRows : rows, currentRole).toFixed(1)}
+                </td>
+              )}
+            </tr>
           </tbody>
         </table>
       </div>
@@ -863,7 +876,12 @@ function SectionSelector({ value, onChange, label = "Appraisal Section", isOptio
       {label}
       <select
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+          });
+        }}
         style={{ height: 36, border: "1px solid #cbd5e1", borderRadius: 7, background: "#fff", color: "#0f172a", padding: "0 10px", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700 }}
       >
         {SECTION_OPTIONS.map((option) => <option key={option.value} value={option.value} disabled={isOptionDisabled(option.value)}>{option.label}</option>)}
@@ -876,7 +894,7 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
       <span style={{ color: saved ? "#047857" : "#64748b", fontSize: 12, fontWeight: 800 }}>
-        {locked ? "Submitted and locked" : saved ? `${label} saved. Next section unlocked.` : `Save ${label} to unlock the next section.`}
+        {locked ? "Submitted and locked" : saved ? `${label} saved to server.` : `Save ${label} draft to server.`}
       </span>
       <button type="button" onClick={onSave} disabled={locked || saving} style={smallButton(locked ? "#94a3b8" : "#2563eb")}>
         {saving ? "Saving..." : `Save ${label}`}
@@ -1113,7 +1131,9 @@ export default function MediaCommDashboard({ fixedRole }) {
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [sectionSaveStatus, setSectionSaveStatus] = useState({ partA: true, partB: true });
+  const [sectionSaveStatus, setSectionSaveStatus] = useState({ partA: false, partB: false });
+  const [savingSection, setSavingSection] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [declaration, setDeclaration] = useState(null);
   const [reviews, setReviews] = useState([]);
   const userEmail = sessionStorage.getItem("username") || "";
@@ -1121,7 +1141,6 @@ export default function MediaCommDashboard({ fixedRole }) {
   const locked = Boolean(declaration);
   const totals = calculateMediaTotals(form, "score");
   const canSelfSubmit = role !== "vc";
-  const draftKey = draftKeyFor({ family: "media-comm", email: userEmail, academicYear });
 
   const setters = useMemo(() => Object.fromEntries([
     ["setInfo", (value) => setForm((prev) => ({ ...prev, info: { ...prev.info, ...value } }))],
@@ -1133,43 +1152,27 @@ export default function MediaCommDashboard({ fixedRole }) {
     ["setInnovDirector", (value) => setForm((prev) => ({ ...prev, innovDirector: value }))],
     ["setInnovDean", (value) => setForm((prev) => ({ ...prev, innovDean: value }))],
     ["setInnovVc", (value) => setForm((prev) => ({ ...prev, innovVc: value }))],
+    ["setSectionApplicability", (value) => setForm((prev) => ({ ...prev, sectionApplicability: { ...(prev.sectionApplicability || {}), ...(value || {}) } }))],
     ["setSectionSaveStatus", (value) => setSectionSaveStatus((prev) => ({ ...prev, ...(value || {}) }))],
   ]), []);
 
   useEffect(() => {
     if (!userEmail || !academicYear || !canSelfSubmit) return;
     const loadAll = async () => {
+      const data = await api.get("/appraisal/status", { params: { academic_year: academicYear } }).catch((err) => {
+        console.error("Could not load workflow status:", err);
+        return null;
+      });
+      const declarationRow = data?.declaration || null;
+      setDeclaration(declarationRow);
+      setReviews(data?.reviews || []);
       await Promise.all([
         loadSavedAppraisal({ facultyEmail: userEmail, academicYear, setters }),
         loadAppraisalDocuments({ facultyEmail: userEmail, academicYear, setDocs }),
       ]);
-      const draft = loadDraft(draftKey);
-      if (draft?.form) {
-        setForm((current) => mergeForm(current, draft.form));
-        if (draft.form.sectionSaveStatus) setSectionSaveStatus((current) => ({ ...current, ...draft.form.sectionSaveStatus }));
-      }
-      if (draft?.docs) setDocs(draft.docs);
     };
     loadAll().catch((err) => console.error("Could not load SoMCS appraisal:", err));
-  }, [userEmail, academicYear, setters, canSelfSubmit, draftKey]);
-
-  useEffect(() => {
-    if (!userEmail || !academicYear || !canSelfSubmit || locked) return undefined;
-    const timer = window.setTimeout(() => {
-      saveDraft(draftKey, { form: { ...form, sectionSaveStatus }, docs });
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [userEmail, academicYear, canSelfSubmit, locked, draftKey, form, sectionSaveStatus, docs]);
-
-  useEffect(() => {
-    if (!userEmail || !academicYear || !canSelfSubmit) return;
-    const loadStatus = async () => {
-      const data = await api.get("/appraisal/status", { params: { academic_year: academicYear } });
-      setDeclaration(data?.declaration || null);
-      setReviews(data?.reviews || []);
-    };
-    loadStatus().catch((err) => console.error("Could not load workflow status:", err));
-  }, [userEmail, academicYear, canSelfSubmit]);
+  }, [userEmail, academicYear, setters, canSelfSubmit]);
 
   const loadQueue = async () => {
     if (role === "faculty") return;
@@ -1197,6 +1200,39 @@ export default function MediaCommDashboard({ fixedRole }) {
 
   const handleSelfSectionChange = (section) => {
     setSelfSectionView(section);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  };
+
+  const handleSaveSelfSection = async (section) => {
+    if (locked) return;
+    if (!userEmail) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    const nextStatus = { ...sectionSaveStatus, [section]: true };
+    setSavingSection(section);
+    try {
+      await saveAppraisalDraftSection({
+        facultyEmail: userEmail,
+        academicYear,
+        form: { ...form, sectionSaveStatus: nextStatus },
+        docs,
+        totals: { partATotal: totals.partA, partBTotal: totals.partB, grandTotal: totals.total },
+        submitterProfile: { ...profile, appraisal_role: role },
+        sectionSaveStatus: nextStatus,
+      });
+      setSectionSaveStatus(nextStatus);
+    } catch (err) {
+      if (err?.statusCode === 403 || err?.response?.status === 403) {
+        setDeclaration((current) => current || { status: "Submitted" });
+        return;
+      }
+      alert(`Unable to save draft.\n\n${err.message}`);
+    } finally {
+      setSavingSection(null);
+    }
   };
 
   const handleSubmitAppraisal = async () => {
@@ -1231,7 +1267,6 @@ export default function MediaCommDashboard({ fixedRole }) {
         submitterProfile,
         activeProfile: submitterProfile,
       });
-      clearDraft(draftKey);
       setDeclaration({ status: pendingStatusFor(getReviewChain({ ...profile, appraisal_role: role })[0]), submitted_at: new Date().toISOString() });
       alert("SoMCS appraisal submitted successfully.");
     } catch (err) {
@@ -1400,7 +1435,7 @@ export default function MediaCommDashboard({ fixedRole }) {
             </div>
           </button>
           <button
-            onClick={() => navigate("/login", { replace: true })}
+            onClick={() => setShowLogoutModal(true)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, background: "none", border: "1px solid #374151", borderRadius: 8, padding: "9px 11px", cursor: "pointer", fontFamily: "Georgia, serif" }}
             onMouseEnter={(event) => { event.currentTarget.style.background = "#1e293b"; }}
             onMouseLeave={(event) => { event.currentTarget.style.background = "none"; }}
@@ -1429,6 +1464,15 @@ export default function MediaCommDashboard({ fixedRole }) {
                   locked={locked}
                   sectionView={selfSectionView}
                 />
+                {!locked && (
+                  <SectionSaveFooter
+                    label={selfSectionView === "partA" ? "Part A" : "Part B"}
+                    saved={Boolean(sectionSaveStatus[selfSectionView])}
+                    saving={savingSection === selfSectionView}
+                    locked={locked}
+                    onSave={() => handleSaveSelfSection(selfSectionView)}
+                  />
+                )}
               </>
             )}
             {selfSectionView === "summary" && (
@@ -1848,6 +1892,31 @@ export default function MediaCommDashboard({ fixedRole }) {
           </div>
         )}
       </main>
+      {showLogoutModal && (
+        <LogoutConfirmModal
+          onCancel={() => setShowLogoutModal(false)}
+          onConfirm={() => {
+            setShowLogoutModal(false);
+            sessionStorage.clear();
+            navigate("/login", { replace: true });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function LogoutConfirmModal({ onCancel, onConfirm }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "grid", placeItems: "center" }} onClick={onCancel}>
+      <div style={{ width: "min(380px, 92vw)", background: "#fff", borderRadius: 12, padding: "26px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: "Georgia, serif" }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 17, marginBottom: 8 }}>Confirm Logout</div>
+        <div style={{ color: "#64748b", fontSize: 12, lineHeight: 1.6, marginBottom: 18 }}>You are about to leave {APP_INFO.PORTAL_NAME}. Any unsaved edits will be lost.</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" onClick={onCancel} style={{ flex: 1, border: "none", borderRadius: 8, background: "#f1f5f9", color: "#475569", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Cancel</button>
+          <button type="button" onClick={onConfirm} style={{ flex: 1, border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Yes, Logout</button>
+        </div>
+      </div>
     </div>
   );
 }

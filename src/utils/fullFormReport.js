@@ -350,7 +350,7 @@ export const generateStandardReport = async ({
   ${lectures.map((l,i)=>`<tr><td class="c">${i+1}</td><td>${l.sem||'&nbsp;'}</td><td>${l.code||'&nbsp;'}</td><td class="c">${l.planned||'&nbsp;'}</td><td class="c">${l.conducted||'&nbsp;'}</td><td class="c">${l.score||'&nbsp;'}</td></tr>`).join('')}
   <tr class="tr"><td colspan="5" class="c b">Average Score (Max 50)</td><td class="c">${totalLecScore.toFixed(1)}</td></tr></table>
   <h3>(ii) Course File (Max 20)</h3>
-  <table><tr><th>SN</th><th>Course/Paper</th><th>Title</th><th>Details</th><th>API Score</th></tr>
+  <table><tr><th>SN</th><th>Course/Paper</th><th>Program & Semester</th><th>Details</th><th>API Score</th></tr>
   ${courseFile.map((c,i)=>`<tr><td class="c">${i+1}</td><td>${c.course||'&nbsp;'}</td><td>${c.title||'&nbsp;'}</td><td>${c.details||'&nbsp;'}</td><td class="c">${c.score||'&nbsp;'}</td></tr>`).join('')}
   <tr class="tr"><td colspan="4" class="c b">Average Score (Max 20)</td><td class="c">${courseFileScore.toFixed(1)}</td></tr></table>
   <h3>(iii) Innovative Teaching-Learning Methodologies (Max 10)</h3>
@@ -483,4 +483,4 @@ export const generateStandardReport = async ({
   win.document.write(html);
   win.document.close();
   win.print();
-};
+};
