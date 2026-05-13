@@ -1722,6 +1722,7 @@ export default function DeanDashboard() {
         const items = await fetchReviewQueueForRole({
           reviewerRole: "dean",
           reviewerProfile: profileFromsessionStorage(),
+          schoolValues: ENGINEERING_SCHOOL_CODES,
         });
         const schoolOf = (item) => getSchoolKey(item.school || item.school_name || item.schoolName || "");
         const roleOf = (item) => (item.appraisalRole || item.appraisal_role || "").toLowerCase();

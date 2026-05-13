@@ -134,7 +134,7 @@ export const workflowValidationError = (profile = {}) => {
     return "";
   }
 
-  if (role !== "vc" && !schoolKey) {
+  if (role !== "vc" && role !== "dean" && !schoolKey) {
     return "Please select one of the approved schools or centers before submitting.";
   }
 
