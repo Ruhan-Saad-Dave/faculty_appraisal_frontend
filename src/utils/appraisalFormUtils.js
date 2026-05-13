@@ -16,6 +16,7 @@ export const SCORE_LIMITS = {
   courseFileRow: 20,
   innovativeRow: 2,
   qualificationRow: 5,
+  acrRow: 5,
   feedbackAverage: 100,
   societyRow: 5,
   fdpRow: 5,
@@ -111,8 +112,11 @@ export const societySelectionForRow = (row = {}) => {
   return toNumber(row.score) > 0 ? "Yes" : "";
 };
 
+export const societyRowLocked = (row = {}) =>
+  normalizedText(societySelectionForRow(row)) !== "yes";
+
 export const societyRowScore = (row = {}) =>
-  clampScore(toNumber(row.score), SCORE_LIMITS.societyRow);
+  societyRowLocked(row) ? 0 : clampScore(toNumber(row.score), SCORE_LIMITS.societyRow);
 
 export const effectiveMaxScore = (baseMax, applicability = {}, sections = []) =>
   Math.max(
@@ -180,6 +184,7 @@ export const rowMaxForSection = (sectionKey, row = {}, sectionMax = 0) => {
   if (sectionKey === "quals") return SCORE_LIMITS.qualificationRow;
   if (sectionKey === "feedback") return 10;
   if (sectionKey === "society") return SCORE_LIMITS.societyRow;
+  if (sectionKey === "acr") return SCORE_LIMITS.acrRow;
   if (sectionKey === "research") return researchGuidanceRowMax(row);
   if (sectionKey === "projects2" || sectionKey === "internalProjects") return SCORE_LIMITS.researchInternalProjects;
   if (sectionKey === "externalProjects") return SCORE_LIMITS.researchExternalProjects;
@@ -194,7 +199,11 @@ export const scoreSectionRows = (sectionKey, rows = [], maxScore, scoreKey = "sc
     const stored = String(row?.score ?? "").trim();
     return stored !== "" ? clampScore(stored, researchGuidanceRowMax(row)) : researchGuidanceScore(row);
   });
-  if (sectionKey === "society" && scoreKey === "score") return sumCalculatedSectionScore(rows, maxScore, societyRowScore);
+  if (sectionKey === "society") {
+    return sumCalculatedSectionScore(rows, maxScore, (row) =>
+      societyRowLocked(row) ? 0 : clampScore(row?.[scoreKey], SCORE_LIMITS.societyRow),
+    );
+  }
   return sumSectionScore(rows, maxScore, scoreKey, (row) => rowMaxForSection(sectionKey, row, maxScore));
 };
 
@@ -266,12 +275,18 @@ export const rowHasAnyValue = (row = {}, keys = []) =>
 export const rowMissingFields = (row = {}, keys = []) =>
   keys.filter((key) => !isFilled(row?.[key]));
 
+export const MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;
+export const ATTACHMENT_REQUIREMENT_TEXT = "Only image or PDF files up to 10 MB are allowed.";
+
 export const isAllowedAttachmentFile = (file = {}) => {
   const type = String(file.type || "").toLowerCase();
   const name = String(file.name || file.url || "").toLowerCase();
-  return type === "application/pdf" ||
+  const size = Number(file.size || 0);
+  const validType = type === "application/pdf" ||
     type.startsWith("image/") ||
     /\.(pdf|png|jpe?g|webp|gif|bmp)$/i.test(name);
+  const validSize = !size || size <= MAX_ATTACHMENT_SIZE_BYTES;
+  return validType && validSize;
 };
 
 export const docsForRow = (docs = {}, docPrefix = "", index = 0, docKey) => {
@@ -333,7 +348,7 @@ export const validateCompleteRows = (sections = [], defaultDocs) => {
         if (!files.length) {
           errors.push(`${label}, row ${index + 1}: attach an image or PDF.`);
         } else if (files.some((file) => !isAllowedAttachmentFile(file))) {
-          errors.push(`${label}, row ${index + 1}: attachment must be an image or PDF.`);
+          errors.push(`${label}, row ${index + 1}: attachment must be an image or PDF up to 10 MB.`);
         }
       }
 
@@ -395,28 +410,3 @@ export const scoreSummaryText = (earned, maxScore) => ({
   max: toNumber(maxScore),
   remaining: scoreRemaining(earned, maxScore),
 });
-
-export const draftKeyFor = ({ family = "teaching", email = "", academicYear = "" }) =>
-  `appraisal-draft:${family}:${String(email).toLowerCase()}:${academicYear}`;
-
-export const loadDraft = (key) => {
-  if (!key) return null;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-export const saveDraft = (key, payload) => {
-  if (!key) return;
-  localStorage.setItem(key, JSON.stringify({
-    ...payload,
-    savedAt: new Date().toISOString(),
-  }));
-};
-
-export const clearDraft = (key) => {
-  if (key) localStorage.removeItem(key);
-};

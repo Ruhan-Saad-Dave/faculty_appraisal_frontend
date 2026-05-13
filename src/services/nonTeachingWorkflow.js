@@ -450,6 +450,33 @@ export const loadNonTeachingAppraisal = async ({
   }
 };
 
+export const saveNonTeachingDraft = async ({
+  form,
+  role = sessionStorage.getItem("role"),
+  profile = profileFromsessionStorage(),
+} = {}) => {
+  const normalizedRole = normalizeNonTeachingRole(role, role);
+  const draftForm = normalizeNonTeachingForm(
+    { ...form, status: NON_TEACHING_STATUS.DRAFT, submittedByRole: normalizedRole },
+    profile,
+    normalizedRole,
+  );
+  const staffEmail = emailKey(
+    draftForm.info.email || profile.email || sessionStorage.getItem("username"),
+  );
+  const ay = academicYear(draftForm.info.ay);
+  const data = await api.put("/non-teaching/appraisal", {
+    staff_email: staffEmail,
+    academic_year: ay,
+    payload: draftForm,
+    status: NON_TEACHING_STATUS.DRAFT,
+  });
+  return {
+    ...data,
+    form: normalizeNonTeachingForm(data?.payload, profile, normalizedRole),
+  };
+};
+
 export const submitNonTeachingSelfAppraisal = async ({
   form,
   role = sessionStorage.getItem("role"),
@@ -605,6 +632,18 @@ const nonTeachingReachedReviewer = (item = {}, reviewerRole) => {
   return expectedIndex >= 0 && currentIndex >= expectedIndex;
 };
 
+const isSubmittedNonTeachingQueueItem = (item = {}) => {
+  const currentIndex = nonTeachingStatusIndex(item.status);
+  const submittedIndex = nonTeachingStatusIndex(NON_TEACHING_STATUS.SUBMITTED);
+  return currentIndex >= submittedIndex ||
+    Boolean(clean(firstNonEmpty(
+      item.submittedOn,
+      item.submitted_at,
+      item.declaration?.submitted_at,
+      item.form?.submitted_at,
+    )));
+};
+
 export const fetchNonTeachingQueueForRole = async ({
   reviewerRole,
   academicYear: ay = APP_INFO.DEFAULT_AY,
@@ -619,6 +658,7 @@ export const fetchNonTeachingQueueForRole = async ({
     return (items || [])
       .map(normalizeNonTeachingQueueItem)
       .filter((item) =>
+        isSubmittedNonTeachingQueueItem(item) &&
         canReviewNonTeachingItem(item, role) &&
         nonTeachingReachedReviewer(item, role)
       );

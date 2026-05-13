@@ -1,7 +1,7 @@
 // ─── HOD-editable score input ─────────────────────────────────────────────────
 import { clampScore } from "../utils/appraisalFormUtils";
 
-export function HodInput({ val, onChange, max }) {
+export function HodInput({ val, onChange, max, disabled = false }) {
   return (
     <input
       type="number"
@@ -9,6 +9,7 @@ export function HodInput({ val, onChange, max }) {
       step="0.5"
       value={val ?? ""}
       max={max}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.value === "" || max === undefined ? e.target.value : String(clampScore(e.target.value, max)))}
       style={{
         width: 58,
@@ -21,7 +22,8 @@ export function HodInput({ val, onChange, max }) {
         fontSize: 11,
         fontFamily: "Georgia, serif",
         outline: "none",
-        background: "#f0f4ff",
+        background: disabled ? "#f1f5f9" : "#f0f4ff",
+        cursor: disabled ? "not-allowed" : "text",
       }}
     />
   );

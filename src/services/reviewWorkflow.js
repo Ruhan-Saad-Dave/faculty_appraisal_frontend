@@ -11,6 +11,7 @@ import {
   roleLabel,
   normalizeRoleForWorkflow,
 } from "../utils/hierarchy";
+import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 
 const n = (value) => parseFloat(value) || 0;
 const clean = (value) => String(value ?? "").trim();
@@ -99,7 +100,57 @@ const getWorkflowStatus = (item = {}) =>
     item.declarationStatus,
     item.declaration_status,
     item.declaration?.status,
+    item.payload?.status,
+    item.form?.status,
   );
+
+const hasSubmittedAppraisal = (item = {}) => {
+  if (item.hasSubmittedAppraisal === true) return true;
+  if (item.hasSubmittedAppraisal === false) return false;
+
+  const status = normalizeStatusText(getWorkflowStatus(item));
+  const chain = getReviewChain(subjectProfileFromItem(item));
+  const workflowStatuses = new Set([
+    "submitted",
+    "pending review",
+    "reviewed",
+    "completed",
+    ...chain.flatMap((role) => [
+      normalizeStatusText(pendingStatusFor(role)),
+      normalizeStatusText(reviewedStatusFor(role)),
+    ]),
+  ]);
+
+  const hasWorkflowStatus =
+    workflowStatuses.has(status) ||
+    status.startsWith("pending ") ||
+    status.includes(" reviewed") ||
+    status.includes(" approved") ||
+    status.includes(" rejected");
+
+  const hasDeclaration = Boolean(clean(firstValue(
+    item.declaration_id,
+    item.declarationId,
+    item.declaration?.id,
+    item.declaration?.submitted_at,
+    item.submitted_at,
+    item.submittedAt,
+    item.submittedOn,
+    item.payload?.submitted_at,
+    item.form?.submitted_at,
+  )));
+
+  const hasWorkflowPointers = Boolean(clean(firstValue(
+    item.next_reviewer,
+    item.nextReviewer,
+    item.next_reviewer_role,
+    item.nextReviewerRole,
+  )));
+
+  const hasPriorReview = ["hod", "center_head", "director", "dean", "vc"].some((role) => hasReviewScore(item, role));
+
+  return hasWorkflowStatus || hasDeclaration || hasWorkflowPointers || hasPriorReview;
+};
 
 const hasReviewScore = (item = {}, role) => {
   if (role === "hod" || role === "center_head") {
@@ -183,17 +234,20 @@ const isReviewableForRole = (item = {}, reviewerRole, reviewerProfile = {}) => {
   const reviewer = { ...reviewerProfile, appraisal_role: role };
   const subjectProfile = subjectProfileFromItem(item);
 
-  return canAuthorityReviewProfile(reviewer, subjectProfile) &&
+  return hasSubmittedAppraisal(item) &&
+    canAuthorityReviewProfile(reviewer, subjectProfile) &&
     hasReachedReviewer(item, role);
 };
 
 const normalizeQueueItem = (item = {}) => {
   const subjectProfile = subjectProfileFromItem(item);
   const appraisalRole = subjectProfile.appraisal_role;
-  const status = getWorkflowStatus(item) || pendingStatusFor(getReviewChain(subjectProfile)[0]);
+  const submitted = hasSubmittedAppraisal(item);
+  const status = getWorkflowStatus(item) || (submitted ? pendingStatusFor(getReviewChain(subjectProfile)[0]) : "");
   const email = subjectProfile.email;
   const academicYear = firstValue(item.academicYear, item.academic_year, item.info?.ay, APP_INFO.DEFAULT_AY, "2025-2026");
   const school = subjectProfile.school;
+  const selfSummary = standardSubmittedScoreSummary(item);
 
   return {
     ...item,
@@ -210,6 +264,16 @@ const normalizeQueueItem = (item = {}) => {
     designation: subjectProfile.designation,
     status,
     workflowStatus: status,
+    hasSubmittedAppraisal: submitted,
+    partATotal: selfSummary.partA,
+    partBTotal: selfSummary.partB,
+    grandTotal: selfSummary.total,
+    selfPartA: selfSummary.partA,
+    selfPartB: selfSummary.partB,
+    selfTotal: selfSummary.total,
+    effectivePartAMax: selfSummary.partAMax,
+    effectivePartBMax: selfSummary.partBMax,
+    effectiveGrandMax: selfSummary.grandMax,
     avatar: initialsFor(firstValue(item.name, item.full_name, email), email),
     avatarColor: roleColor(appraisalRole),
     hodTotal: numberValue(item.hodTotal, item.hod_total, item.hodScore, item.hod_score, item.centerHeadTotal, item.center_head_total),

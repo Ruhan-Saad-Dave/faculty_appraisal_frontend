@@ -18,12 +18,13 @@ import {
   nonTeachingRoleLabel,
   openNonTeachingReport,
   primeFormForReviewer,
+  saveNonTeachingDraft,
   submitNonTeachingReview,
   submitNonTeachingSelfAppraisal,
   validateNonTeachingForm,
   visibleNonTeachingReviewRoles,
 } from "../services/nonTeachingWorkflow";
-import { clampScore, clearDraft, draftKeyFor, loadDraft, saveDraft, scoreRemaining } from "../utils/appraisalFormUtils";
+import { clampScore, scoreRemaining } from "../utils/appraisalFormUtils";
 import { profileFromsessionStorage } from "../utils/hierarchy";
 
 const ACCENT = "#1d4ed8";
@@ -176,7 +177,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
     if (!fileList.length) return;
     const unsupported = fileList.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
-      alert("Only image or PDF files are allowed.");
+      alert("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
@@ -398,15 +399,12 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
   const [tab, setTab] = useState("info");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const accent = roleAccent(normalizedRole);
   const locked = form.status !== NON_TEACHING_STATUS.DRAFT;
-  const draftKey = draftKeyFor({
-    family: "non-teaching",
-    email: form.info?.email || sessionStorage.getItem("username") || "",
-    academicYear: form.info?.ay || APP_INFO.DEFAULT_AY,
-  });
 
   useEffect(() => {
     let active = true;
@@ -420,8 +418,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
           role: normalizedRole,
         });
         if (!active) return;
-        const draft = loadDraft(draftKey);
-        setForm(draft?.form || saved?.form || emptyNonTeachingForm(profile, normalizedRole));
+        setForm(saved?.form || emptyNonTeachingForm(profile, normalizedRole));
       } catch (err) {
         console.error("Could not load non-teaching appraisal:", err);
       } finally {
@@ -430,15 +427,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
     };
     loadForm();
     return () => { active = false; };
-  }, [normalizedRole, draftKey]);
-
-  useEffect(() => {
-    if (locked) return undefined;
-    const timer = window.setTimeout(() => {
-      saveDraft(draftKey, { form });
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [draftKey, form, locked]);
+  }, [normalizedRole]);
 
   const updateInfo = (field, value) => {
     setForm((current) => ({ ...current, info: { ...(current.info || {}), [field]: value } }));
@@ -446,6 +435,28 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
 
   const updateRemarks = (value) => {
     setForm((current) => ({ ...current, remarks: value }));
+  };
+
+  const handleSaveDraft = async () => {
+    if (locked) return;
+    setSavingDraft(true);
+    try {
+      const saved = await saveNonTeachingDraft({
+        form,
+        role: normalizedRole,
+        profile: profileFromsessionStorage(),
+      });
+      setForm(saved.form);
+      setDraftSaved(true);
+    } catch (err) {
+      if (err?.statusCode === 403 || err?.response?.status === 403) {
+        setForm((current) => ({ ...current, status: NON_TEACHING_STATUS.SUBMITTED }));
+        return;
+      }
+      alert(`Unable to save draft.\n\n${err.message}`);
+    } finally {
+      setSavingDraft(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -459,7 +470,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
       const files = form.docs?.[item.key] || [];
       if (!rowHasData) return [];
       if (!files.length) return [`${item.label}: attach an image or PDF.`];
-      if (files.some((file) => !isAllowedAttachmentFile(file))) return [`${item.label}: attachment must be an image or PDF.`];
+      if (files.some((file) => !isAllowedAttachmentFile(file))) return [`${item.label}: attachment must be an image or PDF up to 10 MB.`];
       return [];
     });
     if (attachmentErrors.length) {
@@ -483,7 +494,6 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
       });
       setForm(saved.form);
       setConfirmed(false);
-      clearDraft(draftKey);
       alert("Non-teaching appraisal submitted successfully.");
     } catch (err) {
       console.error("Could not submit non-teaching appraisal:", err);
@@ -534,7 +544,12 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
               ["partA", "Part A"],
               ["summary", "Summary"],
             ].map(([id, label]) => (
-              <button key={id} onClick={() => setTab(id)} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", fontFamily: "Georgia, serif", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
+              <button key={id} onClick={() => {
+                setTab(id);
+                requestAnimationFrame(() => {
+                  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+                });
+              }} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", fontFamily: "Georgia, serif", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
                 {label}
               </button>
             ))}
@@ -561,6 +576,16 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
           )}
 
           {tab === "partA" && <SelfAppraisalTable form={form} setForm={setForm} readOnly={locked} accent={accent} />}
+          {(tab === "info" || tab === "partA") && !locked && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 8, background: "#fff" }}>
+              <span style={{ color: draftSaved ? "#047857" : "#64748b", fontSize: 12, fontWeight: 800 }}>
+                {draftSaved ? "Draft saved to server." : "Save this section draft to server."}
+              </span>
+              <button type="button" onClick={handleSaveDraft} disabled={savingDraft} style={{ ...S.headerButton, background: savingDraft ? "#94a3b8" : accent, color: "#fff", border: "none", cursor: savingDraft ? "wait" : "pointer" }}>
+                {savingDraft ? "Saving..." : `Save ${tab === "info" ? "General Information" : "Part A"}`}
+              </button>
+            </div>
+          )}
           {tab === "summary" && (
             <SummaryPanel
               form={form}
@@ -751,6 +776,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const pendingStatus = expectedPendingStatus(role);
   const locked = readOnly || item.status !== pendingStatus;
   const accent = roleAccent(role);
+  const selfTotals = calculateNonTeachingTotals(form, "self");
   const totals = calculateNonTeachingTotals(form, role === "vc" ? "vc" : role);
 
   const handleSubmit = async () => {
@@ -817,9 +843,14 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
         {[
           ["partA", "Part A"],
           ["partB", "Part B"],
-          ["remarks", "Remarks & Submit"],
+          ["remarks", "Summary"],
         ].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => setTab(id)} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", cursor: "pointer", fontFamily: "Georgia, serif", fontWeight: 800 }}>
+          <button key={id} type="button" onClick={() => {
+            setTab(id);
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            });
+          }} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", cursor: "pointer", fontFamily: "Georgia, serif", fontWeight: 800 }}>
             {label}
           </button>
         ))}
@@ -835,6 +866,21 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
           {role === "vc" && form.roRemarks && <PriorRemark label="Reporting Officer Remarks" value={form.roRemarks} color={ACCENT} />}
           {role === "vc" && form.registrarRemarks && <PriorRemark label="Registrar Remarks" value={form.registrarRemarks} color={REG_ACCENT} />}
 
+          <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Staff Submitted Score</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
+            {[
+              ["Part A", selfTotals.partA, NON_TEACHING_MAX.partA],
+              ["Part B", selfTotals.partB, NON_TEACHING_MAX.partB],
+              ["Grand Total", selfTotals.total, NON_TEACHING_MAX.grand],
+            ].map(([label, value, max]) => (
+              <div key={label} style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", padding: "10px 12px" }}>
+                <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800 }}>{label}</div>
+                <div style={{ color: "#1d4ed8", fontSize: 18, fontWeight: 900 }}>{n(value).toFixed(1)} / {max}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>{nonTeachingRoleLabel(role)} Score</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
             {[
               ["Part A", totals.partA, NON_TEACHING_MAX.partA],
@@ -947,7 +993,12 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
             ["review", "Review Queue"],
             ["self", "My Appraisal"],
           ].map(([id, label]) => (
-            <button key={id} type="button" onClick={() => setTab(id)} style={{ flex: 1, border: "none", borderRadius: 7, padding: "7px 6px", background: tab === id ? accent : "#1e293b", color: tab === id ? "#fff" : "#94a3b8", cursor: "pointer", fontSize: 10, fontWeight: 800, fontFamily: "Georgia, serif" }}>
+            <button key={id} type="button" onClick={() => {
+              setTab(id);
+              requestAnimationFrame(() => {
+                window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+              });
+            }} style={{ flex: 1, border: "none", borderRadius: 7, padding: "7px 6px", background: tab === id ? accent : "#1e293b", color: tab === id ? "#fff" : "#94a3b8", cursor: "pointer", fontSize: 10, fontWeight: 800, fontFamily: "Georgia, serif" }}>
               {label}
             </button>
           ))}

@@ -517,4 +517,4 @@ export const generateStandardReport = async ({
   win.document.write(html);
   win.document.close();
   win.print();
-};
+};
