@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { FORM_SCHOOL_CODES, FORM_TYPES } from "../constants/formRouting";
-import { getSchoolKey } from "../constants/universityHierarchy";
-import { loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
+import { getSchoolByValue, getSchoolKey } from "../constants/universityHierarchy";
+import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { openFullFormReport } from "../utils/fullFormReport";
@@ -11,10 +11,8 @@ import {
   INNOVATIVE_METHODS,
   SCORE_LIMITS,
   averageSectionScore,
-  clearDraft,
   clampScore,
   courseFileRowScore,
-  draftKeyFor,
   effectiveMaxScore,
   feedbackAverage,
   feedbackRowScore,
@@ -23,15 +21,13 @@ import {
   innovativeTeachingScore,
   isAllowedAttachmentFile,
   isValidDDMMYYYY,
-  loadDraft,
   maskDateDDMMYYYY,
   normalizeAutoScores,
   projectGuidanceRowMax,
   researchGuidanceRowMax,
   researchGuidanceScore,
-  saveDraft,
   scoreSectionRows,
-  scoreRemaining,
+  societyRowLocked,
   societyRowScore,
   societySelectionForRow,
   sumSectionScore,
@@ -54,6 +50,32 @@ const SECTION_OPTIONS = [
 const n = (value) => parseFloat(value) || 0;
 const pct = (value, max) => Math.min(100, Math.round((n(value) / max) * 100)) || 0;
 const titleCase = (value) => String(value || "").charAt(0).toUpperCase() + String(value || "").slice(1);
+const isReviewerReviewComplete = (item = {}, reviewerRole = "") => {
+  const status = String(item?.status || item?.workflowStatus || item?.workflow_status || "");
+  const reviewerLabel = roleLabel(reviewerRole);
+  return (
+    n(item?.[`${reviewerRole}Total`]) > 0 ||
+    String(item?.[`${reviewerRole}Remarks`] ?? "").trim() !== "" ||
+    status === reviewedStatusFor(reviewerRole) ||
+    new RegExp(`${reviewerLabel}\\s*(Reviewed|Approved|Rejected)`, "i").test(status)
+  );
+};
+const DESIGN_ARTS_FALLBACK_SCHOOL = "School of Design / School of Applied Arts";
+const designArtsSchoolName = (...sources) => {
+  const school = sources
+    .flatMap((source) => [
+      source?.info?.school,
+      source?.school,
+      source?.schoolName,
+      source?.school_name,
+      source?.schoolCode,
+      source?.school_code,
+      typeof source === "string" ? source : "",
+    ])
+    .map((value) => getSchoolByValue(value)?.name)
+    .find(Boolean);
+  return school || DESIGN_ARTS_FALLBACK_SCHOOL;
+};
 const userInitials = (name) =>
   String(name || "User")
     .split(" ")
@@ -83,7 +105,7 @@ const emptyDesignArtsForm = () => ({
     qual: sessionStorage.getItem("qualification") || "",
     desig: sessionStorage.getItem("designation") || "",
     ay: sessionStorage.getItem("academicYear") || "2025-2026",
-    school: sessionStorage.getItem("school") || "SoD - School of Design",
+    school: sessionStorage.getItem("school") || sessionStorage.getItem("schoolName") || "",
   },
   lectures: [{ sem: "", code: "", planned: "", conducted: "", score: "", _id: uid() }],
   courseFile: [{ course: "", title: "", details: "", score: "", _id: uid() }],
@@ -117,15 +139,15 @@ const cloneRows = (rows) => JSON.parse(JSON.stringify(rows || []));
 
 const PART_A_SECTIONS = [
   { key: "lectures", title: "A(i). Lectures / Tutorials / Practicals", max: 40, doc: "lec", fields: [["sem", "Semester"], ["code", "Course Code / Name"], ["planned", "Planned"], ["conducted", "Conducted"]] },
-  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", rowMax: SCORE_LIMITS.courseFileRow, fields: [["course", "Course / Paper"], ["title", "Year"], ["details", "Availability as per IQAC format"]] },
+  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", rowMax: SCORE_LIMITS.courseFileRow, fields: [["course", "Course / Paper"], ["title", "Program & Semester"], ["details", "Availability as per IQAC format"]] },
   { key: "projects", title: "A(iv). Project Guidance", max: 20, doc: "proj", rowMax: projectGuidanceRowMax, fields: [["label", "Project Category"]] },
   { key: "quals", title: "A(v). Qualification Enhancement", max: 10, doc: "qual", rowMax: SCORE_LIMITS.qualificationRow, fields: [["label", "Category"]] },
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
   { key: "deptActs", title: "Departmental / School Activities", max: 20, doc: "dept", fields: [["activity", "Activity"], ["nature", "Nature"]] },
   { key: "uniActs", title: "University Level Activities", max: 30, doc: "uni", fields: [["activity", "Activity"], ["nature", "Nature"]] },
-  { key: "society", title: "Contribution to Society", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity"], ["details", "Details"], ["participated", "Participation"]] },
+  { key: "society", title: "(ix) Contribution to Society - Max 10 marks (Max 5 per row)", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity"], ["participated", "Yes/No"], ["details", "Details"]] },
   { key: "industry", title: "Industry Connect", max: 5, doc: "ind", fields: [["name", "Name"], ["details", "Details"]] },
-  { key: "acr", title: "(xi) Annual Confidential Report (ACR) - Max 25 marks", max: 25, doc: "acr", fields: [["label", "Attribute", true]], selfReadOnlyScore: true },
+  { key: "acr", title: "(xi) Annual Confidential Report (ACR) - Max 25 marks", max: 25, doc: "acr", rowMax: SCORE_LIMITS.acrRow, fields: [["label", "Attribute", true]], selfReadOnlyScore: true },
 ];
 
 const PART_B_SECTIONS = [
@@ -144,6 +166,26 @@ const PART_B_SECTIONS = [
 ];
 
 const ALL_ARRAY_KEYS = [...PART_A_SECTIONS, ...PART_B_SECTIONS].map((section) => section.key);
+const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
+const preserveSavedReviewScores = (form = {}, source = {}) => {
+  const merged = { ...form };
+  ALL_ARRAY_KEYS.forEach((key) => {
+    if (!Array.isArray(form[key])) return;
+    const sourceRows = Array.isArray(source[key]) ? source[key] : [];
+    merged[key] = form[key].map((row, index) => {
+      const sourceRow = sourceRows[index] || {};
+      const next = { ...row };
+      REVIEW_SCORE_FIELDS.forEach((field) => {
+        if (String(next[field] ?? "").trim() === "" && String(sourceRow[field] ?? "").trim() !== "") next[field] = sourceRow[field];
+      });
+      return next;
+    });
+  });
+  ["innovHod", "innovDirector", "innovDean", "innovVc"].forEach((field) => {
+    if (String(merged[field] ?? "").trim() === "" && String(source[field] ?? "").trim() !== "") merged[field] = source[field];
+  });
+  return merged;
+};
 
 const scoreKeyForInnov = (role) => ({
   hod: "innovHod",
@@ -311,13 +353,13 @@ function DocCell({ id, docs, setDocs, readOnly }) {
     if (!selected.length) return;
     const unsupported = selected.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
-      setUploadError("Only image or PDF files are allowed.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
     const oversized = selected.find((f) => f.size > 10 * 1024 * 1024);
     if (oversized) {
-      setUploadError("File exceeds 10 MB limit.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
@@ -363,17 +405,11 @@ function DocCell({ id, docs, setDocs, readOnly }) {
   );
 }
 
-function SectionShell({ title, max, earned = 0, children, accent = ACCENT, showScoreSummary = true }) {
+function SectionShell({ title, children, accent = ACCENT }) {
   return (
     <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`, borderRadius: 8, overflow: "hidden", marginBottom: 14 }}>
       <div style={{ padding: "10px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div style={{ fontWeight: 800, color: accent, fontSize: 13 }}>{title}</div>
-        {showScoreSummary && (
-          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, textAlign: "right" }}>
-            <div>Earned Score: {clampScore(earned, max).toFixed(1)} / {max}</div>
-            <div>Remaining Credits: {scoreRemaining(earned, max).toFixed(1)}</div>
-          </div>
-        )}
       </div>
       <div style={{ padding: 12 }}>{children}</div>
     </section>
@@ -394,6 +430,16 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
     ? averageSectionScore(rows, section.max)
     : scoreSectionRows(section.key, rows, section.max);
   const hideIndividualB8Summary = mode === "self" && (section.key === "fdps" || section.key === "training");
+  const totalLabel = ["lectures", "courseFile", "feedback"].includes(section.key)
+    ? `Average Score (Max ${section.max})`
+    : `Total Score (Max ${section.max})`;
+  const totalLabelColSpan = 1 + section.fields.length + (section.key === "feedback" ? 1 : 0) + (section.key !== "courseFile" ? 1 : 0);
+  const sectionTotalScore = (sourceRows = rows, scoreKey = "score") => {
+    if (notApplicable) return 0;
+    if (section.key === "lectures" || section.key === "courseFile") return averageSectionScore(sourceRows, section.max, scoreKey);
+    if (section.key === "feedback" && scoreKey === "score") return feedbackSectionScore(sourceRows, section.max);
+    return scoreSectionRows(section.key, sourceRows, section.max, scoreKey);
+  };
 
   if (section.key === "acr" && mode === "self") {
     const acrRows = createAcrRows(rows);
@@ -424,7 +470,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </ul>
                     )}
                   </td>
-                  <td style={tdCenter}><RO value={row.score || "-"} center /></td>
+                  <td style={tdCenter}><RO value={String(row.score ?? "").trim() ? clampScore(row.score, SCORE_LIMITS.acrRow) : "-"} center /></td>
                 </tr>
               ))}
               <tr style={{ background: "#eff6ff" }}>
@@ -525,7 +571,9 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
           </thead>
           <tbody>
             {rows.map((row, index) => {
-              const socRowLocked = section.key === "society" && societySelectionForRow(row) !== "Yes";
+              const socRowLocked = section.key === "society" && societyRowLocked(row);
+              const currentRowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
+              const displayScore = (value) => String(value ?? "").trim() ? clampScore(value, currentRowMax) : "";
               return (
               <tr key={row._id ?? `${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
                 <td style={tdCenter}>{index + 1}</td>
@@ -567,7 +615,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </select>
                     ) : (
                       <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : (section.key === "courseFile" && key === "title") ? "integer" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated" && !(section.key === "society" && (key === "label" || key === "details")))} onChange={(value) => updateRow(index, key, value)} />
+                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, key, value)} />
                         {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
                           <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
                             {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
@@ -591,15 +639,31 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                         : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
                     : <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
                 </td>
-                {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={row[role]} center /></td>)}
+                {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={socRowLocked ? "0" : displayScore(row[role])} center /></td>)}
                 {mode === "review" && (
                   <td style={tdCenter}>
-                    <TI type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={reviewLocked} value={reviewRows[index]?.[currentRole] ?? row[currentRole] ?? ""} onChange={(value) => updateReview(index, value)} />
+                    <TI type="number" center max={currentRowMax} readOnly={reviewLocked || socRowLocked} value={socRowLocked ? "0" : displayScore(reviewRows[index]?.[currentRole] ?? row[currentRole] ?? "")} onChange={(value) => updateReview(index, value)} />
                   </td>
                 )}
               </tr>
               );
             })}
+            {!hideIndividualB8Summary && (
+              <tr style={{ background: "#eff6ff" }}>
+                <td style={{ ...tdCenter, fontWeight: "bold" }} colSpan={totalLabelColSpan}>{totalLabel}</td>
+                <td style={{ ...tdCenter, fontWeight: "bold" }}>{earned.toFixed(1)}</td>
+                {mode === "review" && previousRoles.map((role) => (
+                  <td key={role} style={{ ...tdCenter, fontWeight: "bold" }}>
+                    {sectionTotalScore(rows, role).toFixed(1)}
+                  </td>
+                ))}
+                {mode === "review" && (
+                  <td style={{ ...tdCenter, fontWeight: "bold" }}>
+                    {sectionTotalScore(reviewRows.length ? reviewRows : rows, currentRole).toFixed(1)}
+                  </td>
+                )}
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -751,7 +815,12 @@ function SectionSelector({ value, onChange, label = "Appraisal Section", isOptio
       {label}
       <select
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+          });
+        }}
         style={{ height: 36, border: "1px solid #cbd5e1", borderRadius: 7, background: "#fff", color: "#0f172a", padding: "0 10px", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700 }}
       >
         {SECTION_OPTIONS.map((option) => <option key={option.value} value={option.value} disabled={isOptionDisabled(option.value)}>{option.label}</option>)}
@@ -764,7 +833,7 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
       <span style={{ color: saved ? "#047857" : "#64748b", fontSize: 12, fontWeight: 800 }}>
-        {locked ? "Submitted and locked" : saved ? `${label} saved. Next section unlocked.` : `Save ${label} to unlock the next section.`}
+        {locked ? "Submitted and locked" : saved ? `${label} saved to server.` : `Save ${label} draft to server.`}
       </span>
       <button type="button" onClick={onSave} disabled={locked || saving} style={smallButton(locked ? "#94a3b8" : "#2563eb")}>
         {saving ? "Saving..." : `Save ${label}`}
@@ -809,7 +878,11 @@ function buildDesignArtsSectionScores(person, reviewData, reviewerRole) {
     const reviewRows = Array.isArray(reviewData[key]) ? reviewData[key] : [];
     payload[key] = rows.map((row, index) => ({
       ...row,
-      [reviewerRole]: reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
+      [reviewerRole]: key === "society" && societyRowLocked(row)
+        ? "0"
+        : key === "acr"
+        ? (String(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "").trim() ? String(clampScore(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole], SCORE_LIMITS.acrRow)) : "")
+        : reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
     }));
   });
   payload.innovativeTeaching = {
@@ -834,28 +907,38 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
   const [confirmed, setConfirmed] = useState(false);
   const form = mergeForm(emptyDesignArtsForm(), person || {});
   const [docs, setDocs] = useState(form.docs || {});
-  const subjectProfile = { school: person?.school, department: person?.department, appraisal_role: person?.appraisalRole };
+  const subjectProfile = { school: person?.school || form.info?.school, department: person?.department, appraisal_role: person?.appraisalRole };
   const visiblePreviousRoles = visiblePreviousReviewRoles(reviewerRole, subjectProfile);
+  const schoolDisplayName = designArtsSchoolName(person, form);
 
   const reviewerForm = useMemo(() => {
     const merged = { ...form };
     ALL_ARRAY_KEYS.forEach((key) => {
       merged[key] = (form[key] || []).map((row, index) => ({
         ...row,
-        [reviewerRole]: reviewData[key]?.[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
+        [reviewerRole]: key === "society" && societyRowLocked(row) ? "0" : reviewData[key]?.[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
       }));
     });
     merged[scoreKeyForInnov(reviewerRole)] = reviewData.innovativeTeaching?.[reviewerRole] ?? form[scoreKeyForInnov(reviewerRole)] ?? "";
     return merged;
   }, [form, reviewData, reviewerRole]);
+  const facultyTotals = calculateDesignArtsTotals(form, "score");
   const totals = calculateDesignArtsTotals(reviewerForm, reviewerRole);
-  const reviewCompleted = readOnly || /Reviewed/.test(person?.status || "") || n(person?.[`${reviewerRole}Total`]) > 0;
+  const reviewCompleted = readOnly || isReviewerReviewComplete(person, reviewerRole);
+  const savedReviewerTotalKeys = [`${reviewerRole}PartA`, `${reviewerRole}PartB`, `${reviewerRole}Total`];
+  const hasSavedReviewerTotals = savedReviewerTotalKeys.some((key) => String(person?.[key] ?? "").trim() !== "");
+  const reviewerSummaryTotals = reviewCompleted && hasSavedReviewerTotals ? {
+    ...totals,
+    partA: String(person?.[`${reviewerRole}PartA`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}PartA`]) : totals.partA,
+    partB: String(person?.[`${reviewerRole}PartB`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}PartB`]) : totals.partB,
+    total: String(person?.[`${reviewerRole}Total`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}Total`]) : totals.total,
+  } : totals;
 
   const generateReviewReport = () => {
     if (!reviewCompleted) return;
     openFullFormReport({
-      title: "Design & Applied Arts VC Appraisal Report",
-      subtitle: "School of Design / School of Applied Arts",
+      title: `${schoolDisplayName} Appraisal Report`,
+      subtitle: `${roleLabel(reviewerRole)} review`,
       form: reviewerForm,
       docs,
       partASections: PART_A_SECTIONS,
@@ -882,7 +965,7 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
         <button onClick={onBack} style={smallButton("#1e293b")}>Back</button>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 900 }}>{person?.name || person?.email}</div>
-          <div style={{ color: "#94a3b8", fontSize: 12 }}>{person?.designation || titleCase(person?.appraisalRole)} - Design & Applied Arts</div>
+          <div style={{ color: "#94a3b8", fontSize: 12 }}>{person?.designation || titleCase(person?.appraisalRole)} - {schoolDisplayName}</div>
         </div>
         <StatusBadge status={person?.status} />
       </div>
@@ -906,7 +989,8 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
       )}
       {sectionView === "summary" && (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
-          <SummaryBox totals={totals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the Design & Applied Arts appraisal form.`} />
+          <SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel={`Faculty submitted score for the ${schoolDisplayName} appraisal form.`} />
+          <SummaryBox totals={reviewerSummaryTotals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the ${schoolDisplayName} appraisal form.`} />
           <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
             {roleLabel(reviewerRole)} Remarks
             <textarea value={remarks} readOnly={readOnly} onChange={(event) => setRemarks(event.target.value)} rows={5} style={{ border: "1px solid #99f6e4", borderRadius: 7, padding: 10, fontFamily: "Georgia, serif", resize: "vertical" }} />
@@ -947,10 +1031,13 @@ export default function DesignArtsDashboard({ fixedRole }) {
   const [queue, setQueue] = useState([]);
   const [reviewing, setReviewing] = useState(null);
   const [loadingQueue, setLoadingQueue] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [sectionSaveStatus, setSectionSaveStatus] = useState({ partA: true, partB: true });
+  const [savingSection, setSavingSection] = useState(null);
   const [declaration, setDeclaration] = useState(null);
   const [reviews, setReviews] = useState([]);
   const userEmail = sessionStorage.getItem("username") || "";
@@ -958,7 +1045,13 @@ export default function DesignArtsDashboard({ fixedRole }) {
   const locked = Boolean(declaration);
   const totals = calculateDesignArtsTotals(form, "score");
   const canSelfSubmit = role !== "vc";
-  const draftKey = draftKeyFor({ family: "design-arts", email: userEmail, academicYear });
+  const currentSchoolValue = form.info?.school || profile.school || sessionStorage.getItem("school") || sessionStorage.getItem("schoolName") || "";
+  const schoolDisplayName = designArtsSchoolName(
+    profile,
+    sessionStorage.getItem("school"),
+    sessionStorage.getItem("schoolName"),
+    form,
+  );
 
   const setters = useMemo(() => Object.fromEntries([
     ["setInfo", (value) => setForm((prev) => ({ ...prev, info: { ...prev.info, ...value } }))],
@@ -970,43 +1063,27 @@ export default function DesignArtsDashboard({ fixedRole }) {
     ["setInnovDirector", (value) => setForm((prev) => ({ ...prev, innovDirector: value }))],
     ["setInnovDean", (value) => setForm((prev) => ({ ...prev, innovDean: value }))],
     ["setInnovVc", (value) => setForm((prev) => ({ ...prev, innovVc: value }))],
+    ["setSectionApplicability", (value) => setForm((prev) => ({ ...prev, sectionApplicability: { ...(prev.sectionApplicability || {}), ...(value || {}) } }))],
     ["setSectionSaveStatus", (value) => setSectionSaveStatus((prev) => ({ ...prev, ...(value || {}) }))],
   ]), []);
 
   useEffect(() => {
     if (!userEmail || !academicYear || !canSelfSubmit) return;
     const loadAll = async () => {
+      const data = await api.get("/appraisal/status", { params: { academic_year: academicYear } }).catch((err) => {
+        console.error("Could not load workflow status:", err);
+        return null;
+      });
+      const declarationRow = data?.declaration || null;
+      setDeclaration(declarationRow);
+      setReviews(data?.reviews || []);
       await Promise.all([
         loadSavedAppraisal({ facultyEmail: userEmail, academicYear, setters }),
         loadAppraisalDocuments({ facultyEmail: userEmail, academicYear, setDocs }),
       ]);
-      const draft = loadDraft(draftKey);
-      if (draft?.form) {
-        setForm((current) => mergeForm(current, draft.form));
-        if (draft.form.sectionSaveStatus) setSectionSaveStatus((current) => ({ ...current, ...draft.form.sectionSaveStatus }));
-      }
-      if (draft?.docs) setDocs(draft.docs);
     };
-    loadAll().catch((err) => console.error("Could not load Design & Applied Arts appraisal:", err));
-  }, [userEmail, academicYear, setters, canSelfSubmit, draftKey]);
-
-  useEffect(() => {
-    if (!userEmail || !academicYear || !canSelfSubmit || locked) return undefined;
-    const timer = window.setTimeout(() => {
-      saveDraft(draftKey, { form: { ...form, sectionSaveStatus }, docs });
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [userEmail, academicYear, canSelfSubmit, locked, draftKey, form, sectionSaveStatus, docs]);
-
-  useEffect(() => {
-    if (!userEmail || !academicYear || !canSelfSubmit) return;
-    const loadStatus = async () => {
-      const data = await api.get("/appraisal/status", { params: { academic_year: academicYear } });
-      setDeclaration(data?.declaration || null);
-      setReviews(data?.reviews || []);
-    };
-    loadStatus().catch((err) => console.error("Could not load workflow status:", err));
-  }, [userEmail, academicYear, canSelfSubmit]);
+    loadAll().catch((err) => console.error(`Could not load ${schoolDisplayName} appraisal:`, err));
+  }, [userEmail, academicYear, setters, canSelfSubmit]);
 
   const loadQueue = async () => {
     if (role === "faculty") return;
@@ -1017,9 +1094,9 @@ export default function DesignArtsDashboard({ fixedRole }) {
         reviewerProfile: { ...profile, appraisal_role: role },
         schoolValues: FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS],
       });
-      setQueue(items.filter((item) => FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS].includes(getSchoolKey(item.school))));
+      setQueue(items.filter((item) => FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS].includes(getSchoolKey(item.school || item.info?.school))));
     } catch (err) {
-      console.error("Could not load Design & Applied Arts review queue:", err);
+      console.error(`Could not load ${schoolDisplayName} review queue:`, err);
       setQueue([]);
     } finally {
       setLoadingQueue(false);
@@ -1033,21 +1110,45 @@ export default function DesignArtsDashboard({ fixedRole }) {
   const isSelfSectionOpen = (_section) => true;
 
   const handleSelfSectionChange = (section) => {
-    if (selfSectionView === "partA" && section !== "partA") {
-      const validationErrors = validateDesignArtsBeforeSubmit(form, docs, "partA");
-      if (validationErrors.length) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-    }
-    if (selfSectionView === "partB" && section === "summary") {
-      const validationErrors = validateDesignArtsBeforeSubmit(form, docs, "partB");
-      if (validationErrors.length) {
-        alert(validationErrors.join("\n"));
-        return;
-      }
-    }
     setSelfSectionView(section);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  };
+
+  const handleSaveSelfSection = async (section) => {
+    if (locked) return;
+    if (!userEmail) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    const nextStatus = { ...sectionSaveStatus, [section]: true };
+    const formToSave = {
+      ...form,
+      info: { ...form.info, school: currentSchoolValue },
+      sectionSaveStatus: nextStatus,
+    };
+    setSavingSection(section);
+    try {
+      await saveAppraisalDraftSection({
+        facultyEmail: userEmail,
+        academicYear,
+        form: formToSave,
+        docs,
+        totals: { partATotal: totals.partA, partBTotal: totals.partB, grandTotal: totals.total },
+        submitterProfile: { ...profile, school: currentSchoolValue, appraisal_role: role },
+        sectionSaveStatus: nextStatus,
+      });
+      setSectionSaveStatus(nextStatus);
+    } catch (err) {
+      if (err?.statusCode === 403 || err?.response?.status === 403) {
+        setDeclaration((current) => current || { status: "Submitted" });
+        return;
+      }
+      alert(`Unable to save draft.\n\n${err.message}`);
+    } finally {
+      setSavingSection(null);
+    }
   };
 
   const handleSubmitAppraisal = async () => {
@@ -1059,13 +1160,16 @@ export default function DesignArtsDashboard({ fixedRole }) {
       navigate("/login", { replace: true });
       return;
     }
-    const submitterProfile = { ...profile, appraisal_role: role };
+    const submitterProfile = { ...profile, school: currentSchoolValue, appraisal_role: role };
     const workflowError = workflowValidationError(submitterProfile);
     if (workflowError) {
       alert(workflowError);
       return;
     }
-    const normalizedForm = normalizeScoresForSubmit(form);
+    const normalizedForm = normalizeScoresForSubmit({
+      ...form,
+      info: { ...form.info, school: currentSchoolValue },
+    });
     const validationErrors = validateDesignArtsBeforeSubmit(normalizedForm, docs);
     if (validationErrors.length) {
       alert(validationErrors.join("\n"));
@@ -1082,9 +1186,8 @@ export default function DesignArtsDashboard({ fixedRole }) {
         submitterProfile,
         activeProfile: submitterProfile,
       });
-      clearDraft(draftKey);
-      setDeclaration({ status: pendingStatusFor(getReviewChain({ ...profile, appraisal_role: role })[0]), submitted_at: new Date().toISOString() });
-      alert("Design & Applied Arts appraisal submitted successfully.");
+      setDeclaration({ status: pendingStatusFor(getReviewChain(submitterProfile)[0]), submitted_at: new Date().toISOString() });
+      alert(`${schoolDisplayName} appraisal submitted successfully.`);
     } catch (err) {
       alert(`Unable to submit appraisal.\n\n${err.message}`);
     } finally {
@@ -1121,8 +1224,8 @@ export default function DesignArtsDashboard({ fixedRole }) {
 
   const generateSelfReport = () => {
     openFullFormReport({
-      title: "Design & Applied Arts Appraisal Report",
-      subtitle: "School of Design / School of Applied Arts",
+      title: `${schoolDisplayName} Appraisal Report`,
+      subtitle: `${roleLabel(role)} appraisal form`,
       form,
       docs,
       partASections: PART_A_SECTIONS,
@@ -1144,7 +1247,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
       <aside style={{ width: 230, height: "100vh", minHeight: "100vh", position: "sticky", top: 0, alignSelf: "flex-start", boxSizing: "border-box", overflow: "hidden", background: "#0f172a", color: "#f8fafc", padding: "18px 12px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ borderBottom: "1px solid #1e293b", paddingBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 900 }}>{APP_INFO.PORTAL_NAME}</div>
-          <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 3 }}>Design & Applied Arts</div>
+          <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 3 }}>{schoolDisplayName}</div>
         </div>
         {canSelfSubmit && (
           <>
@@ -1204,13 +1307,13 @@ export default function DesignArtsDashboard({ fixedRole }) {
       </aside>
       <main style={{ flex: 1, padding: "20px 24px", overflowX: "auto" }}>
         <div style={{ marginBottom: 16 }}>
-          <h2 style={{ margin: 0, color: "#0f172a", fontSize: 21 }}>School of Design & Applied Arts</h2>
+          <h2 style={{ margin: 0, color: "#0f172a", fontSize: 21 }}>{schoolDisplayName}</h2>
           <div style={{ color: "#64748b", fontSize: 12, marginTop: 3 }}>{roleLabel(role)} workflow dashboard</div>
         </div>
 
         {activeTab === "my" && canSelfSubmit && (
           <div style={{ display: "grid", gap: 16 }}>
-            <WorkflowTracker declaration={declaration} reviews={reviews} profile={{ ...profile, appraisal_role: role }} />
+            <WorkflowTracker declaration={declaration} reviews={reviews} profile={{ ...profile, school: currentSchoolValue, appraisal_role: role }} />
             {(selfSectionView === "partA" || selfSectionView === "partB") && (
               <>
                 <DesignArtsForm
@@ -1222,11 +1325,20 @@ export default function DesignArtsDashboard({ fixedRole }) {
                   locked={locked}
                   sectionView={selfSectionView}
                 />
+                {!locked && (
+                  <SectionSaveFooter
+                    label={selfSectionView === "partA" ? "Part A" : "Part B"}
+                    saved={Boolean(sectionSaveStatus[selfSectionView])}
+                    saving={savingSection === selfSectionView}
+                    locked={locked}
+                    onSave={() => handleSaveSelfSection(selfSectionView)}
+                  />
+                )}
               </>
             )}
             {selfSectionView === "summary" && (
               <div style={{ display: "grid", gap: 16 }}>
-                <SummaryBox totals={totals} maxScores={totals.maxScores} roleScoreLabel="Faculty/self appraisal score from the Design & Applied Arts form." />
+                <SummaryBox totals={totals} maxScores={totals.maxScores} roleScoreLabel={`Faculty/self appraisal score from the ${schoolDisplayName} form.`} />
                 <div style={{ display: "grid", gap: 12, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
                   {locked ? <StatusBadge status={declaration?.status || "Submitted"} /> : <AccuracyCheckbox checked={confirmed} onChange={setConfirmed} />}
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
@@ -1245,14 +1357,14 @@ export default function DesignArtsDashboard({ fixedRole }) {
 
         {activeTab === "approvals" && !reviewing && role !== "faculty" && (
           <div style={{ display: "grid", gap: 14 }}>
-            {loadingQueue && <div style={{ color: "#64748b" }}>Loading Design & Applied Arts queue...</div>}
-            {!loadingQueue && queue.length === 0 && <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 30, color: "#64748b" }}>No Design & Applied Arts submissions are assigned to you.</div>}
+            {loadingQueue && <div style={{ color: "#64748b" }}>Loading {schoolDisplayName} queue...</div>}
+            {!loadingQueue && queue.length === 0 && <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 30, color: "#64748b" }}>No {schoolDisplayName} submissions are assigned to you.</div>}
             {queue.map((item) => (
               <div key={item.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${ACCENT}`, borderRadius: 10, padding: 16, display: "grid", gap: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                   <div>
                     <div style={{ fontWeight: 900, color: "#0f172a" }}>{item.name}</div>
-                    <div style={{ color: "#64748b", fontSize: 12 }}>{titleCase(item.appraisalRole)} - {item.school}</div>
+                    <div style={{ color: "#64748b", fontSize: 12 }}>{titleCase(item.appraisalRole)} - {designArtsSchoolName(item)}</div>
                   </div>
                   <StatusBadge status={item.status} />
                 </div>
@@ -1261,8 +1373,32 @@ export default function DesignArtsDashboard({ fixedRole }) {
                   return <SummaryBox totals={itemTotals} maxScores={itemTotals.maxScores} roleScoreLabel={`Submitted on ${item.submittedOn || "record"}`} />;
                 })()}
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button onClick={() => setReviewing(item)} style={smallButton(item.status === "Reviewed" ? "#1e293b" : ACCENT2)}>
-                    {item.status === "Reviewed" ? "View Review" : "Review Form"}
+                  <button
+                    disabled={reviewLoading === item.id}
+                    onClick={async () => {
+                      setReviewLoading(item.id);
+                      try {
+                        const data = await fetchSavedAppraisal({
+                          facultyEmail: item.email,
+                          academicYear: item.academic_year || item.academicYear || item.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026",
+                        });
+                        const submittedForm = data?.payload?.form || data?.form || {};
+                        const submittedDocs = data?.payload?.docs || data?.docs || {};
+                        const mergedForm = preserveSavedReviewScores(submittedForm, item);
+                        setReviewing({ ...item, ...mergedForm, docs: submittedDocs });
+                      } catch (err) {
+                        alert(`Unable to open submitted form.\n\n${err.message}`);
+                      } finally {
+                        setReviewLoading(null);
+                      }
+                    }}
+                    style={{
+                      ...smallButton(item.status === "Reviewed" ? "#1e293b" : ACCENT2),
+                      cursor: reviewLoading === item.id ? "wait" : "pointer",
+                      opacity: reviewLoading === item.id ? 0.7 : 1,
+                    }}
+                  >
+                    {reviewLoading === item.id ? "Loading..." : item.status === "Reviewed" ? "View Review" : "Review Form"}
                   </button>
                 </div>
               </div>
@@ -1276,7 +1412,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
             reviewerRole={role}
             onBack={() => setReviewing(null)}
             onSubmit={handleSubmitReview}
-            readOnly={/Reviewed/.test(reviewing.status || "")}
+            readOnly={isReviewerReviewComplete(reviewing, role)}
           />
         )}
 
@@ -1326,7 +1462,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
                           Score will be 50 if teacher has taken 100% assigned classes to particular subject as specified by University.<br/>
                           If a teacher has taken classes less than the allotted hours but above 80% limit of total, then 2 points will be deducted from 50 for each less hour of classes.<br/>
                           <em>Maximum score of 50 if there is 100% performance | 91–99: 95% of 50 | 81–89: 85% | 70–79: 75%</em><br/>
-                          <em>Note: For School of Applied Arts and Crafts, School of Design — 40 Marks can be claimed.</em>
+                          <em>Note: For {schoolDisplayName} — 40 Marks can be claimed.</em>
                         </td>
                         <td style={tdCenter}>50</td>
                       </tr>
@@ -1368,7 +1504,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
                         <td style={tdStyle}>
                           <strong>Guided Students Project</strong> (New schools or if there is no project batch allotted can mention as NA)<br/>
                           Project guided: 3/group | Industrial collaboration/Sponsorship (Max 5 marks) | Project outcome: events/competitions (Max 5 marks)<br/>
-                          <em>Note: For School of Applied Arts and Crafts, School of Design — 20 Marks can be claimed.</em><br/>
+                          <em>Note: For {schoolDisplayName} — 20 Marks can be claimed.</em><br/>
                           Guided students project other than curriculum: Project apart from curriculum: 5 | Industrial collaboration/Sponsorship: 5 | Any Award for project (Max 5 marks): 5
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1461,7 +1597,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
                           Books by international publishers: 15/publication | National publishers: 10/publication | Local publisher with ISBN/ISSN: 5/publication<br/>
                           Chapter in Edited Book: 5/publication | Editor of Book (International): 10 | (National): 8 | (Local with ISBN/ISSN): 3<br/>
                           Translation works: Chapter/Research paper: 3 | Book: 8<br/>
-                          <strong>Instructions:</strong> Multiple DYPIU authors: 70% first author, 30% each co-author. SoMCS/SoD/SAA: Max 60 marks; Other schools: Max 50.
+                          <strong>Instructions:</strong> Multiple DYPIU authors: 70% first author, 30% each co-author. School of Media &amp; Communication Studies / {schoolDisplayName}: Max 60 marks; Other schools: Max 50.
                         </td>
                         <td style={tdCenter}>50 / 60</td>
                       </tr>
@@ -1472,7 +1608,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
                           (a) Development of Innovative pedagogy which does not exist globally: 5<br/>
                           (b) MOOCs / Course Builder / Coursera Course: 5/course<br/>
                           (c) E-Content (available online publicly) — video lecture, blog, website etc.: 5<br/>
-                          <em>Note: SoMCS max 30; SoD &amp; SAA max 50; Other schools max 20.</em>
+                          <em>Note: School of Media &amp; Communication Studies max 30; {schoolDisplayName} max 50; Other schools max 20.</em>
                         </td>
                         <td style={tdCenter}>20 / 30 / 50</td>
                       </tr>
@@ -1519,7 +1655,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
                         <td style={tdStyle}>
                           (i) Research proposal submitted: &gt;20 Lacs → 10 marks; &lt;20 Lacs → 5 marks<br/>
                           (ii) Product development in Lab/commercialized (Maximum 10)<br/>
-                          <em>Note: SAA &amp; SoD max 10; SoMCS max 30; Other schools max 20.</em>
+                          <em>Note: {schoolDisplayName} max 10; School of Media &amp; Communication Studies max 30; Other schools max 20.</em>
                         </td>
                         <td style={tdCenter}>10 / 20 / 30</td>
                       </tr>
@@ -1642,20 +1778,30 @@ export default function DesignArtsDashboard({ fixedRole }) {
         )}
       </main>
       {showLogoutModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowLogoutModal(false)}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: "32px 36px", maxWidth: 380, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, fontFamily: "Georgia, serif" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>!</div>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 800, fontSize: 17, color: "#0f172a", marginBottom: 6 }}>Confirm Logout</div>
-              <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>You are about to log out of <strong>{APP_INFO.PORTAL_NAME}</strong>.<br />Any unsaved changes will be lost.</div>
-            </div>
-            <div style={{ display: "flex", gap: 12, width: "100%" }}>
-              <button onClick={() => setShowLogoutModal(false)} style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>Cancel</button>
-              <button onClick={() => { setShowLogoutModal(false); sessionStorage.clear(); navigate("/login", { replace: true }); }} style={{ flex: 1, padding: "10px 0", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>Yes, Logout</button>
-            </div>
-          </div>
-        </div>
+        <LogoutConfirmModal
+          onCancel={() => setShowLogoutModal(false)}
+          onConfirm={() => {
+            setShowLogoutModal(false);
+            sessionStorage.clear();
+            navigate("/login", { replace: true });
+          }}
+        />
       )}
+    </div>
+  );
+}
+
+function LogoutConfirmModal({ onCancel, onConfirm }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "grid", placeItems: "center" }} onClick={onCancel}>
+      <div style={{ width: "min(380px, 92vw)", background: "#fff", borderRadius: 12, padding: "26px 28px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", fontFamily: "Georgia, serif" }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 17, marginBottom: 8 }}>Confirm Logout</div>
+        <div style={{ color: "#64748b", fontSize: 12, lineHeight: 1.6, marginBottom: 18 }}>You are about to leave {APP_INFO.PORTAL_NAME}. Any unsaved edits will be lost.</div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" onClick={onCancel} style={{ flex: 1, border: "none", borderRadius: 8, background: "#f1f5f9", color: "#475569", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Cancel</button>
+          <button type="button" onClick={onConfirm} style={{ flex: 1, border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Yes, Logout</button>
+        </div>
+      </div>
     </div>
   );
 }

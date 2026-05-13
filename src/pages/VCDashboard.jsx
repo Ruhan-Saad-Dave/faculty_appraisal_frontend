@@ -12,7 +12,7 @@ import { openFullFormReport } from "../utils/fullFormReport";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
 import { NonTeachingAuthorityReviewPanel } from "./NonTeachingStaffDashboard";
-import { SCORE_LIMITS, clampScore, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, societySelectionForRow } from "../utils/appraisalFormUtils";
+import { SCORE_LIMITS, clampScore, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, societyRowLocked, societyRowScore, societySelectionForRow } from "../utils/appraisalFormUtils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -86,12 +86,13 @@ function ScoreValue({ val, center }) {
   const empty = val === undefined || val === null || val === "";
   return <span style={{ fontSize: 11, fontFamily: "Georgia, serif", color: "#1e293b", display: "block", textAlign: center ? "center" : "left" }}>{empty ? <span style={{ color: "#cbd5e1" }}>-</span> : val}</span>;
 }
-function VCInput({ val, onChange, max }) {
+function VCInput({ val, onChange, max, disabled = false }) {
   return (
     <input type="number" min="0" step="0.5" value={val ?? ""}
       max={max}
+      disabled={disabled}
       onChange={e => onChange(e.target.value === "" || max === undefined ? e.target.value : String(clampScore(e.target.value, max)))}
-      style={{ width: 58, textAlign: "center", border: "1.5px solid #7c3aed", borderRadius: 5, padding: "3px 5px", fontSize: 11, fontFamily: "Georgia, serif", outline: "none", background: "#fdf4ff" }}
+      style={{ width: 58, textAlign: "center", border: "1.5px solid #7c3aed", borderRadius: 5, padding: "3px 5px", fontSize: 11, fontFamily: "Georgia, serif", outline: "none", background: disabled ? "#f1f5f9" : "#fdf4ff", cursor: disabled ? "not-allowed" : "text" }}
     />
   );
 }
@@ -287,9 +288,29 @@ const vcReviewSummaryFrom = (...sources) => {
 };
 
 const VC_REVIEW_ARRAY_KEYS = ["lectures", "courseFile", "projects", "quals", "feedback", "deptActs", "uniActs", "society", "industry", "acr", "journals", "books", "ict", "research", "projects2", "externalProjects", "patents", "awards", "confs", "proposals", "products", "fdps", "training"];
+const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
+const preserveSavedReviewScores = (form = {}, source = {}) => {
+  const merged = { ...form };
+  VC_REVIEW_ARRAY_KEYS.forEach((key) => {
+    if (!Array.isArray(form[key])) return;
+    const sourceRows = Array.isArray(source[key]) ? source[key] : [];
+    merged[key] = form[key].map((row, index) => {
+      const sourceRow = sourceRows[index] || {};
+      const next = { ...row };
+      REVIEW_SCORE_FIELDS.forEach((field) => {
+        if (String(next[field] ?? "").trim() === "" && String(sourceRow[field] ?? "").trim() !== "") next[field] = sourceRow[field];
+      });
+      return next;
+    });
+  });
+  ["innovHod", "innovDirector", "innovDean", "innovVc"].forEach((field) => {
+    if (String(merged[field] ?? "").trim() === "" && String(source[field] ?? "").trim() !== "") merged[field] = source[field];
+  });
+  return merged;
+};
 const VC_REPORT_PART_A_SECTIONS = [
   { key: "lectures", title: "A(i). Lectures / Tutorials / Practicals", max: 50, doc: "lec", fields: [["sem", "Semester"], ["code", "Course Code / Name"], ["planned", "Classes (as per course structure)"], ["conducted", "Classes Actually Conducted"]] },
-  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", fields: [["course", "Course / Paper"], ["title", "Year"], ["details", "Availability as per IQAC format"]] },
+  { key: "courseFile", title: "A(ii). Course File", max: 20, doc: "cf", fields: [["course", "Course / Paper"], ["title", "Program & Semester"], ["details", "Availability as per IQAC format"]] },
   { key: "projects", title: "A(iv). Project Guidance", max: 10, doc: "proj", fields: [["label", "Project Category"]] },
   { key: "quals", title: "A(v). Qualification Enhancement", max: 10, doc: "qual", fields: [["label", "Category"]] },
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback"], ["fb2", "Second Feedback"]] },
@@ -321,7 +342,11 @@ const buildVcSectionScores = (person, vcData) => {
     const rows = Array.isArray(person[key]) ? person[key] : [];
     payload[key] = rows.map((row, index) => ({
       ...row,
-      vc: vcData[key]?.[index]?.vc ?? row.vc ?? "",
+      vc: key === "society" && societyRowLocked(row)
+        ? "0"
+        : key === "acr"
+        ? (String(vcData[key]?.[index]?.vc ?? row.vc ?? "").trim() ? String(clampScore(vcData[key]?.[index]?.vc ?? row.vc, SCORE_LIMITS.acrRow)) : "")
+        : vcData[key]?.[index]?.vc ?? row.vc ?? "",
     }));
   });
   payload.innovativeTeaching = {
@@ -333,7 +358,7 @@ const buildVcSectionScores = (person, vcData) => {
 
 // ─── VC Review Form ───────────────────────────────────────────────────────────
 // personMode: "dean" | "director" | "hod" | "faculty"
-function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
+function VCReviewForm({ person, vcData, setVcData, personMode = "director", sectionView = "partA" }) {
   const reviewRoles = vcPreviousRolesFor(person, personMode);
   const selfScoreLabel = personMode === "faculty" ? "Faculty Score" : "Self Score";
 
@@ -388,6 +413,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
 
   const renderScoreCells = (r, section, i) => {
     const maxForRow = vcRowMax(section, r);
+    const locked = section === "society" && societyRowLocked(r);
     const displayScore = (value) => maxForRow ? clampScore(value, maxForRow) : value;
     const displayReviewScore = (value) =>
       value === undefined || value === null || String(value).trim() === ""
@@ -395,12 +421,12 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
         : displayScore(value);
     return (
       <>
-        <td style={TDS}><ScoreValue val={section === "research" ? researchGuidanceScore(r).toFixed(1) : displayScore(r?.score)} center /></td>
+        <td style={TDS}><ScoreValue val={section === "research" ? researchGuidanceScore(r).toFixed(1) : section === "society" ? societyRowScore(r) : displayScore(r?.score)} center /></td>
         {reviewRoles.map((role) => {
           const meta = vcRoleMeta(role);
-          return <td key={role} style={meta.cellStyle}><ScoreValue val={displayReviewScore(vcScoreForRole(r, role))} center /></td>;
+          return <td key={role} style={meta.cellStyle}><ScoreValue val={locked ? "0" : displayReviewScore(vcScoreForRole(r, role))} center /></td>;
         })}
-        <td style={TDS_VC}><VCInput val={get(section, i, "vc")} max={maxForRow} onChange={v => set(section, i, "vc", v)} /></td>
+        <td style={TDS_VC}><VCInput val={locked ? "0" : displayReviewScore(get(section, i, "vc")) ?? ""} max={maxForRow} disabled={locked} onChange={v => set(section, i, "vc", v)} /></td>
       </>
     );
   };
@@ -430,6 +456,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
         </table>
       </SC>
 
+      {sectionView === "partA" && (<>
       <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#dbeafe", padding: "8px 14px", borderRadius: 6, marginBottom: 10 }}>PART A — Teaching &amp; Academic Activities</div>
 
       {/* A1 Lectures */}
@@ -454,7 +481,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
       {/* A2 Course File */}
       <SC title="A2. Course File (Max 20)" accent="#7c3aed">
         <table style={T}><thead><tr>
-          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Year</th><th style={TH}>Availability as per IQAC format</th>
+          <th style={TH}>SN</th><th style={TH}>Course</th><th style={TH}>Program & Semester</th><th style={TH}>Availability as per IQAC format</th>
           {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.courseFile).map((r, i) => (
@@ -553,7 +580,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
           {renderScoreHeaders()}
         </tr></thead>
         <tbody>{rows(person.society).map((r, i) => (
-          <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+          <tr key={i} style={societyRowLocked(r) ? { background: "#f1f5f9", opacity: 0.65 } : i % 2 ? { background: "#f8fafc" } : {}}>
             <td style={TDC}>{i + 1}</td>
             <td style={TD}><RO val={r.label} /></td>
             <td style={TDC}><RO val={societySelectionForRow(r) || "No"} center /></td>
@@ -586,6 +613,8 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
         ))}</tbody></table>
       </SC>
 
+      </>)}
+      {sectionView === "partB" && (<>
       <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b", background: "#ede9fe", padding: "8px 14px", borderRadius: 6, marginBottom: 10 }}>PART B — Research &amp; Academic Contributions</div>
 
       {/* B1 Journals */}
@@ -656,6 +685,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director" }) {
           })}</tbody></table></div>
         </SC>
       ))}
+      </>)}
     </div>
   );
 }
@@ -672,8 +702,9 @@ function calcVCScore(person, vcData) {
     return idx === null ? n(Array.isArray(source) ? source[0]?.[field] : source?.[field]) : n(source?.[idx]?.[field]);
   };
   const sectionMax = { lectures: 50, courseFile: 20, projects: 10, quals: 10, feedback: 10, deptActs: 20, uniActs: 30, society: 10, industry: 5, acr: 25, journals: 120, books: 50, ict: 20, research: 30, projects2: SCORE_LIMITS.researchInternalProjects, externalProjects: SCORE_LIMITS.researchExternalProjects, patents: 40, awards: 10, confs: 30, proposals: 10, products: 10, fdps: 5, training: 5 };
-  const rowMax = { courseFile: () => SCORE_LIMITS.courseFileRow, projects: projectGuidanceRowMax, quals: () => SCORE_LIMITS.qualificationRow, feedback: () => 10, society: () => SCORE_LIMITS.societyRow, research: researchGuidanceRowMax, fdps: () => SCORE_LIMITS.fdpRow, training: () => SCORE_LIMITS.fdpRow };
+  const rowMax = { courseFile: () => SCORE_LIMITS.courseFileRow, projects: projectGuidanceRowMax, quals: () => SCORE_LIMITS.qualificationRow, feedback: () => 10, society: () => SCORE_LIMITS.societyRow, acr: () => SCORE_LIMITS.acrRow, research: researchGuidanceRowMax, fdps: () => SCORE_LIMITS.fdpRow, training: () => SCORE_LIMITS.fdpRow };
   const sum = (arr, s, f) => clampScore((arr || []).reduce((a, row, i) => {
+    if (s === "society" && societyRowLocked(row)) return a;
     const limit = rowMax[s]?.(row);
     return a + (limit ? clampScore(get(s, i, f), limit) : get(s, i, f));
   }, 0), sectionMax[s] || 0);
@@ -700,7 +731,7 @@ function calcVCScore(person, vcData) {
 function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false }) {
   const [vcData, setVcData] = useState({});
   const [remarks, setRemarks] = useState(person.vcRemarks || "");
-  const [tab, setTab] = useState("form");
+  const [sectionView, setSectionView] = useState("partA");
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const reviewLocked = readOnly || isVcReviewed(person);
 
@@ -732,7 +763,11 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
       const rows = Array.isArray(person[key]) ? person[key] : (person[key] ? [person[key]] : []);
       reportForm[key] = rows.map((row, index) => ({
         ...row,
-        vc: vcData[key]?.[index]?.vc ?? row.vc ?? "",
+        vc: key === "society" && societyRowLocked(row)
+          ? "0"
+          : key === "acr"
+          ? (String(vcData[key]?.[index]?.vc ?? row.vc ?? "").trim() ? String(clampScore(vcData[key]?.[index]?.vc ?? row.vc, SCORE_LIMITS.acrRow)) : "")
+          : vcData[key]?.[index]?.vc ?? row.vc ?? "",
       }));
     });
     reportForm.innovVc = vcData.innovVc ?? vcData.innovVC ?? person.innovVc ?? "";
@@ -798,23 +833,28 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Section switcher */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-        {[["form", "📋 Review Form"], ["remarks", "✏️ Remarks & Submit"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: tab === id ? "#4c1d95" : "#e2e8f0", color: tab === id ? "#ddd6fe" : "#475569" }}>
+        {[["partA", "Part A"], ["partB", "Part B"], ["summary", "Summary"]].map(([id, label]) => (
+          <button key={id} onClick={() => {
+            setSectionView(id);
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            });
+          }}
+            style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "Georgia, serif", fontSize: 12, fontWeight: 700, background: sectionView === id ? "#4c1d95" : "#e2e8f0", color: sectionView === id ? "#ddd6fe" : "#475569" }}>
             {label}
           </button>
         ))}
       </div>
 
-      {tab === "form" && (
+      {(sectionView === "partA" || sectionView === "partB") && (
         <fieldset disabled={reviewLocked} style={{ border: "none", padding: 0, margin: 0 }}>
-          <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} />
+          <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} sectionView={sectionView} />
         </fieldset>
       )}
 
-      {tab === "remarks" && (
+      {sectionView === "summary" && (
         <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
           <h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>{reviewLocked ? "VC Submitted Review" : "VC Remarks &amp; Final Submission"}</h3>
 
@@ -1328,8 +1368,9 @@ export default function VCDashboard() {
       const form = data?.payload?.form || data?.form || {};
       const docs = data?.payload?.docs || data?.docs || {};
       const reviewSummary = vcReviewSummaryFrom(person, data, data?.payload);
+      const mergedForm = preserveSavedReviewScores(form, person);
       setReviewing({
-        person: { ...person, ...form, ...reviewSummary, docs, academicYear, academic_year: academicYear },
+        person: { ...person, ...mergedForm, ...reviewSummary, docs, academicYear, academic_year: academicYear },
         personMode,
       });
     } catch (err) {
