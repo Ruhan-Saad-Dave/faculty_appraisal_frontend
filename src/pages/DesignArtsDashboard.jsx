@@ -866,12 +866,13 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
         total: n(person?.[`${reviewerRole}Total`] ?? totals.total),
       },
       maxScores: getDesignArtsEffectiveMaxScores(reviewerForm),
-      scoreRoles: ["score", ...visiblePreviousRoles, reviewerRole],
+      scoreRoles: ["score"],
       roleLabel,
       status: person?.status,
       remarksLabel: `${roleLabel(reviewerRole)} Remarks`,
       remarks: person?.[`${reviewerRole}Remarks`] || remarks,
       generatedBy: sessionStorage.getItem("name") || roleLabel(reviewerRole),
+      showTotal: true,
     });
   };
 
@@ -948,6 +949,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
   const [loadingQueue, setLoadingQueue] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [sectionSaveStatus, setSectionSaveStatus] = useState({ partA: true, partB: true });
   const [declaration, setDeclaration] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -1131,6 +1133,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
       roleLabel,
       status: declaration?.status || "Draft / Pre-submit Review",
       generatedBy: sessionStorage.getItem("name") || roleLabel(role),
+      showTotal: true,
     });
   };
 
@@ -1190,7 +1193,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
             </div>
           </button>
           <button
-            onClick={() => navigate("/login", { replace: true })}
+            onClick={() => setShowLogoutModal(true)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, background: "none", border: "1px solid #374151", borderRadius: 8, padding: "9px 11px", cursor: "pointer", fontFamily: "Georgia, serif" }}
             onMouseEnter={(event) => { event.currentTarget.style.background = "#1e293b"; }}
             onMouseLeave={(event) => { event.currentTarget.style.background = "none"; }}
@@ -1638,6 +1641,21 @@ export default function DesignArtsDashboard({ fixedRole }) {
           </div>
         )}
       </main>
+      {showLogoutModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setShowLogoutModal(false)}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: "32px 36px", maxWidth: 380, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", alignItems: "center", gap: 18, fontFamily: "Georgia, serif" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#fee2e2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26 }}>!</div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 800, fontSize: 17, color: "#0f172a", marginBottom: 6 }}>Confirm Logout</div>
+              <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>You are about to log out of <strong>{APP_INFO.PORTAL_NAME}</strong>.<br />Any unsaved changes will be lost.</div>
+            </div>
+            <div style={{ display: "flex", gap: 12, width: "100%" }}>
+              <button onClick={() => setShowLogoutModal(false)} style={{ flex: 1, padding: "10px 0", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>Cancel</button>
+              <button onClick={() => { setShowLogoutModal(false); sessionStorage.clear(); navigate("/login", { replace: true }); }} style={{ flex: 1, padding: "10px 0", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "Georgia, serif" }}>Yes, Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
