@@ -177,7 +177,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
     if (!fileList.length) return;
     const unsupported = fileList.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
-      alert("Only image or PDF files are allowed.");
+      alert("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
@@ -470,7 +470,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
       const files = form.docs?.[item.key] || [];
       if (!rowHasData) return [];
       if (!files.length) return [`${item.label}: attach an image or PDF.`];
-      if (files.some((file) => !isAllowedAttachmentFile(file))) return [`${item.label}: attachment must be an image or PDF.`];
+      if (files.some((file) => !isAllowedAttachmentFile(file))) return [`${item.label}: attachment must be an image or PDF up to 10 MB.`];
       return [];
     });
     if (attachmentErrors.length) {
@@ -776,6 +776,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const pendingStatus = expectedPendingStatus(role);
   const locked = readOnly || item.status !== pendingStatus;
   const accent = roleAccent(role);
+  const selfTotals = calculateNonTeachingTotals(form, "self");
   const totals = calculateNonTeachingTotals(form, role === "vc" ? "vc" : role);
 
   const handleSubmit = async () => {
@@ -865,6 +866,21 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
           {role === "vc" && form.roRemarks && <PriorRemark label="Reporting Officer Remarks" value={form.roRemarks} color={ACCENT} />}
           {role === "vc" && form.registrarRemarks && <PriorRemark label="Registrar Remarks" value={form.registrarRemarks} color={REG_ACCENT} />}
 
+          <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Staff Submitted Score</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
+            {[
+              ["Part A", selfTotals.partA, NON_TEACHING_MAX.partA],
+              ["Part B", selfTotals.partB, NON_TEACHING_MAX.partB],
+              ["Grand Total", selfTotals.total, NON_TEACHING_MAX.grand],
+            ].map(([label, value, max]) => (
+              <div key={label} style={{ border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", padding: "10px 12px" }}>
+                <div style={{ color: "#64748b", fontSize: 10, fontWeight: 800 }}>{label}</div>
+                <div style={{ color: "#1d4ed8", fontSize: 18, fontWeight: 900 }}>{n(value).toFixed(1)} / {max}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>{nonTeachingRoleLabel(role)} Score</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
             {[
               ["Part A", totals.partA, NON_TEACHING_MAX.partA],

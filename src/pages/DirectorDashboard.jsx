@@ -6,9 +6,10 @@ import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows 
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowScore, societySelectionForRow, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
+import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowLocked, societyRowScore, societySelectionForRow, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
+import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const n = (v) => parseFloat(v) || 0;
@@ -122,13 +123,13 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
     const unsupported = selectedFiles.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
-      setUploadError("Only image or PDF files are allowed.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
     const oversized = selectedFiles.find((f) => f.size > 10 * 1024 * 1024);
     if (oversized) {
-      setUploadError("File exceeds 10 MB limit.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
@@ -202,12 +203,13 @@ function RO({ val, center }) {
   return <span style={{ fontSize: 11, fontFamily: "Georgia, serif", color: "#1e293b", display: "block", textAlign: center ? "center" : "left" }}>{val || <span style={{ color: "#cbd5e1" }}>—</span>}</span>;
 }
 
-function DirInput({ val, onChange, max }) {
+function DirInput({ val, onChange, max, disabled = false }) {
   return (
     <input type="number" min="0" step="0.5" value={val ?? ""}
       max={max}
+      disabled={disabled}
       onChange={e => onChange(e.target.value === "" || max === undefined ? e.target.value : String(clampScore(e.target.value, max)))}
-      style={{ width: 58, textAlign: "center", border: "1.5px solid #0ea5e9", borderRadius: 5, padding: "3px 5px", fontSize: 11, fontFamily: "Georgia, serif", outline: "none", background: "#f0fbff" }}
+      style={{ width: 58, textAlign: "center", border: "1.5px solid #0ea5e9", borderRadius: 5, padding: "3px 5px", fontSize: 11, fontFamily: "Georgia, serif", outline: "none", background: disabled ? "#f1f5f9" : "#f0fbff", cursor: disabled ? "not-allowed" : "text" }}
     />
   );
 }
@@ -259,13 +261,41 @@ const TDS_DIR = { ...TDS, background: "#f0fdf4", minWidth: 62 };
 const TDV = { ...TD, background: "#fafbff", minWidth: 110 };
 
 const REVIEW_ARRAY_KEYS = ["lectures", "courseFile", "projects", "quals", "feedback", "deptActs", "uniActs", "society", "industry", "acr", "journals", "books", "ict", "research", "projects2", "externalProjects", "patents", "awards", "confs", "proposals", "products", "fdps", "training"];
+const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
+const preserveSavedReviewScores = (form = {}, source = {}) => {
+  const merged = { ...form };
+  REVIEW_ARRAY_KEYS.forEach((key) => {
+    if (!Array.isArray(form[key])) return;
+    const sourceRows = Array.isArray(source[key]) ? source[key] : [];
+    merged[key] = form[key].map((row, index) => {
+      const sourceRow = sourceRows[index] || {};
+      const next = { ...row };
+      REVIEW_SCORE_FIELDS.forEach((field) => {
+        if (String(next[field] ?? "").trim() === "" && String(sourceRow[field] ?? "").trim() !== "") {
+          next[field] = sourceRow[field];
+        }
+      });
+      return next;
+    });
+  });
+  ["innovHod", "innovDirector", "innovDean", "innovVc"].forEach((field) => {
+    if (String(merged[field] ?? "").trim() === "" && String(source[field] ?? "").trim() !== "") {
+      merged[field] = source[field];
+    }
+  });
+  return merged;
+};
 const buildDirectorSectionScores = (faculty, dirData) => {
   const payload = {};
   REVIEW_ARRAY_KEYS.forEach((key) => {
     const rows = Array.isArray(faculty[key]) ? faculty[key] : [];
     payload[key] = rows.map((row, index) => ({
       ...row,
-      director: dirData[key]?.[index]?.dir ?? row.director ?? "",
+      director: key === "society" && societyRowLocked(row)
+        ? "0"
+        : key === "acr"
+        ? (String(dirData[key]?.[index]?.dir ?? row.director ?? "").trim() ? String(clampScore(dirData[key]?.[index]?.dir ?? row.director, SCORE_LIMITS.acrRow)) : "")
+        : dirData[key]?.[index]?.dir ?? row.director ?? "",
     }));
   });
   payload.innovativeTeaching = {
@@ -553,14 +583,14 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData, 
           </tr></thead>
           <tbody>
             {rows(society).map((r, i) => (
-              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+              <tr key={i} style={societyRowLocked(r) ? { background: "#f1f5f9", opacity: 0.65 } : i % 2 ? { background: "#f8fafc" } : {}}>
                 <td style={TDC}>{i + 1}</td>
                 <td style={TD}><RO val={r.label} /></td>
                 <td style={TDC}><RO val={societySelectionForRow(r) || "No"} center /></td>
                 <td style={TD}><RO val={r.details} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`soc-${i}`} docs={docs} /></td>
                 <td style={TDS}><RO val={societyRowScore(r)} center /></td>
-                <td style={TDS_DIR}><DirInput val={getDir("society", i, "dir")} max={SCORE_LIMITS.societyRow} onChange={v => setDir("society", i, "dir", v)} /></td>
+                <td style={TDS_DIR}><DirInput val={societyRowLocked(r) ? "0" : getDir("society", i, "dir")} max={SCORE_LIMITS.societyRow} disabled={societyRowLocked(r)} onChange={v => setDir("society", i, "dir", v)} /></td>
               </tr>
             ))}
           </tbody>
@@ -601,7 +631,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData, 
               <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
                 <td style={TDC}>{i + 1}</td>
                 <td style={TD}><RO val={r.label} /></td>
-                <td style={TDS_DIR}><DirInput val={getDir("acr", i, "dir")} onChange={v => setDir("acr", i, "dir", v)} /></td>
+                <td style={TDS_DIR}><DirInput val={String(getDir("acr", i, "dir") ?? "").trim() ? clampScore(getDir("acr", i, "dir"), SCORE_LIMITS.acrRow) : ""} max={SCORE_LIMITS.acrRow} onChange={v => setDir("acr", i, "dir", v)} /></td>
               </tr>
             ))}
           </tbody>
@@ -950,7 +980,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
   const [dirRemarks, setDirRemarks] = useState(faculty.directorRemarks || "");
   const [sectionView, setSectionView] = useState("partA");
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
-  const reviewLocked = readOnly || faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "");
+  const reviewLocked = readOnly || faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.directorTotal) > 0 || String(faculty.directorRemarks || "").trim() !== "";
 
   // Compute HOD total from hodData
   const calcHodScore = () => {
@@ -965,6 +995,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
     const getS = (key) => n(hodData[key] ?? faculty[key]);
     const sumReviewRows = (section, field, max, rowMax) => clampScore(
       (faculty[section] || []).reduce((total, row, index) => {
+        if (section === "society" && societyRowLocked(row)) return total;
         const limit = typeof rowMax === "function" ? rowMax(row) : rowMax;
         return total + (limit ? clampScore(get(section, index, field), limit) : get(section, index, field));
       }, 0),
@@ -991,7 +1022,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
     const uni = sumReviewRows("uniActs", "hod", 30);
     const soc = sumReviewRows("society", "hod", 10, SCORE_LIMITS.societyRow);
     const ind = sumReviewRows("industry", "hod", 5);
-    const acrT = sumReviewRows("acr", "hod", 25);
+    const acrT = sumReviewRows("acr", "hod", 25, SCORE_LIMITS.acrRow);
     const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, 200);
 
     const jour = sumReviewRows("journals", "hod", 120);
@@ -1025,6 +1056,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
     const getDirS = (key) => n(dirData[key] ?? faculty.innovDirector ?? faculty.innovDir);
     const sumReviewRows = (section, field, max, rowMax) => clampScore(
       (faculty[section] || []).reduce((total, row, index) => {
+        if (section === "society" && societyRowLocked(row)) return total;
         const limit = typeof rowMax === "function" ? rowMax(row) : rowMax;
         return total + (limit ? clampScore(getD(section, index, field), limit) : getD(section, index, field));
       }, 0),
@@ -1051,7 +1083,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
     const uni = sumReviewRows("uniActs", "dir", 30);
     const soc = sumReviewRows("society", "dir", 10, SCORE_LIMITS.societyRow);
     const ind = sumReviewRows("industry", "dir", 5);
-    const acrT = sumReviewRows("acr", "dir", 25);
+    const acrT = sumReviewRows("acr", "dir", 25, SCORE_LIMITS.acrRow);
     const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, 200);
 
     const jour = sumReviewRows("journals", "dir", 120);
@@ -1073,8 +1105,19 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
   };
 
   const { partA, partB, total } = calcHodScore();
-  const { partA: dirPartA, partB: dirPartB, total: dirTotal } = calcDirScore();
+  const calculatedDirScores = calcDirScore();
+  const hasSavedDirectorScores = ["directorPartA", "directorPartB", "directorTotal"].some((key) => String(faculty?.[key] ?? "").trim() !== "");
+  const displayedDirScores = reviewLocked && hasSavedDirectorScores ? {
+    partA: String(faculty?.directorPartA ?? "").trim() !== "" ? n(faculty.directorPartA) : calculatedDirScores.partA,
+    partB: String(faculty?.directorPartB ?? "").trim() !== "" ? n(faculty.directorPartB) : calculatedDirScores.partB,
+    total: String(faculty?.directorTotal ?? "").trim() !== "" ? n(faculty.directorTotal) : calculatedDirScores.total,
+  } : calculatedDirScores;
+  const { partA: dirPartA, partB: dirPartB, total: dirTotal } = displayedDirScores;
   const g = grade(dirTotal, 575);
+  const facultySummary = standardSubmittedScoreSummary(faculty, {
+    partA: faculty.lectures?.reduce((a, r) => a + n(r.score), 0) || 0,
+    partB: faculty.journals?.reduce((a, r) => a + n(r.score), 0) || 0,
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, minHeight: "100%" }}>
@@ -1135,8 +1178,8 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
             </tr></thead>
             <tbody>
               {[
-                ["Part A — Teaching & Activities", 200, faculty.lectures?.reduce((a, r) => a + n(r.score), 0) || 0, partA, dirPartA],
-                ["Part B — Research & Contributions", 375, faculty.journals?.reduce((a, r) => a + n(r.score), 0) || 0, partB, dirPartB],
+                ["Part A — Teaching & Activities", facultySummary.partAMax, facultySummary.partA, partA, dirPartA],
+                ["Part B — Research & Contributions", facultySummary.partBMax, facultySummary.partB, partB, dirPartB],
               ].map(([label, max, fac, _hod, dir]) => (
                 <tr key={label}>
                   <td style={TD}>{label}</td>
@@ -1147,13 +1190,9 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
               ))}
               <tr style={{ background: "#d1fae5", fontWeight: 700 }}>
                 <td style={TD}>Grand Total</td>
-                <td style={TDC}>575</td>
-                <td style={TDS}>—</td>
+                <td style={TDC}>{facultySummary.grandMax}</td>
+                <td style={TDS}>{facultySummary.total.toFixed(1)}</td>
                 <td style={{ ...TDS_DIR, color: "#065f46", fontSize: 14 }}>{dirTotal.toFixed(1)}</td>
-              </tr>
-              <tr style={{ background: g.bg }}>
-                <td style={TD} colSpan={3}><strong>Grade (based on Director Score)</strong></td>
-                <td style={{ ...TDC, color: g.color, fontWeight: 800 }}>{g.label}</td>
               </tr>
             </tbody>
           </table>
@@ -1452,7 +1491,7 @@ export default function DirectorDashboard() {
   const uniScore = sumSectionScore(uniActs, 30);
   const societyScore = clampScore(society.reduce((total, row) => total + societyRowScore(row), 0), 10);
   const industryScore = sumSectionScore(industry, 5);
-  const acrScore = sumSectionScore(acr, 25);
+  const acrScore = sumSectionScore(acr, 25, "score", SCORE_LIMITS.acrRow);
   const effectivePartAMax = effectiveMaxScore(200, sectionApplicability, [{ key: "projects", max: 10 }]);
   const partATotal = clampScore(teachingRaw + stuFeedbackScore + deptScore + uniScore + societyScore + industryScore + acrScore, effectivePartAMax);
 
@@ -1486,11 +1525,11 @@ export default function DirectorDashboard() {
   const isDirectorPending = (item) => {
     const s = item.status || "";
     return s === "pending_director" || s === "Pending Review" || s === "pending_hod" ||
-      (s !== "Reviewed" && s !== "pending_dean" && s !== "director_reviewed" && !/Director\s*(Reviewed|Rejected)/i.test(s) && s !== "completed");
+      (n(item.directorTotal) <= 0 && !String(item.directorRemarks || "").trim() && s !== "Reviewed" && s !== "pending_dean" && s !== "director_reviewed" && !/Director\s*(Reviewed|Rejected)/i.test(s) && s !== "completed");
   };
   const isDirectorReviewed = (item) => {
     const s = item.status || "";
-    return s === "Reviewed" || s === "pending_dean" || s === "director_reviewed" || /Director\s*Reviewed/i.test(s);
+    return n(item.directorTotal) > 0 || String(item.directorRemarks || "").trim() !== "" || s === "Reviewed" || s === "pending_dean" || s === "director_reviewed" || /Director\s*Reviewed/i.test(s);
   };
 
   const facultyPendingCount = facultyList.filter(isDirectorPending).length;
@@ -2149,7 +2188,7 @@ export default function DirectorDashboard() {
                     </thead>
                     <tbody>
                       {society.map((r, i) => {
-                        const socLocked = societySelectionForRow(r) !== "Yes";
+                        const socLocked = societyRowLocked(r);
                         return (
                         <tr key={i} style={socLocked ? { background: "#f1f5f9", opacity: 0.65 } : i % 2 === 1 ? { background: "#f8fafc" } : {}}>
                           <td style={TDC}>{i + 1}</td>
@@ -2227,7 +2266,7 @@ export default function DirectorDashboard() {
                         <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
                           <td style={TDC}>{i + 1}</td>
                           <td style={TD}><div style={{ fontWeight: 700 }}>{r.label}</div>{ACR_DETAIL_POINTS[r.label] && <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>{ACR_DETAIL_POINTS[r.label].map((point) => <li key={point}>{point}</li>)}</ul>}</td>
-                          <td style={TDS}><RO val={r.score || "-"} center /></td>
+                          <td style={TDS}><RO val={String(r.score ?? "").trim() ? clampScore(r.score, SCORE_LIMITS.acrRow) : "-"} center /></td>
 
                         </tr>
                       ))}
@@ -2865,7 +2904,7 @@ export default function DirectorDashboard() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14 }}>
               {filtered.map(item => {
-                const g = grade(item.grandTotal || 350, 575);
+                const itemSummary = standardSubmittedScoreSummary(item);
                 const courseFilePartA = Array.isArray(item.courseFile)
                   ? (() => {
                       const filled = item.courseFile.filter(row => String(row?.score ?? "").trim() !== "");
@@ -2880,7 +2919,7 @@ export default function DirectorDashboard() {
                   ...(item.feedback || []).map(r => n(r.score)),
                   ...(item.deptActs || []).map(r => n(r.score)),
                   ...(item.uniActs || []).map(r => n(r.score)),
-                  ...(item.society || []).map(r => n(r.score)),
+                  ...(item.society || []).map(r => societyRowScore(r)),
                   ...(item.industry || []).map(r => n(r.score)),
                 ].reduce((a, b) => a + b, 0);
 
@@ -2907,8 +2946,8 @@ export default function DirectorDashboard() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, background: "#f8fafc", borderRadius: 8, padding: "12px 14px" }}>
                       {[
-                        { label: "Part A", val: partA, max: 200, color: "#6366f1" },
-                        { label: "Part B", val: partB, max: 375, color: "#0ea5e9" },
+                        { label: "Part A", val: itemSummary.partA, max: itemSummary.partAMax, color: "#6366f1" },
+                        { label: "Part B", val: itemSummary.partB, max: itemSummary.partBMax, color: "#0ea5e9" },
                         { label: "Docs", val: docCount, max: null, color: "#10b981" },
                       ].map(({ label, val, max, color }) => (
                         <div key={label} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2935,7 +2974,8 @@ export default function DirectorDashboard() {
                             });
                             const form = data?.payload?.form || data?.form || {};
                             const docs = data?.payload?.docs || data?.docs || {};
-                            const merged = { ...item, ...form, docs };
+                            const mergedForm = preserveSavedReviewScores(form, item);
+                            const merged = { ...item, ...mergedForm, docs };
                             activeMainTab === "facultyApprovals" ? setReviewingFaculty(merged) : setReviewingHod(merged);
                           } catch (err) {
                             alert(`Unable to open submitted form.\n\n${err.message}`);

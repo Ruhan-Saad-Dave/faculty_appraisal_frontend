@@ -632,6 +632,18 @@ const nonTeachingReachedReviewer = (item = {}, reviewerRole) => {
   return expectedIndex >= 0 && currentIndex >= expectedIndex;
 };
 
+const isSubmittedNonTeachingQueueItem = (item = {}) => {
+  const currentIndex = nonTeachingStatusIndex(item.status);
+  const submittedIndex = nonTeachingStatusIndex(NON_TEACHING_STATUS.SUBMITTED);
+  return currentIndex >= submittedIndex ||
+    Boolean(clean(firstNonEmpty(
+      item.submittedOn,
+      item.submitted_at,
+      item.declaration?.submitted_at,
+      item.form?.submitted_at,
+    )));
+};
+
 export const fetchNonTeachingQueueForRole = async ({
   reviewerRole,
   academicYear: ay = APP_INFO.DEFAULT_AY,
@@ -646,6 +658,7 @@ export const fetchNonTeachingQueueForRole = async ({
     return (items || [])
       .map(normalizeNonTeachingQueueItem)
       .filter((item) =>
+        isSubmittedNonTeachingQueueItem(item) &&
         canReviewNonTeachingItem(item, role) &&
         nonTeachingReachedReviewer(item, role)
       );

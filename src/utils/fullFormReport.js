@@ -38,7 +38,9 @@ const roleColumnLabel = (role, roleLabel = (value) => value) =>
 const displaySectionScore = (section, row, role) => {
   if (section.key === "research" && role === "score") return researchGuidanceScore(row).toFixed(1);
   if (role === "score") return clampScore(row?.[role], rowMaxForSection(section.key, row, section.max));
-  return row?.[role];
+  const value = row?.[role];
+  if (value === undefined || value === null || String(value).trim() === "") return "";
+  return clampScore(value, rowMaxForSection(section.key, row, section.max));
 };
 
 const renderSection = ({ section, rows = [], docs = {}, scoreRoles = ["score"], roleLabel }) => `
@@ -387,7 +389,7 @@ export const generateStandardReport = async ({
   <tr class="tr"><td colspan="3" class="c b">Total (Max 5)</td><td class="c">${industryScore.toFixed(1)}</td></tr></table>
   <h3>G. Annual Confidential Report (Max 25)</h3>
   <table><tr><th>SN</th><th>Parameter</th><th>API Score</th></tr>
-  ${acr.map((a,i)=>`<tr><td class="c">${i+1}</td><td>${a.label||'&nbsp;'}</td><td class="c">${a.score||'&nbsp;'}</td></tr>`).join('')}
+  ${acr.map((a,i)=>`<tr><td class="c">${i+1}</td><td>${a.label||'&nbsp;'}</td><td class="c">${String(a.score ?? "").trim() ? clampScore(a.score, SCORE_LIMITS.acrRow) : '&nbsp;'}</td></tr>`).join('')}
   <tr class="tr"><td colspan="2" class="c b">Total (Max 25)</td><td class="c">${acrScore.toFixed(1)}</td></tr></table>
   <table class="st">
     <tr><th>Part A Summary</th><th>Max</th><th>Faculty Score</th></tr>

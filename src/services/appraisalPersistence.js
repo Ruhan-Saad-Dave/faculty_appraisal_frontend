@@ -2,6 +2,7 @@ import { api } from "./api";
 import { storeUserSession } from "../auth/session";
 import { getDeanTrack, getReviewChain, normalizeRoleForWorkflow, pendingStatusFor } from "../utils/hierarchy";
 import { DEAN_TRACKS } from "../constants/universityHierarchy";
+import { attachSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 
 const SNAPSHOT_SETTERS = {
   info: "setInfo",
@@ -1056,9 +1057,24 @@ const normalizeFetchedForm = (form = {}) => {
 const normalizeFetchedAppraisal = (data = {}) => {
   const reviews = reviewsFromAppraisalResponse(data);
   const payload = data.payload ? { ...data.payload } : null;
-  const payloadForm = payload?.form ? mergeReviewScoresIntoForm(normalizeFetchedForm(payload.form), reviews) : null;
-  const directForm = data.form ? mergeReviewScoresIntoForm(normalizeFetchedForm(data.form), reviews) : null;
-  const directData = mergeReviewScoresIntoForm(normalizeFetchedForm(data), reviews);
+  const payloadForm = payload?.form ? attachSubmittedScoreSummary(
+    mergeReviewScoresIntoForm(normalizeFetchedForm(payload.form), reviews),
+    data,
+    payload,
+    payload.totals,
+  ) : null;
+  const directForm = data.form ? attachSubmittedScoreSummary(
+    mergeReviewScoresIntoForm(normalizeFetchedForm(data.form), reviews),
+    data,
+    data.totals,
+  ) : null;
+  const directData = attachSubmittedScoreSummary(
+    mergeReviewScoresIntoForm(normalizeFetchedForm(data), reviews),
+    data,
+    data.totals,
+    payload,
+    payload?.totals,
+  );
 
   return {
     ...directData,

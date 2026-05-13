@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { saveAppraisalDraftSection, submitAppraisal, loadSavedAppraisal, loadAppraisalDocuments } from "../services/appraisalPersistence";
 import { api } from "../services/api";
-import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowScore, societySelectionForRow, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
+import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowLocked, societyRowScore, societySelectionForRow, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import {
   getReviewChain,
   isRejectedStatus,
@@ -12,6 +12,7 @@ import {
   roleLabel,
   workflowValidationError,
 } from "../utils/hierarchy";
+import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 
 // --- Helpers ------------------------------------------------------------------
 const n = (v) => parseFloat(v) || 0;
@@ -177,13 +178,14 @@ function RO({ val, center }) {
 }
 
 // --- HOD-editable score input -------------------------------------------------
-function HodInput({ val, onChange, max }) {
+function HodInput({ val, onChange, max, disabled = false }) {
   return (
     <input
       type="number" min="0" step="0.5" value={val ?? ""}
       max={max}
+      disabled={disabled}
       onChange={e => onChange(e.target.value === "" || max === undefined ? e.target.value : String(clampScore(e.target.value, max)))}
-      style={{ width: 58, height: 30, boxSizing: "border-box", textAlign: "center", border: "1.5px solid #6366f1", borderRadius: 5, padding: "5px 6px", fontSize: 11, fontFamily: "Georgia, serif", outline: "none", background: "#f0f4ff" }}
+      style={{ width: 58, height: 30, boxSizing: "border-box", textAlign: "center", border: "1.5px solid #6366f1", borderRadius: 5, padding: "5px 6px", fontSize: 11, fontFamily: "Georgia, serif", outline: "none", background: disabled ? "#f1f5f9" : "#f0f4ff", cursor: disabled ? "not-allowed" : "text" }}
     />
   );
 }
@@ -243,14 +245,14 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
     const unsupported = selectedFiles.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
-      setUploadError("Only image or PDF files are allowed.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
 
     const oversized = selectedFiles.find((f) => f.size > 10 * 1024 * 1024);
     if (oversized) {
-      setUploadError("File exceeds 10 MB limit.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
@@ -644,14 +646,14 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
           </tr></thead>
           <tbody>
             {rows(society).map((r, i) => (
-              <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
+              <tr key={i} style={societyRowLocked(r) ? { background: "#f1f5f9", opacity: 0.65 } : i % 2 ? { background: "#f8fafc" } : {}}>
                 <td style={TDC}>{i + 1}</td>
                 <td style={TD}><RO val={r.label} /></td>
                 <td style={TDC}><RO val={societySelectionForRow(r) || "No"} center /></td>
                 <td style={TD}><RO val={r.details} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`soc-${i}`} docs={docs} /></td>
                 <td style={TDS}><RO val={societyRowScore(r)} center /></td>
-                <td style={TDS_HOD}><HodInput val={get("society", i, "hod")} max={SCORE_LIMITS.societyRow} onChange={v => set("society", i, "hod", v)} /></td>
+                <td style={TDS_HOD}><HodInput val={societyRowLocked(r) ? "0" : get("society", i, "hod")} max={SCORE_LIMITS.societyRow} disabled={societyRowLocked(r)} onChange={v => set("society", i, "hod", v)} /></td>
               </tr>
             ))}
           </tbody>
@@ -692,7 +694,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
               <tr key={i} style={i % 2 ? { background: "#f8fafc" } : {}}>
                 <td style={TDC}>{i + 1}</td>
                 <td style={TD}><RO val={r.label} /></td>
-                <td style={TDS_HOD}><HodInput val={get("acr", i, "hod")} onChange={v => set("acr", i, "hod", v)} /></td>
+                <td style={TDS_HOD}><HodInput val={String(get("acr", i, "hod") ?? "").trim() ? clampScore(get("acr", i, "hod"), SCORE_LIMITS.acrRow) : ""} max={SCORE_LIMITS.acrRow} onChange={v => set("acr", i, "hod", v)} /></td>
               </tr>
             ))}
           </tbody>
@@ -1069,9 +1071,9 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const fb = (faculty.feedback || []).reduce((a, _, i) => a + get("feedback", i, "hod"), 0);
     const dept = (faculty.deptActs || []).reduce((a, _, i) => a + get("deptActs", i, "hod"), 0);
     const uni = (faculty.uniActs || []).reduce((a, _, i) => a + get("uniActs", i, "hod"), 0);
-    const soc = (faculty.society || []).reduce((a, _, i) => a + get("society", i, "hod"), 0);
+    const soc = (faculty.society || []).reduce((a, row, i) => a + (societyRowLocked(row) ? 0 : get("society", i, "hod")), 0);
     const ind = (faculty.industry || []).reduce((a, _, i) => a + get("industry", i, "hod"), 0);
-    const acrT = (faculty.acr || []).reduce((a, _, i) => a + get("acr", i, "hod"), 0);
+    const acrT = (faculty.acr || []).reduce((a, _, i) => a + clampScore(get("acr", i, "hod"), SCORE_LIMITS.acrRow), 0);
     const partA = lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT;
 
     const jour = (faculty.journals || []).reduce((a, _, i) => a + get("journals", i, "hod"), 0);
@@ -1094,6 +1096,10 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
 
   const { partA, partB, total } = calcHodScore();
   const g = grade(total, 575);
+  const facultySummary = standardSubmittedScoreSummary(faculty, {
+    partA: faculty.lectures?.reduce((a, r) => a + n(r.score), 0) || 0,
+    partB: faculty.journals?.reduce((a, r) => a + n(r.score), 0) || 0,
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, minHeight: "100%" }}>
@@ -1152,8 +1158,8 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
             </tr></thead>
             <tbody>
               {[
-                ["Part A - Teaching & Activities", 200, faculty.lectures?.reduce((a, r) => a + n(r.score), 0) || 0, partA],
-                ["Part B - Research & Contributions", 375, faculty.journals?.reduce((a, r) => a + n(r.score), 0) || 0, partB],
+                ["Part A - Teaching & Activities", facultySummary.partAMax, facultySummary.partA, partA],
+                ["Part B - Research & Contributions", facultySummary.partBMax, facultySummary.partB, partB],
               ].map(([label, max, fac, hod]) => (
                 <tr key={label}>
                   <td style={TD}>{label}</td>
@@ -1164,13 +1170,9 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
               ))}
               <tr style={{ background: "#d1fae5", fontWeight: 700 }}>
                 <td style={TD}>Grand Total</td>
-                <td style={TDC}>575</td>
-                <td style={TDS}>-</td>
+                <td style={TDC}>{facultySummary.grandMax}</td>
+                <td style={TDS}>{facultySummary.total.toFixed(1)}</td>
                 <td style={{ ...TDS_HOD, color: "#065f46", fontSize: 14 }}>{total.toFixed(1)}</td>
-              </tr>
-              <tr style={{ background: g.bg }}>
-                <td style={TD} colSpan={3}><strong>Grade</strong></td>
-                <td style={{ ...TDC, color: g.color, fontWeight: 800 }}>{g.label}</td>
               </tr>
             </tbody>
           </table>
@@ -1401,7 +1403,7 @@ export default function HODDashboard() {
   const uniScore = sumSectionScore(uniActs, 30);
   const societyScore = clampScore(society.reduce((total, row) => total + societyRowScore(row), 0), 10);
   const industryScore = sumSectionScore(industry, 5);
-  const acrScore = sumSectionScore(acr, 25);
+  const acrScore = sumSectionScore(acr, 25, "score", SCORE_LIMITS.acrRow);
   const effectivePartAMax = effectiveMaxScore(200, sectionApplicability, [{ key: "projects", max: 10 }]);
   const partATotal = clampScore(teachingRaw + stuFeedbackScore + deptScore + uniScore + societyScore + industryScore + acrScore, effectivePartAMax);
 
@@ -1755,7 +1757,7 @@ export default function HODDashboard() {
     <h3>G. Annual Confidential Report &nbsp;(Max 25)</h3>
     <table>
       <tr><th>SN</th><th>Parameter</th><th>API Score</th></tr>
-      ${acr.map((a,i) => `<tr><td class="c">${i+1}</td><td>${a.label||'&nbsp;'}</td><td class="c">${a.score||'&nbsp;'}</td></tr>`).join('')}
+      ${acr.map((a,i) => `<tr><td class="c">${i+1}</td><td>${a.label||'&nbsp;'}</td><td class="c">${String(a.score ?? "").trim() ? clampScore(a.score, SCORE_LIMITS.acrRow) : '&nbsp;'}</td></tr>`).join('')}
       <tr class="tr"><td colspan="2" class="c b">Total (Max 25)</td><td class="c">${acrScore.toFixed(1)}</td></tr>
     </table>
 
@@ -2329,7 +2331,7 @@ export default function HODDashboard() {
                     </thead>
                     <tbody>
                       {society.map((r, i) => {
-                        const socLocked = societySelectionForRow(r) !== "Yes";
+                        const socLocked = societyRowLocked(r);
                         return (
                         <tr key={i} style={socLocked ? { background: "#f1f5f9", opacity: 0.65 } : i % 2 === 1 ? { background: "#f8fafc" } : {}}>
                           <td style={TDC}>{i + 1}</td>
@@ -2407,7 +2409,7 @@ export default function HODDashboard() {
                         <tr key={i} style={i % 2 === 1 ? { background: "#f8fafc" } : {}}>
                           <td style={TDC}>{i + 1}</td>
                           <td style={TD}><div style={{ fontWeight: 700 }}>{r.label}</div>{ACR_DETAIL_POINTS[r.label] && <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>{ACR_DETAIL_POINTS[r.label].map((point) => <li key={point}>{point}</li>)}</ul>}</td>
-                          <td style={TDS}><RO val={r.score || "-"} center /></td>
+                          <td style={TDS}><RO val={String(r.score ?? "").trim() ? clampScore(r.score, SCORE_LIMITS.acrRow) : "-"} center /></td>
                         </tr>
                       ))}
                       <tr style={{ background: "#eff6ff" }}>

@@ -28,6 +28,7 @@ import {
   researchGuidanceScore,
   rowHasAnyValue,
   scoreSectionRows,
+  societyRowLocked,
   societyRowScore,
   societySelectionForRow,
   sumSectionScore,
@@ -50,6 +51,16 @@ const SECTION_OPTIONS = [
 const n = (value) => parseFloat(value) || 0;
 const pct = (value, max) => Math.min(100, Math.round((n(value) / max) * 100)) || 0;
 const titleCase = (value) => String(value || "").charAt(0).toUpperCase() + String(value || "").slice(1);
+const isReviewerReviewComplete = (item = {}, reviewerRole = "") => {
+  const status = String(item?.status || item?.workflowStatus || item?.workflow_status || "");
+  const reviewerLabel = roleLabel(reviewerRole);
+  return (
+    n(item?.[`${reviewerRole}Total`]) > 0 ||
+    String(item?.[`${reviewerRole}Remarks`] ?? "").trim() !== "" ||
+    status === reviewedStatusFor(reviewerRole) ||
+    new RegExp(`${reviewerLabel}\\s*(Reviewed|Approved|Rejected)`, "i").test(status)
+  );
+};
 const userInitials = (name) =>
   String(name || "User")
     .split(" ")
@@ -119,8 +130,8 @@ const PART_A_SECTIONS = [
   { key: "feedback", title: "Student Feedback", max: 10, doc: "fb", fields: [["code", "Course Code / Name"], ["fb1", "First Feedback (%)"], ["fb2", "Second Feedback (%)"]] },
   { key: "deptActs", title: "Departmental / School Activities", max: 20, doc: "dept", fields: [["activity", "Activity"], ["nature", "Nature"]] },
   { key: "uniActs", title: "University Level Activities", max: 30, doc: "uni", fields: [["activity", "Activity"], ["nature", "Nature"]] },
-  { key: "society", title: "Contribution to Society", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity"], ["details", "Details"], ["participated", "Participation"]] },
-  { key: "acr", title: "(xi) Annual Confidential Report (ACR) - Max 25 marks", max: 25, doc: "acr", fields: [["label", "Attribute", true]], selfReadOnlyScore: true },
+  { key: "society", title: "(ix) Contribution to Society - Max 10 marks (Max 5 per row)", max: 10, doc: "soc", rowMax: SCORE_LIMITS.societyRow, fields: [["label", "Activity"], ["participated", "Yes/No"], ["details", "Details"]] },
+  { key: "acr", title: "(xi) Annual Confidential Report (ACR) - Max 25 marks", max: 25, doc: "acr", rowMax: SCORE_LIMITS.acrRow, fields: [["label", "Attribute", true]], selfReadOnlyScore: true },
 ];
 
 const PART_B_SECTIONS = [
@@ -308,13 +319,13 @@ function DocCell({ id, docs, setDocs, readOnly }) {
     if (!selected.length) return;
     const unsupported = selected.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
-      setUploadError("Only image or PDF files are allowed.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
     const oversized = selected.find((f) => f.size > 10 * 1024 * 1024);
     if (oversized) {
-      setUploadError("File exceeds 10 MB limit.");
+      setUploadError("Only image or PDF files up to 10 MB are allowed.");
       if (ref.current) ref.current.value = "";
       return;
     }
@@ -424,7 +435,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </ul>
                     )}
                   </td>
-                  <td style={tdCenter}><RO value={row.score || "-"} center /></td>
+                  <td style={tdCenter}><RO value={String(row.score ?? "").trim() ? clampScore(row.score, SCORE_LIMITS.acrRow) : "-"} center /></td>
                 </tr>
               ))}
               <tr style={{ background: "#eff6ff" }}>
@@ -526,7 +537,9 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
           </thead>
           <tbody>
             {rows.map((row, index) => {
-              const socRowLocked = section.key === "society" && societySelectionForRow(row) !== "Yes";
+              const socRowLocked = section.key === "society" && societyRowLocked(row);
+              const currentRowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
+              const displayScore = (value) => String(value ?? "").trim() ? clampScore(value, currentRowMax) : "";
               return (
               <tr key={row._id ?? `${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
                 <td style={tdCenter}>{index + 1}</td>
@@ -568,7 +581,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                       </select>
                     ) : (
                       <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || (socRowLocked && key !== "participated" && !(section.key === "society" && (key === "label" || key === "details")))} onChange={(value) => updateRow(index, key, value)} />
+                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, key, value)} />
                         {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
                           <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
                             {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
@@ -587,13 +600,13 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                   {mode === "self"
                     ? section.key === "feedback"
                       ? <RO value={feedbackRowScore(row, section.max).toFixed(1)} center />
-                      : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || (section.key === "society" && societySelectionForRow(row) === "No")} onChange={(value) => updateRow(index, "score", value)} />
+                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
                     : <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
                 </td>
-                {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={row[role]} center /></td>)}
+                {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={socRowLocked ? "0" : displayScore(row[role])} center /></td>)}
                 {mode === "review" && (
                   <td style={tdCenter}>
-                    <TI type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={reviewLocked} value={reviewRows[index]?.[currentRole] ?? row[currentRole] ?? ""} onChange={(value) => updateReview(index, value)} />
+                    <TI type="number" center max={currentRowMax} readOnly={reviewLocked || socRowLocked} value={socRowLocked ? "0" : displayScore(reviewRows[index]?.[currentRole] ?? row[currentRole] ?? "")} onChange={(value) => updateReview(index, value)} />
                   </td>
                 )}
               </tr>
@@ -939,7 +952,11 @@ function buildMediaSectionScores(person, reviewData, reviewerRole) {
     const reviewRows = Array.isArray(reviewData[key]) ? reviewData[key] : [];
     payload[key] = rows.map((row, index) => ({
       ...row,
-      [reviewerRole]: reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
+      [reviewerRole]: key === "society" && societyRowLocked(row)
+        ? "0"
+        : key === "acr"
+        ? (String(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "").trim() ? String(clampScore(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole], SCORE_LIMITS.acrRow)) : "")
+        : reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
     }));
   });
   payload.innovativeTeaching = {
@@ -972,14 +989,23 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
     ALL_ARRAY_KEYS.forEach((key) => {
       merged[key] = (form[key] || []).map((row, index) => ({
         ...row,
-        [reviewerRole]: reviewData[key]?.[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
+        [reviewerRole]: key === "society" && societyRowLocked(row) ? "0" : reviewData[key]?.[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
       }));
     });
     merged[scoreKeyForInnov(reviewerRole)] = reviewData.innovativeTeaching?.[reviewerRole] ?? form[scoreKeyForInnov(reviewerRole)] ?? "";
     return merged;
   }, [form, reviewData, reviewerRole]);
+  const facultyTotals = calculateMediaTotals(form, "score");
   const totals = calculateMediaTotals(reviewerForm, reviewerRole);
-  const reviewCompleted = readOnly || /Reviewed/.test(person?.status || "") || n(person?.[`${reviewerRole}Total`]) > 0;
+  const reviewCompleted = readOnly || isReviewerReviewComplete(person, reviewerRole);
+  const savedReviewerTotalKeys = [`${reviewerRole}PartA`, `${reviewerRole}PartB`, `${reviewerRole}Total`];
+  const hasSavedReviewerTotals = savedReviewerTotalKeys.some((key) => String(person?.[key] ?? "").trim() !== "");
+  const reviewerSummaryTotals = reviewCompleted && hasSavedReviewerTotals ? {
+    ...totals,
+    partA: String(person?.[`${reviewerRole}PartA`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}PartA`]) : totals.partA,
+    partB: String(person?.[`${reviewerRole}PartB`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}PartB`]) : totals.partB,
+    total: String(person?.[`${reviewerRole}Total`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}Total`]) : totals.total,
+  } : totals;
 
   const generateReviewReport = async () => {
     if (!reviewCompleted) return;
@@ -1088,7 +1114,8 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
       )}
       {sectionView === "summary" && (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
-          <SummaryBox totals={totals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the SoMCS media appraisal form.`} />
+          <SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel="Faculty submitted score for the SoMCS media appraisal form." />
+          <SummaryBox totals={reviewerSummaryTotals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the SoMCS media appraisal form.`} />
           <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
             {roleLabel(reviewerRole)} Remarks
             <textarea value={remarks} readOnly={readOnly} onChange={(event) => setRemarks(event.target.value)} rows={5} style={{ border: "1px solid #99f6e4", borderRadius: 7, padding: 10, fontFamily: "Georgia, serif", resize: "vertical" }} />
@@ -1527,7 +1554,7 @@ export default function MediaCommDashboard({ fixedRole }) {
             reviewerRole={role}
             onBack={() => setReviewing(null)}
             onSubmit={handleSubmitReview}
-            readOnly={/Reviewed/.test(reviewing.status || "")}
+            readOnly={isReviewerReviewComplete(reviewing, role)}
           />
         )}
 
