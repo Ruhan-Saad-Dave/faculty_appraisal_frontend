@@ -721,7 +721,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
           <table style={T}>
             <thead><tr>
               <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Journal</th>
-              <th style={TH}>ISSN</th><th style={TH}>General Indexing</th>
+              <th style={TH}>ISSN</th><th style={TH}>Journal Indexing</th>
               <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
             </tr></thead>
             <tbody>
@@ -1787,7 +1787,7 @@ export default function HODDashboard() {
 
     <h3>1) Published Papers in Journals &nbsp;(Max 120)</h3>
     <table>
-      <tr><th>SN</th><th>Title with Page Nos.</th><th>Journal Details</th><th>ISSN/ISBN No.</th><th>General Indexing</th><th>API Score</th></tr>
+      <tr><th>SN</th><th>Title with Page Nos.</th><th>Journal Details</th><th>ISSN/ISBN No.</th><th>Journal Indexing</th><th>API Score</th></tr>
       ${journals.map((j,i) => `<tr><td class="c">${i+1}</td><td>${j.title||'&nbsp;'}</td><td>${j.journal||'&nbsp;'}</td><td class="c">${j.issn||'&nbsp;'}</td><td class="c">${j.index||'&nbsp;'}</td><td class="c">${j.score||'&nbsp;'}</td></tr>`).join('')}
       <tr class="tr"><td colspan="5" class="c b">Total (Max 120)</td><td class="c">${journalScore.toFixed(1)}</td></tr>
     </table>
@@ -2458,7 +2458,7 @@ export default function HODDashboard() {
                         <th style={TH}>Title</th>
                         <th style={TH}>Journal</th>
                         <th style={TH}>ISSN</th>
-                        <th style={TH}>General Indexing</th>
+                        <th style={TH}>Journal Indexing</th>
                         <th style={TH}>Attachment</th>
                         <th style={TH}>View Docs</th>
                         <th style={TH}>Score</th>

@@ -657,7 +657,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData, 
           <table style={T}>
             <thead><tr>
               <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Journal</th>
-              <th style={TH}>ISSN</th><th style={TH}>General Indexing</th>
+              <th style={TH}>ISSN</th><th style={TH}>Journal Indexing</th>
               <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_DIR}>Director Score</th>
             </tr></thead>
             <tbody>
@@ -2316,7 +2316,7 @@ export default function DirectorDashboard() {
                         <th style={TH}>Title</th>
                         <th style={TH}>Journal</th>
                         <th style={TH}>ISSN</th>
-                        <th style={TH}>General Indexing</th>
+                        <th style={TH}>Journal Indexing</th>
                         <th style={TH}>Attachment</th>
                         <th style={TH}>View Docs</th>
                         <th style={TH}>Score</th>
