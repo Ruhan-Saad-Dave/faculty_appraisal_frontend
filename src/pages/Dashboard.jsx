@@ -273,7 +273,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
         uploadedFiles.push(uploaded);
       }
 
-      setDocs((p) => ({ ...p, [id]: uploadedFiles.slice(0, 1) }));
+      setDocs((p) => ({ ...p, [id]: [...(p[id] ?? []), ...uploadedFiles] }));
     } catch (err) {
       console.error("Upload error:", err);
       setUploadError(err.message);
