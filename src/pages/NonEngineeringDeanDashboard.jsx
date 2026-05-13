@@ -607,7 +607,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
           <table style={T}>
             <thead><tr>
               <th style={TH}>SN</th><th style={TH}>Title</th><th style={TH}>Journal</th>
-              <th style={TH}>ISSN</th><th style={TH}>General Indexing</th>
+              <th style={TH}>ISSN</th><th style={TH}>Journal Indexing</th>
               <th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
             </tr></thead>
             <tbody>
@@ -1414,7 +1414,7 @@ function DeanReviewScoreForm({ approval, deanData, setDeanData, sectionView = "p
           { label: "Title", render: (r) => r.title },
           { label: "Journal", render: (r) => r.journal },
           { label: "ISSN", render: (r) => r.issn, center: true },
-          { label: "General Indexing", render: (r) => r.index, center: true },
+          { label: "Journal Indexing", render: (r) => r.index, center: true },
         ]}
       />
 
@@ -2839,7 +2839,7 @@ export default function NonEngineeringDeanDashboard() {
                         <th style={TH}>Title</th>
                         <th style={TH}>Journal</th>
                         <th style={TH}>ISSN</th>
-                        <th style={TH}>General Indexing</th>
+                        <th style={TH}>Journal Indexing</th>
                         <th style={TH}>Attachment</th>
                         <th style={TH}>View Docs</th>
                         <th style={TH}>Score</th>
