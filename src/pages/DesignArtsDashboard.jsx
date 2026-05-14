@@ -161,8 +161,8 @@ const PART_B_SECTIONS = [
   { key: "awards", title: "B5(b). Research Awards", max: 10, doc: "awd", fields: [["title", "Title"], ["date", "Date"], ["agency", "Agency"], ["level", "Level"]] },
   { key: "confs", title: "B6. Conferences / Seminars / Workshops", max: 30, doc: "conf", fields: [["title", "Title"], ["type", "Type"], ["org", "Organization"], ["level", "Level"]] },
   { key: "proposals", title: "B7. Research Proposals", max: 10, doc: "prop", fields: [["title", "Title"], ["duration", "Duration"], ["agency", "Agency"], ["amount", "Amount"]] },
-  { key: "fdps", title: "B8(a). FDP / Self Development", max: 10, doc: "fdp", rowMax: SCORE_LIMITS.fdpRow, fields: [["program", "Program"], ["duration", "Duration"], ["org", "Organization"]] },
-  { key: "training", title: "B8(b). Industrial Training", max: 10, doc: "train", rowMax: SCORE_LIMITS.fdpRow, fields: [["company", "Company"], ["duration", "Duration"], ["nature", "Nature"]] },
+  { key: "fdps", title: "B8(a). FDP / Self Development", max: 20, doc: "fdp", rowMax: SCORE_LIMITS.fdpRow, fields: [["program", "Program"], ["duration", "Duration"], ["org", "Organization"]] },
+  { key: "training", title: "B8(b). Industrial Training", max: 20, doc: "train", rowMax: SCORE_LIMITS.fdpRow, fields: [["company", "Company"], ["duration", "Duration"], ["nature", "Nature"]] },
 ];
 
 const ALL_ARRAY_KEYS = [...PART_A_SECTIONS, ...PART_B_SECTIONS].map((section) => section.key);
@@ -679,7 +679,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
           <tbody>
             <tr style={{ background: "#f3e8ff" }}>
               <td style={{ ...tdCenter, fontWeight: "bold" }} colSpan={6}>Total B8 Score (Max 20)</td>
-              <td style={{ ...tdCenter, fontWeight: "bold" }}>{Math.min(scoreSectionRows("fdps", form.fdps || [], 10) + scoreSectionRows("training", form.training || [], 10), 20).toFixed(1)}</td>
+              <td style={{ ...tdCenter, fontWeight: "bold" }}>{Math.min(scoreSectionRows("fdps", form.fdps || [], 20) + scoreSectionRows("training", form.training || [], 20), 20).toFixed(1)}</td>
             </tr>
           </tbody>
         </table>
@@ -946,7 +946,7 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
     const partATotal = n(person?.[`${reviewerRole}PartA`] ?? totals.partA);
     const partBTotal = n(person?.[`${reviewerRole}PartB`] ?? totals.partB);
     const grandTotal = n(person?.[`${reviewerRole}Total`] ?? totals.total);
-    const b8Score = clampScore(rowSum("fdps", 10) + rowSum("training", 10), 20);
+    const b8Score = clampScore(rowSum("fdps", 20) + rowSum("training", 20), 20);
     generateMediaCommReport({
       title: `${schoolDisplayName} Appraisal Report`,
       subtitle: `${roleLabel(reviewerRole)} review`,
@@ -1260,7 +1260,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
     const cfScore = applicability["courseFile"] === "notApplicable" ? 0 : averageSectionScore(form.courseFile || [], 20, "score");
     const innovScore = clampScore(Array.isArray(form.innovRows) ? form.innovRows.reduce((t, r) => t + clampScore(r.score, SCORE_LIMITS.innovativeRow), 0) : innovativeTeachingScore(form.innovDetails, form.innovScore, 10), 10);
     const maxScores = getDesignArtsEffectiveMaxScores(form);
-    const b8Score = clampScore(rowSum("fdps", 10) + rowSum("training", 10), 20);
+    const b8Score = clampScore(rowSum("fdps", 20) + rowSum("training", 20), 20);
     const partATotal = clampScore(lecScore + cfScore + innovScore + rowSum("projects", 20) + rowSum("quals", 10) + feedbackSectionScore(form.feedback || [], 10) + rowSum("deptActs", 20) + rowSum("uniActs", 30) + rowSum("society", 10) + rowSum("industry", 5) + rowSum("acr", 25), maxScores.partA);
     const partBTotal = clampScore(rowSum("journals", 80) + rowSum("books", 60) + rowSum("ict", 50) + rowSum("research", 30) + rowSum("internalProjects", 15) + rowSum("externalProjects", 30) + rowSum("ipr", 40) + rowSum("awards", 10) + rowSum("confs", 30) + rowSum("proposals", 10) + b8Score, maxScores.partB);
     const grandTotal = clampScore(partATotal + partBTotal, maxScores.grand);
