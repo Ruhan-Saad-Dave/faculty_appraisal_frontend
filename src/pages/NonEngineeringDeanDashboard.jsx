@@ -887,7 +887,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
       </SC>
 
       {/* B8: Self Dev */}
-      <SC title="B8(a). FDP / Workshops Attended (Max 20)" accent="#10b981">
+      <SC title="B8(a). FDP / Workshops Attended (Max 10)" accent="#10b981">
         <table style={T}>
           <thead><tr>
             <th style={TH}>SN</th><th style={TH}>Program</th><th style={TH}>Duration</th><th style={TH}>Organizer</th>
@@ -982,9 +982,9 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const conf = (faculty.confs || []).reduce((a, _, i) => a + get("confs", i, "hod"), 0);
     const prop = (faculty.proposals || []).reduce((a, _, i) => a + get("proposals", i, "hod"), 0);
     const prod = (faculty.products || []).reduce((a, _, i) => a + get("products", i, "hod"), 0);
-    const fdp = clampScore((faculty.fdps || []).reduce((a, _, i) => a + clampScore(get("fdps", i, "hod"), SCORE_LIMITS.fdpRow), 0), 20);
-    const train = clampScore((faculty.training || []).reduce((a, _, i) => a + clampScore(get("training", i, "hod"), SCORE_LIMITS.fdpRow), 0), 20);
-    const b8 = clampScore(fdp + train, 20);
+    const fdp = clampScore((faculty.fdps || []).reduce((a, _, i) => a + clampScore(get("fdps", i, "hod"), SCORE_LIMITS.fdpRow), 0), 10);
+    const train = clampScore((faculty.training || []).reduce((a, _, i) => a + clampScore(get("training", i, "hod"), SCORE_LIMITS.fdpRow), 0), 10);
+    const b8 = clampScore(fdp + train, 10);
     const partB = jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8;
 
     return { partA, partB, total: partA + partB };
@@ -1114,7 +1114,7 @@ const preserveSavedReviewScores = (form = {}, source = {}) => {
   });
   return merged;
 };
-const DEAN_SECTION_MAX = { lectures: 50, courseFile: 20, projects: 10, quals: 10, feedback: 10, deptActs: 20, uniActs: 30, society: 10, industry: 5, acr: 25, journals: 120, books: 50, ict: 20, research: 30, projects2: SCORE_LIMITS.researchInternalProjects, externalProjects: SCORE_LIMITS.researchExternalProjects, patents: 40, awards: 10, confs: 30, proposals: 10, products: 10, fdps: 20, training: 20 };
+const DEAN_SECTION_MAX = { lectures: 50, courseFile: 20, projects: 10, quals: 10, feedback: 10, deptActs: 20, uniActs: 30, society: 10, industry: 5, acr: 25, journals: 120, books: 50, ict: 20, research: 30, projects2: SCORE_LIMITS.researchInternalProjects, externalProjects: SCORE_LIMITS.researchExternalProjects, patents: 40, awards: 10, confs: 30, proposals: 10, products: 10, fdps: 10, training: 10 };
 const DEAN_ROW_MAX = { courseFile: () => SCORE_LIMITS.courseFileRow, projects: projectGuidanceRowMax, quals: () => SCORE_LIMITS.qualificationRow, feedback: () => 10, society: () => SCORE_LIMITS.societyRow, acr: () => SCORE_LIMITS.acrRow, research: researchGuidanceRowMax, fdps: () => SCORE_LIMITS.fdpRow, training: () => SCORE_LIMITS.fdpRow };
 
 const deanScorePayload = (approval, deanData) => {
@@ -1152,8 +1152,9 @@ const sumDeanRows = (payload, keys) =>
 
 const deanScoreTotals = (payload) => {
   const partA = clampScore(sumDeanRows(payload, DEAN_REVIEW_PART_A_KEYS) + clampScore(payload.innovativeTeaching?.dean, 10), 200);
-  const partB = sumDeanRows(payload, DEAN_REVIEW_PART_B_KEYS);
-  const cappedPartB = clampScore(partB, 375);
+  const b8 = clampScore(sumDeanRows(payload, ["fdps"]) + sumDeanRows(payload, ["training"]), 10);
+  const partBWithoutB8 = sumDeanRows(payload, DEAN_REVIEW_PART_B_KEYS.filter(k => k !== "fdps" && k !== "training"));
+  const cappedPartB = clampScore(partBWithoutB8 + b8, 375);
   return { partA, partB: cappedPartB, total: clampScore(partA + cappedPartB, 575) };
 };
 
@@ -1960,7 +1961,7 @@ export default function NonEngineeringDeanDashboard() {
   const innovTotal = hasInnovRows
     ? clampScore(innovRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10)
     : innovativeTeachingScore(innovDetails, innovScore, 10);
-  const innovScoreComputed = String(innovTotal);
+  const innovScoreComputed = (hasInnovRows || innovScore !== "") ? String(innovTotal) : "";
   const projectTotal = sectionApplicability.projects === "notApplicable" ? 0 : sumSectionScore(projects, 10, "score", projectGuidanceRowMax);
   const qualTotal = sumSectionScore(quals, 10, "score", SCORE_LIMITS.qualificationRow);
   const teachingRaw = totalLecScore + courseFileScore + innovTotal + projectTotal + qualTotal;
@@ -1984,9 +1985,9 @@ export default function NonEngineeringDeanDashboard() {
   const confScore = sumSectionScore(confs, 30);
   const proposalScore = sumSectionScore(proposals, 10);
   const productScore = sumSectionScore(products, 10);
-  const fdpScore = clampScore(fdps.reduce((s, r) => s + clampScore(parseFloat(r.score) || 0, SCORE_LIMITS.fdpRow), 0), 20);
-  const trainScore = clampScore(training.reduce((s, r) => s + clampScore(parseFloat(r.score) || 0, SCORE_LIMITS.fdpRow), 0), 20);
-  const b8Score = clampScore(fdpScore + trainScore, 20);
+  const fdpScore = clampScore(fdps.reduce((s, r) => s + clampScore(parseFloat(r.score) || 0, SCORE_LIMITS.fdpRow), 0), 10);
+  const trainScore = clampScore(training.reduce((s, r) => s + clampScore(parseFloat(r.score) || 0, SCORE_LIMITS.fdpRow), 0), 10);
+  const b8Score = clampScore(fdpScore + trainScore, 10);
   const effectivePartBMax = effectiveMaxScore(375, sectionApplicability, [{ key: "research", max: 30 }]);
   const effectiveGrandMax = effectivePartAMax + effectivePartBMax;
   const partBTotal = clampScore(journalScore + bookScore + ictScore + researchScore + projectBScore + externalProjectScore + patentScore + awardScore + confScore + proposalScore + productScore + b8Score, effectivePartBMax);
@@ -2104,8 +2105,8 @@ export default function NonEngineeringDeanDashboard() {
       { label: "B6. Conferences", rows: confs, fields: ["title", "type", "org", "level", "score"] },
       { label: "B7(a). Proposals", rows: proposals, fields: ["title", "duration", "agency", "amount", "score"] },
       { label: "B7(b). Products", rows: products, fields: ["details", "usage", "score"] },
-      { label: "B8(a). FDP / Workshops", rows: fdps, fields: ["program", "duration", "org", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 20 },
-      { label: "B8(b). Industrial Training", rows: training, fields: ["company", "duration", "nature", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 20 },
+      { label: "B8(a). FDP / Workshops", rows: fdps, fields: ["program", "duration", "org", "score"], rowMax: SCORE_LIMITS.fdpRow },
+      { label: "B8(b). Industrial Training", rows: training, fields: ["company", "duration", "nature", "score"], rowMax: SCORE_LIMITS.fdpRow },
     ];
     sections.push({ label: "A(iii). Innovative Teaching Methods", rows: visibleInnovRows, fields: ["method", "details", "score"], docKey: (_row, index) => index === 0 ? "innov" : `innov-${index}`, rowMax: SCORE_LIMITS.innovativeRow, maxScore: 10 });
     const errors = validateCompleteRows(sections, docs);
@@ -2144,8 +2145,8 @@ export default function NonEngineeringDeanDashboard() {
       { label: "B6. Conferences", rows: confs, fields: ["title", "type", "org", "level", "score"] },
       { label: "B7(a). Proposals", rows: proposals, fields: ["title", "duration", "agency", "amount", "score"] },
       { label: "B7(b). Products", rows: products, fields: ["details", "usage", "score"] },
-      { label: "B8(a). FDP / Workshops", rows: fdps, fields: ["program", "duration", "org", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 20 },
-      { label: "B8(b). Industrial Training", rows: training, fields: ["company", "duration", "nature", "score"], rowMax: SCORE_LIMITS.fdpRow, maxScore: 20 },
+      { label: "B8(a). FDP / Workshops", rows: fdps, fields: ["program", "duration", "org", "score"], rowMax: SCORE_LIMITS.fdpRow },
+      { label: "B8(b). Industrial Training", rows: training, fields: ["company", "duration", "nature", "score"], rowMax: SCORE_LIMITS.fdpRow },
     ];
     if (section === "partA") partASections.push({ label: "A(iii). Innovative Teaching Methods", rows: visibleInnovRows, fields: ["method", "details", "score"], docKey: (_row, index) => index === 0 ? "innov" : `innov-${index}`, rowMax: SCORE_LIMITS.innovativeRow, maxScore: 10 });
     const errors = validateCompleteRows(section === "partA" ? partASections : partBSections, docs);
@@ -2533,11 +2534,11 @@ export default function NonEngineeringDeanDashboard() {
                       {visibleInnovRows.map((r, i) => (
                         <tr key={i}>
                           <td style={TDC}>{i + 1}</td>
-                          <td style={TD}><TI val={r.method} onChange={(v) => setInnov(i, "method", v)} /></td>
-                          <td style={TD}><TI val={r.details} onChange={(v) => setInnov(i, "details", v)} /></td>
+                          <td style={TD}><TI val={r.method} onChange={(v) => { setInnov(i, "method", v); if (i === 0) setInnovDetails(v); }} /></td>
+                          <td style={TD}><TI val={r.details} onChange={(v) => { setInnov(i, "details", v); if (i === 0) setInnovDetails(v); }} /></td>
                           <td style={TD}><DocCell id={i === 0 ? "innov" : `innov-${i}`} docs={docs} setDocs={setDocs} /></td>
                           <td style={TD}><ViewCell id={i === 0 ? "innov" : `innov-${i}`} docs={docs} /></td>
-                          <td style={TDS}><TI val={r.score} onChange={(v) => setInnov(i, "score", v === "" ? "" : String(clampScore(v, SCORE_LIMITS.innovativeRow)))} numeric max={SCORE_LIMITS.innovativeRow} center /></td>
+                          <td style={TDS}><TI val={r.score} onChange={(v) => { const clamped = v === "" ? "" : String(clampScore(v, SCORE_LIMITS.innovativeRow)); setInnov(i, "score", clamped); if (i === 0) setInnovScore(clamped); }} numeric max={SCORE_LIMITS.innovativeRow} center /></td>
                         </tr>
                       ))}
                       <tr style={{ background: "#eff6ff" }}>
@@ -3298,7 +3299,7 @@ export default function NonEngineeringDeanDashboard() {
 
                 {/* B8(a). FDP / Workshops Attended */}
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B8(a). FDP / Workshops Attended - Max 20 marks</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>B8(a). FDP / Workshops Attended - Max 10 marks</div>
                   <table style={T}>
                     <thead>
                       <tr>
@@ -3361,7 +3362,7 @@ export default function NonEngineeringDeanDashboard() {
                   <table style={{ ...T, marginTop: 8 }}>
                     <tbody>
                       <tr style={{ background: "#f3e8ff" }}>
-                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total B8 Score (Max 20)</td>
+                        <td style={{ ...TDC, fontWeight: "bold" }} colSpan={6}>Total B8 Score (Max 10)</td>
                         <td style={{ ...TDS, fontWeight: "bold" }}>{b8Score.toFixed(1)}</td>
                       </tr>
                     </tbody>
