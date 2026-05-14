@@ -463,7 +463,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
                 <td style={TDC}>{i + 1}</td>
                 <td style={TD}><RO val={r.label} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`proj-${i}`} docs={docs} /></td>
-                <td style={TDS}><RO val={clampScore(r.score, projectGuidanceRowMax(r))} center /></td>
+                <td style={TDS}><RO val={String(r.score ?? "").trim() ? clampScore(r.score, projectGuidanceRowMax(r)) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={get("projects", i, "hod")} max={projectGuidanceRowMax(r)} onChange={v => set("projects", i, "hod", v)} /></td>
               </tr>
             ))}
@@ -584,7 +584,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
                 <td style={TD}><RO val={r.label} /></td>
                 <td style={TD}><RO val={r.details} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`soc-${i}`} docs={docs} /></td>
-                <td style={TDS}><RO val={societyRowScore(r)} center /></td>
+                <td style={TDS}><RO val={String(r.score ?? "").trim() ? societyRowScore(r) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={societyRowLocked(r) ? "0" : get("society", i, "hod")} max={SCORE_LIMITS.societyRow} disabled={societyRowLocked(r)} onChange={v => set("society", i, "hod", v)} /></td>
               </tr>
             ))}
@@ -732,7 +732,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
                 <td style={TD}><RO val={r.name} /></td>
                 <td style={TD}><RO val={r.thesis} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`res-${i}`} docs={docs} /></td>
-                <td style={TDS}><RO val={researchGuidanceScore(r).toFixed(1)} center /></td>
+                <td style={TDS}><RO val={r.degree || r.name || r.thesis || r.score ? researchGuidanceScore(r).toFixed(1) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={get("research", i, "hod")} onChange={v => set("research", i, "hod", v)} /></td>
               </tr>
             ))}
@@ -933,7 +933,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
                 <td style={TDC}><RO val={r.duration} center /></td>
                 <td style={TD}><RO val={r.org} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`fdp-${i}`} docs={docs} /></td>
-                <td style={TDS}><RO val={clampScore(r.score, SCORE_LIMITS.fdpRow)} center /></td>
+                <td style={TDS}><RO val={String(r.score ?? "").trim() ? clampScore(r.score, SCORE_LIMITS.fdpRow) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={get("fdps", i, "hod")} max={SCORE_LIMITS.fdpRow} onChange={v => set("fdps", i, "hod", v)} /></td>
               </tr>
             ))}
@@ -956,7 +956,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
                 <td style={TDC}><RO val={r.duration} center /></td>
                 <td style={TD}><RO val={r.nature} /></td>
                 <td style={TDV}><ViewDocsCell docKey={`train-${i}`} docs={docs} /></td>
-                <td style={TDS}><RO val={clampScore(r.score, SCORE_LIMITS.fdpRow)} center /></td>
+                <td style={TDS}><RO val={String(r.score ?? "").trim() ? clampScore(r.score, SCORE_LIMITS.fdpRow) : ""} center /></td>
                 <td style={TDS_HOD}><HodInput val={get("training", i, "hod")} max={SCORE_LIMITS.fdpRow} onChange={v => set("training", i, "hod", v)} /></td>
               </tr>
             ))}
@@ -1836,7 +1836,7 @@ export default function HODDashboard({
     <h3>4a) Research Guidance — PhD / PG &nbsp;(Max 30)</h3>
     <table>
       <tr><th>SN</th><th>Degree</th><th>Name of Student</th><th>Thesis / Status</th><th>API Score</th></tr>
-      ${research.map((r,i) => `<tr><td class="c">${i+1}</td><td class="c">${r.degree||'&nbsp;'}</td><td>${r.name||'&nbsp;'}</td><td>${r.thesis||'&nbsp;'}</td><td class="c">${researchGuidanceScore(r).toFixed(1)}</td></tr>`).join('')}
+      ${research.map((r,i) => `<tr><td class="c">${i+1}</td><td class="c">${r.degree||'&nbsp;'}</td><td>${r.name||'&nbsp;'}</td><td>${r.thesis||'&nbsp;'}</td><td class="c">${r.degree || r.name || r.thesis || r.score ? researchGuidanceScore(r).toFixed(1) : ""}</td></tr>`).join('')}
       <tr class="tr"><td colspan="4" class="c b">Total (Max 30)</td><td class="c">${researchScore.toFixed(1)}</td></tr>
     </table>` : ""}
 
@@ -2333,7 +2333,7 @@ export default function HODDashboard({
                           <td style={TDC}><TI val={r.fb1} numeric onChange={(v) => setFb(i, "fb1", v)} center max={SCORE_LIMITS.feedbackAverage} /></td>
                           <td style={TDC}><TI val={r.fb2} numeric onChange={(v) => setFb(i, "fb2", v)} center max={SCORE_LIMITS.feedbackAverage} /></td>
                           <td style={{ ...TDC, fontWeight: 700, color: "#0ea5e9" }}>{r.fb1 || r.fb2 ? feedbackAverage(r).toFixed(2) : ""}</td>
-                          <td style={TDS}>{feedbackRowScore(r, 10).toFixed(1)}</td>
+                          <td style={TDS}>{r.fb1 || r.fb2 ? feedbackRowScore(r, 10).toFixed(1) : ""}</td>
                         </tr>
                       ))}
                       <tr style={{ background: "#eff6ff" }}>
@@ -2693,7 +2693,7 @@ export default function HODDashboard({
                           <td style={TD}><TI val={r.thesis} readOnly={sectionApplicability.research === "notApplicable"} onChange={(v) => setRes(i, "thesis", v)} textOnly /></td>
                           <td style={TD}><DocCell id={`res-${i}`} docs={docs} setDocs={setDocs} readOnly={sectionApplicability.research === "notApplicable"} /></td>
                           <td style={TD}><ViewCell id={`res-${i}`} docs={docs} /></td>
-                          <td style={TDS}><RO val={sectionApplicability.research === "notApplicable" ? "0" : researchGuidanceScore(r).toFixed(1)} center /></td>
+                          <td style={TDS}><RO val={sectionApplicability.research === "notApplicable" ? "0" : (r.degree || r.name || r.thesis || r.score ? researchGuidanceScore(r).toFixed(1) : "")} center /></td>
                         </tr>
                       ))}
                       <tr style={{ background: "#f3e8ff" }}>

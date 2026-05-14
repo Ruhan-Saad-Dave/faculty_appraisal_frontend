@@ -387,14 +387,19 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director", sect
   const renderScoreCells = (r, section, i) => {
     const maxForRow = vcRowMax(section, r);
     const locked = section === "society" && societyRowLocked(r);
-    const displayScore = (value) => maxForRow ? clampScore(value, maxForRow) : value;
+    const displayScore = (value) => maxForRow ? (String(value ?? "").trim() ? clampScore(value, maxForRow) : "") : value;
+    const facultyScore = section === "research"
+      ? (r.degree || r.name || r.thesis || r.score ? researchGuidanceScore(r).toFixed(1) : "")
+      : section === "society"
+        ? (String(r?.score ?? "").trim() ? societyRowScore(r) : "")
+        : displayScore(r?.score);
     const displayReviewScore = (value) =>
       value === undefined || value === null || String(value).trim() === ""
         ? undefined
         : displayScore(value);
     return (
       <>
-        <td style={TDS}><ScoreValue val={section === "research" ? researchGuidanceScore(r).toFixed(1) : section === "society" ? societyRowScore(r) : displayScore(r?.score)} center /></td>
+        <td style={TDS}><ScoreValue val={facultyScore} center /></td>
         {reviewRoles.map((role) => {
           const meta = vcRoleMeta(role);
           return <td key={role} style={meta.cellStyle}><ScoreValue val={locked ? "0" : displayReviewScore(vcScoreForRole(r, role))} center /></td>;

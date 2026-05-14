@@ -207,18 +207,32 @@ export const scoreSectionRows = (sectionKey, rows = [], maxScore, scoreKey = "sc
   return sumSectionScore(rows, maxScore, scoreKey, (row) => rowMaxForSection(sectionKey, row, maxScore));
 };
 
+const hasScoreValue = (row = {}, key = "score") =>
+  String(row?.[key] ?? "").trim() !== "";
+
+const hasFeedbackScoreValues = (row = {}) =>
+  ["fb1", "fb2"].some((key) => String(row?.[key] ?? "").trim() !== "");
+
+const innovRowsScore = (rows = []) => {
+  const hasAnyScore = rows.some((row) => hasScoreValue(row));
+  if (!hasAnyScore) return "";
+  return String(clampScore(rows.reduce((total, row) => total + clampScore(row?.score, SCORE_LIMITS.innovativeRow), 0), 10));
+};
+
 export const normalizeAutoScores = (form = {}) => ({
   ...form,
-  innovScore: String(Array.isArray(form.innovRows)
-    ? clampScore(form.innovRows.reduce((total, row) => total + clampScore(row?.score, SCORE_LIMITS.innovativeRow), 0), 10)
-    : innovativeTeachingScore(form.innovDetails, form.innovScore, 10)),
+  innovScore: Array.isArray(form.innovRows) && form.innovRows.length
+    ? innovRowsScore(form.innovRows)
+    : (String(form.innovDetails ?? "").trim() || String(form.innovScore ?? "").trim()
+      ? String(innovativeTeachingScore(form.innovDetails, form.innovScore, 10))
+      : ""),
   courseFile: (form.courseFile || []).map((row) => ({
     ...row,
     score: courseFileRowScore(row) ? String(courseFileRowScore(row)) : "",
   })),
   feedback: (form.feedback || []).map((row) => ({
     ...row,
-    score: feedbackRowScore(row, 10).toFixed(1),
+    score: hasFeedbackScoreValues(row) ? feedbackRowScore(row, 10).toFixed(1) : "",
   })),
   society: (form.society || []).map((row) => {
     return {

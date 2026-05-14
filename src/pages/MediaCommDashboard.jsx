@@ -489,7 +489,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
       [section.key]: (prev[section.key] || []).map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const rowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
-        const nextValue = key === "date" ? maskDateDDMMYYYY(value) : key === "score" ? clampScore(value, rowMax) : value;
+        const nextValue = key === "date" ? maskDateDDMMYYYY(value) : key === "score" ? (value === "" ? "" : clampScore(value, rowMax)) : value;
         const nextRow = { ...row, [key]: nextValue };
         if (section.key === "research" && ["degree", "name", "thesis"].includes(key)) return { ...nextRow, score: researchGuidanceScore(nextRow) ? String(researchGuidanceScore(nextRow)) : "" };
         return nextRow;
@@ -618,12 +618,12 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
                     )}
                   </td>
                 ))}
-                {section.key === "feedback" && <td style={tdCenter}>{feedbackAverage(row).toFixed(2)}</td>}
+                {section.key === "feedback" && <td style={tdCenter}>{row.fb1 || row.fb2 ? feedbackAverage(row).toFixed(2) : ""}</td>}
                 {section.key !== "courseFile" && <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked || socRowLocked} /></td>}
                 <td style={tdCenter}>
                   {mode === "self"
                     ? section.key === "feedback"
-                      ? <RO value={feedbackRowScore(row, section.max).toFixed(1)} center />
+                      ? <RO value={row.fb1 || row.fb2 ? feedbackRowScore(row, section.max).toFixed(1) : ""} center />
                         : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
                     : <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
                 </td>
@@ -676,7 +676,7 @@ function B8SectionTable({ section, form, setForm, docs, setDocs, mode, locked, r
       ...prev,
       [section.key]: (prev[section.key] || []).map((row, rowIndex) => (
         rowIndex === index
-          ? { ...row, [key]: key === "score" ? clampScore(value, SCORE_LIMITS.fdpRow) : value }
+          ? { ...row, [key]: key === "score" ? (value === "" ? "" : clampScore(value, SCORE_LIMITS.fdpRow)) : value }
           : row
       )),
     }));
@@ -787,12 +787,15 @@ function InnovativeSection({ form, setForm, docs, setDocs, mode, locked, reviewe
         ? prev.innovRows
         : [{ method: prev.innovDetails, details: prev.innovDetails, score: prev.innovScore }];
       const nextRows = baseRows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row));
-      const nextScore = clampScore(nextRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10);
+      const hasAnyScore = nextRows.some((row) => String(row.score ?? "").trim() !== "");
+      const nextScore = hasAnyScore
+        ? String(clampScore(nextRows.reduce((total, row) => total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10))
+        : "";
       return {
         ...prev,
         innovRows: nextRows,
         innovDetails: nextRows.map((row) => row.method).filter(Boolean).join(", "),
-        innovScore: String(nextScore),
+        innovScore: nextScore,
       };
     });
   };
