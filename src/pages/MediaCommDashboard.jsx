@@ -146,8 +146,8 @@ const PART_B_SECTIONS = [
   { key: "confs", title: "B6. Conferences / Seminars / Workshops", max: 30, doc: "conf", fields: [["title", "Title"], ["type", "Type"], ["org", "Organization"], ["level", "Level"]] },
   { key: "proposals", title: "B7(a). Research Proposals", max: 10, doc: "prop", fields: [["title", "Title"], ["duration", "Duration"], ["agency", "Agency"], ["amount", "Amount"]] },
   { key: "products", title: "B7(b). Products Developed / Used", max: 20, doc: "prod", fields: [["details", "Product Details"], ["used", "Used / Adopted"]] },
-  { key: "fdps", title: "B8(a). FDP / Self Development", max: 10, doc: "fdp", rowMax: SCORE_LIMITS.fdpRow, fields: [["program", "Program"], ["duration", "Duration"], ["org", "Organization"]] },
-  { key: "training", title: "B8(b). Industrial Training", max: 10, doc: "train", rowMax: SCORE_LIMITS.fdpRow, fields: [["company", "Company"], ["duration", "Duration"], ["nature", "Nature"]] },
+  { key: "fdps", title: "B8(a). FDP / Self Development", max: 20, doc: "fdp", rowMax: SCORE_LIMITS.fdpRow, fields: [["program", "Program"], ["duration", "Duration"], ["org", "Organization"]] },
+  { key: "training", title: "B8(b). Industrial Training", max: 20, doc: "train", rowMax: SCORE_LIMITS.fdpRow, fields: [["company", "Company"], ["duration", "Duration"], ["nature", "Nature"]] },
 ];
 
 const ALL_ARRAY_KEYS = [...PART_A_SECTIONS, ...PART_B_SECTIONS].map((section) => section.key);
@@ -196,7 +196,7 @@ const calculateMediaTotals = (form, scoreKey = "score") => {
     rowSum("deptActs", 20) + rowSum("uniActs", 30) + rowSum("society", 10) + rowSum("acr", 25),
     maxScores.partA,
   );
-  const b8Score = clampScore(rowSum("fdps", 10) + rowSum("training", 10), 20);
+  const b8Score = clampScore(rowSum("fdps", 20) + rowSum("training", 20), 20);
   const partB = clampScore(
     PART_B_SECTIONS
       .filter((section) => section.key !== "fdps" && section.key !== "training")
@@ -671,7 +671,7 @@ function B8SectionTable({ section, form, setForm, docs, setDocs, mode, locked, r
   const reviewRows = reviewData?.[section.key] || [];
   const editableSelf = mode === "self" && !locked;
   const reviewLocked = mode === "review" && locked;
-  const totalB8 = clampScore(scoreSectionRows("fdps", form.fdps || [], 10) + scoreSectionRows("training", form.training || [], 10), 20);
+  const totalB8 = clampScore(scoreSectionRows("fdps", form.fdps || [], 20) + scoreSectionRows("training", form.training || [], 20), 20);
 
   const updateRow = (index, key, value) => {
     setForm((prev) => ({
@@ -748,12 +748,12 @@ function B8SectionTable({ section, form, setForm, docs, setDocs, mode, locked, r
                 <td style={{ ...tdCenter, fontWeight: 900 }}>{totalB8.toFixed(1)}</td>
                 {mode === "review" && previousRoles.map((role) => (
                   <td key={role} style={{ ...tdCenter, fontWeight: 900 }}>
-                    {clampScore(scoreSectionRows("fdps", form.fdps || [], 10, role) + scoreSectionRows("training", form.training || [], 10, role), 20).toFixed(1)}
+                    {clampScore(scoreSectionRows("fdps", form.fdps || [], 20, role) + scoreSectionRows("training", form.training || [], 20, role), 20).toFixed(1)}
                   </td>
                 ))}
                 {mode === "review" && (
                   <td style={{ ...tdCenter, fontWeight: 900 }}>
-                    {clampScore(scoreSectionRows("fdps", reviewData.fdps || form.fdps || [], 10, reviewerRole) + scoreSectionRows("training", reviewData.training || form.training || [], 10, reviewerRole), 20).toFixed(1)}
+                    {clampScore(scoreSectionRows("fdps", reviewData.fdps || form.fdps || [], 20, reviewerRole) + scoreSectionRows("training", reviewData.training || form.training || [], 20, reviewerRole), 20).toFixed(1)}
                   </td>
                 )}
               </tr>
@@ -1063,7 +1063,7 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
     const b6Score = rowSum("confs", 30);
     const b7aScore = rowSum("proposals", 10);
     const b7bScore = rowSum("products", 20);
-    const b8Score = clampScore(rowSum("fdps", 10) + rowSum("training", 10), 20);
+    const b8Score = clampScore(rowSum("fdps", 20) + rowSum("training", 20), 20);
     const maxScores = getMediaEffectiveMaxScores(reviewerForm);
     const partATotal = n(person?.[`${reviewerRole}PartA`] ?? totals.partA);
     const partBTotal = n(person?.[`${reviewerRole}PartB`] ?? totals.partB);
@@ -1406,7 +1406,7 @@ export default function MediaCommDashboard({ fixedRole }) {
     const b6Score = rowSum("confs", 30);
     const b7aScore = rowSum("proposals", 10);
     const b7bScore = rowSum("products", 20);
-    const b8Score = clampScore(rowSum("fdps", 10) + rowSum("training", 10), 20);
+    const b8Score = clampScore(rowSum("fdps", 20) + rowSum("training", 20), 20);
     const maxScores = getMediaEffectiveMaxScores(form);
     const partATotal = clampScore(lecScore + cfScore + innovScore + projScore + qualScore + fbScore + deptScore + uniScore + socScore + acrScore, maxScores.partA);
     const partBTotal = clampScore(b1iScore + b1iiScore + b2Score + b3Score + b4aScore + b4bScore + b4cScore + b5Score + b6Score + b7aScore + b7bScore + b8Score, maxScores.partB);
