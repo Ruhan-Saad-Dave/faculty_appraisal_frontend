@@ -5,15 +5,15 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: 'es2020',
-    minify: 'esbuild',
+    minify: 'oxc',
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'router': ['react-router-dom'],
-          'http': ['axios'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'react-vendor'
+          if (id.includes('node_modules/react-router-dom/')) return 'router'
+          if (id.includes('node_modules/axios/')) return 'http'
         },
       },
     },

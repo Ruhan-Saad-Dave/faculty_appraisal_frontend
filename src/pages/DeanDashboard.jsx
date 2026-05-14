@@ -2436,7 +2436,7 @@ export default function DeanDashboard() {
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>My Appraisal Form</h2>
                 <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{info.name || "HOD"} · {info.ay}</p>
               </div>
-              <AppraisalHeaderImage height={45} />
+              <AppraisalHeaderImage height={64} />
             </div>
 
             {appraisalLocked && (
