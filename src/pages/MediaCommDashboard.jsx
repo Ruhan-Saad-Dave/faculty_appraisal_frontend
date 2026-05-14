@@ -239,7 +239,7 @@ const validateMediaBeforeSubmit = (form, docs = {}, sectionView = "all") => {
       ...(section.selfReadOnlyScore || section.autoScore || section.key === "feedback" ? [] : ["score"]),
     ],
     rowMax: section.rowMax,
-    maxScore: section.max,
+    maxScore: section.key === "feedback" ? undefined : section.max,
     docPrefix: section.key !== "courseFile" && section.key !== "acr" ? section.doc : "",
     skip: applicability[section.key] === "notApplicable",
   }));
