@@ -6,7 +6,7 @@ import { getSchoolKey } from "../constants/universityHierarchy";
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { generateMediaCommReport } from "../utils/fullFormReport";
+import { buildReviewRemarks, generateMediaCommReport } from "../utils/fullFormReport";
 import {
   INNOVATIVE_METHODS,
   SCORE_LIMITS,
@@ -1079,6 +1079,12 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
       totals: { partA: partATotal, partB: partBTotal, total: grandTotal },
       maxScores,
       generatedBy: sessionStorage.getItem("name") || roleLabel(reviewerRole),
+      remarksSections: buildReviewRemarks({
+        source: person,
+        currentRole: reviewerRole,
+        currentRemarks: remarks,
+        roleLabels: { hod: visiblePreviousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks" },
+      }),
       detailedSummaryRows: [
         { isHeader: true, label: "Part A — Teaching Process & Academic Activities" },
         { id: "A(i)", label: "Lectures / Tutorials / Practicals", max: 50, score: lecScore },

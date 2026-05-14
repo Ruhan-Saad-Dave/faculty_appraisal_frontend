@@ -21,6 +21,57 @@ const displayValue = (value) => {
   return text ? safeHtml(text) : "&nbsp;";
 };
 
+const firstFilled = (...values) =>
+  values.find((value) => String(value ?? "").trim() !== "") ?? "";
+
+export const buildReviewRemarks = ({
+  source = {},
+  currentRole = "",
+  currentRemarks = "",
+  roleLabels = {},
+} = {}) => {
+  const remarkRoles = [
+    {
+      role: "hod",
+      label: roleLabels.hod || "HOD Remarks",
+      keys: ["hodRemarks", "hod_remarks", "centerHeadRemarks", "center_head_remarks"],
+    },
+    {
+      role: "director",
+      label: roleLabels.director || "Director Remarks",
+      keys: ["directorRemarks", "director_remarks"],
+    },
+    {
+      role: "dean",
+      label: roleLabels.dean || "Dean Remarks",
+      keys: ["deanRemarks", "dean_remarks"],
+    },
+    {
+      role: "vc",
+      label: roleLabels.vc || "VC Remarks",
+      keys: ["vcRemarks", "vc_remarks"],
+    },
+  ];
+
+  return remarkRoles
+    .map(({ role, label, keys }) => {
+      const value = firstFilled(
+        role === currentRole || (role === "hod" && currentRole === "center_head") ? currentRemarks : "",
+        ...keys.map((key) => source?.[key]),
+      );
+      return { label, remarks: value };
+    })
+    .filter((item) => String(item.remarks ?? "").trim() !== "");
+};
+
+const renderReviewRemarks = (sections = []) => sections.length ? `
+  <h3 style="background:#d9d9d9;padding:4px;text-align:center;font-size:13px">REVIEW REMARKS</h3>
+  ${sections.map((section) => `
+    <h3>${safeHtml(section.label)}</h3>
+    <div class="remarks">${safeHtml(section.remarks || "No remarks recorded.")}</div>
+  `).join("")}
+` : "";
+
 const docsFor = (docs, key) => {
   const files = docs?.[key] || [];
   if (!files.length) return "&nbsp;";
@@ -190,6 +241,7 @@ export const openFullFormReport = async ({
   status = "",
   remarksLabel = "",
   remarks = "",
+  remarksSections = null,
   generatedBy = "",
   showTotal = false,
   declaration = null,
@@ -270,7 +322,7 @@ export const openFullFormReport = async ({
       ${status ? `<tr><td>Status</td><td colspan="2">${safeHtml(status)}</td></tr>` : ""}
     </tbody>
   </table>
-  ${remarksLabel ? `<h3>${safeHtml(remarksLabel)}</h3><div class="remarks">${safeHtml(remarks || "No remarks recorded.")}</div>` : ""}
+  ${renderReviewRemarks(Array.isArray(remarksSections) ? remarksSections : (remarksLabel ? [{ label: remarksLabel, remarks }] : []))}
   ${buildSignaturePage({
     facultyName: form.info?.name || form.name || "",
     submittedAt: declaration?.submitted_at || "",
@@ -297,6 +349,7 @@ export const generateMediaCommReport = async ({
   detailedSummaryRows = null,
   declaration = null,
   reviewChain = [],
+  remarksSections = [],
 }) => {
   const win = window.open("", "_blank", "width=1000,height=800");
   if (!win) { alert("Please allow popups to generate the report."); return; }
@@ -330,6 +383,7 @@ export const generateMediaCommReport = async ({
     .ht{width:100%;border:none;margin-bottom:6px}.ht td{border:none;padding:2px}
     .logo{width:22mm;height:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .st th{background:#bfbfbf}
+    .remarks{white-space:pre-wrap;border:1px solid #000;padding:8px;min-height:40px}
     h3 span{color:#555;font-size:10px;font-weight:400}
   </style>
 </head>
@@ -384,6 +438,7 @@ export const generateMediaCommReport = async ({
     <tr><td>Part B</td><td class="c">${n(totals.partB).toFixed(1)}</td><td class="c">${safeHtml(String(maxScores.partB || ""))}</td></tr>
     <tr class="tr"><td>Grand Total</td><td class="c">${n(totals.total).toFixed(1)}</td><td class="c">${safeHtml(String(maxScores.grand || ""))}</td></tr>
   </table>`}
+  ${renderReviewRemarks(remarksSections)}
   ${buildSignaturePage({
     facultyName: info.name || "",
     submittedAt: declaration?.submitted_at || "",

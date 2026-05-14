@@ -8,7 +8,7 @@ import { ACR_DETAIL_POINTS, MAX_SCORES, APP_INFO, createAcrRows } from "../const
 import { DEAN_TRACKS, UNIVERSITY_SCHOOLS, normalizeHierarchyText } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
 import { getSchoolKey, reviewedStatusFor, profileFromsessionStorage, visiblePreviousReviewRoles } from "../utils/hierarchy";
-import { openFullFormReport } from "../utils/fullFormReport";
+import { buildReviewRemarks, openFullFormReport } from "../utils/fullFormReport";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
 import { NonTeachingAuthorityReviewPanel } from "./NonTeachingStaffDashboard";
@@ -722,6 +722,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
   const selfPartB = n(person.declaration?.part_b_total ?? person.selfPartB ?? person.partBTotal);
   const selfTotal = vcSelfTotalForPerson(person);
   const vcReviewCompleted = person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) > 0;
+  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
 
   const generateVcReport = () => {
     if (!vcReviewCompleted) return;
@@ -764,8 +765,12 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
       scoreRoles: ["score", ...previousRoles, "vc"],
       roleLabel: (value) => value === "vc" ? "VC" : vcRoleMeta(value).shortLabel || value,
       status: person.status,
-      remarksLabel: "VC Remarks",
-      remarks: person.vcRemarks || remarks,
+      remarksSections: buildReviewRemarks({
+        source: person,
+        currentRole: "vc",
+        currentRemarks: remarks,
+        roleLabels: { hod: firstReviewRoleLabel },
+      }),
       generatedBy: sessionStorage.getItem("name") || "Vice Chancellor",
     });
   };
