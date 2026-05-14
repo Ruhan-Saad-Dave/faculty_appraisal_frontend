@@ -56,7 +56,7 @@ export const UNIVERSITY_SCHOOLS = [
     label: "SoC — School of Commerce & Management",
     deanTrack: DEAN_TRACKS.NON_ENGINEERING,
     hodDepartments: [],
-    aliases: ["soc", "commerce", "commerce management", "management"],
+    aliases: ["soc", "socm", "commerce", "commerce management", "management"],
   },
   {
     code: "SoMCS",
