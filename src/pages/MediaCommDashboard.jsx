@@ -546,119 +546,119 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
         </div>
       )}
       {!notApplicable && (<>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>SN</th>
-              {section.fields.map(([, label]) => <th key={label} style={thStyle}>{label}</th>)}
-              {section.key === "feedback" && <th style={thStyle}>Average</th>}
-              {section.key !== "courseFile" && <th style={thStyle}>Documents</th>}
-              <th style={thStyle}>Faculty Score</th>
-              {mode === "review" && previousRoles.map((role) => <th key={role} style={thStyle}>{roleLabel(role)} Score</th>)}
-              {mode === "review" && <th style={thStyle}>{roleLabel(currentRole)} Score</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => {
-              const socRowLocked = section.key === "society" && societyRowLocked(row);
-              const currentRowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
-              const displayScore = (value) => String(value ?? "").trim() ? clampScore(value, currentRowMax) : "";
-              return (
-              <tr key={row._id ?? `${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
-                <td style={tdCenter}>{index + 1}</td>
-                {section.fields.map(([key, , readOnlyField]) => (
-                  <td key={key} style={tdStyle}>
-                    {mode !== "self" ? <RO value={row[key]} /> : key === "first" ? (
-                      <select
-                        value={row[key] || ""}
-                        disabled={!editableSelf || readOnlyField || notApplicable || selfLocked}
-                        onChange={(event) => updateRow(index, key, event.target.value)}
-                        style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "inherit", fontSize: 11 }}
-                      >
-                        <option value="">Select</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                    ) : section.key === "research" && key === "degree" ? (
-                      <select
-                        value={row[key] || ""}
-                        disabled={!editableSelf || readOnlyField || notApplicable || selfLocked}
-                        onChange={(event) => updateRow(index, key, event.target.value)}
-                        style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "inherit", fontSize: 11 }}
-                      >
-                        <option value="">Select</option>
-                        <option value="PhD">PhD</option>
-                        <option value="PG">PG</option>
-                      </select>
-                    ) : section.key === "courseFile" && key === "details" ? (
-                      <select
-                        value={row[key] || ""}
-                        disabled={!editableSelf || notApplicable || selfLocked}
-                        onChange={(event) => updateRow(index, key, event.target.value)}
-                        style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "inherit", fontSize: 11 }}
-                      >
-                        <option value="">Select</option>
-                        <option value="1.Available">1.Available</option>
-                        <option value="2.Partially Available">2.Partially Available</option>
-                        <option value="3.Not Available">3.Not Available</option>
-                      </select>
-                    ) : (
-                      <>
-                        <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, key, value)} />
-                        {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
-                          <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
-                            {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
-                          </ul>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>SN</th>
+                {section.fields.map(([, label]) => <th key={label} style={thStyle}>{label}</th>)}
+                {section.key === "feedback" && <th style={thStyle}>Average</th>}
+                {section.key !== "courseFile" && <th style={thStyle}>Documents</th>}
+                <th style={thStyle}>Faculty Score</th>
+                {mode === "review" && previousRoles.map((role) => <th key={role} style={thStyle}>{roleLabel(role)} Score</th>)}
+                {mode === "review" && <th style={thStyle}>{roleLabel(currentRole)} Score</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => {
+                const socRowLocked = section.key === "society" && societyRowLocked(row);
+                const currentRowMax = section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max;
+                const displayScore = (value) => String(value ?? "").trim() ? clampScore(value, currentRowMax) : "";
+                return (
+                  <tr key={row._id ?? `${section.key}-${index}`} style={socRowLocked ? { background: "#f1f5f9", opacity: 0.65 } : {}}>
+                    <td style={tdCenter}>{index + 1}</td>
+                    {section.fields.map(([key, , readOnlyField]) => (
+                      <td key={key} style={tdStyle}>
+                        {mode !== "self" ? <RO value={row[key]} /> : key === "first" ? (
+                          <select
+                            value={row[key] || ""}
+                            disabled={!editableSelf || readOnlyField || notApplicable || selfLocked}
+                            onChange={(event) => updateRow(index, key, event.target.value)}
+                            style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "inherit", fontSize: 11 }}
+                          >
+                            <option value="">Select</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                          </select>
+                        ) : section.key === "research" && key === "degree" ? (
+                          <select
+                            value={row[key] || ""}
+                            disabled={!editableSelf || readOnlyField || notApplicable || selfLocked}
+                            onChange={(event) => updateRow(index, key, event.target.value)}
+                            style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "inherit", fontSize: 11 }}
+                          >
+                            <option value="">Select</option>
+                            <option value="PhD">PhD</option>
+                            <option value="PG">PG</option>
+                          </select>
+                        ) : section.key === "courseFile" && key === "details" ? (
+                          <select
+                            value={row[key] || ""}
+                            disabled={!editableSelf || notApplicable || selfLocked}
+                            onChange={(event) => updateRow(index, key, event.target.value)}
+                            style={{ width: "100%", height: 30, border: "1px solid #cbd5e1", borderRadius: 4, background: "#fff", fontFamily: "inherit", fontSize: 11 }}
+                          >
+                            <option value="">Select</option>
+                            <option value="1.Available">1.Available</option>
+                            <option value="2.Partially Available">2.Partially Available</option>
+                            <option value="3.Not Available">3.Not Available</option>
+                          </select>
+                        ) : (
+                          <>
+                            <TI value={row[key]} type={NUMERIC_KEYS.has(key) ? "number" : "text"} center={section.key === "courseFile" && key === "title"} max={key === "fb1" || key === "fb2" ? SCORE_LIMITS.feedbackAverage : undefined} textOnly={TEXT_ONLY_KEYS.has(key) && !(section.key === "courseFile" && key === "title")} readOnly={!editableSelf || readOnlyField || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, key, value)} />
+                            {section.key === "acr" && key === "label" && ACR_DETAIL_POINTS[row[key]] && (
+                              <ul style={{ margin: "5px 0 0 16px", padding: 0, color: "#64748b", fontSize: 10, lineHeight: 1.5 }}>
+                                {ACR_DETAIL_POINTS[row[key]].map((point) => <li key={point}>{point}</li>)}
+                              </ul>
+                            )}
+                            {key === "date" && row[key] && !isValidDDMMYYYY(row[key]) && (
+                              <div style={{ color: "#dc2626", fontSize: 10, marginTop: 3 }}>Use DD/MM/YYYY</div>
+                            )}
+                          </>
                         )}
-                        {key === "date" && row[key] && !isValidDDMMYYYY(row[key]) && (
-                          <div style={{ color: "#dc2626", fontSize: 10, marginTop: 3 }}>Use DD/MM/YYYY</div>
-                        )}
-                      </>
+                      </td>
+                    ))}
+                    {section.key === "feedback" && <td style={tdCenter}>{row.fb1 || row.fb2 ? feedbackAverage(row).toFixed(2) : ""}</td>}
+                    {section.key !== "courseFile" && <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked || socRowLocked} /></td>}
+                    <td style={tdCenter}>
+                      {mode === "self"
+                        ? section.key === "feedback"
+                          ? <RO value={row.fb1 || row.fb2 ? feedbackRowScore(row, section.max).toFixed(1) : ""} center />
+                          : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
+                        : <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
+                    </td>
+                    {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={socRowLocked ? "0" : displayScore(row[role])} center /></td>)}
+                    {mode === "review" && (
+                      <td style={tdCenter}>
+                        <TI type="number" center max={currentRowMax} readOnly={reviewLocked || socRowLocked} value={socRowLocked ? "0" : displayScore(reviewRows[index]?.[currentRole] ?? row[currentRole] ?? "")} onChange={(value) => updateReview(index, value)} />
+                      </td>
                     )}
+                  </tr>
+                );
+              })}
+              <tr style={{ background: "#eff6ff" }}>
+                <td style={{ ...tdCenter, fontWeight: "bold" }} colSpan={totalLabelColSpan}>{totalLabel}</td>
+                <td style={{ ...tdCenter, fontWeight: "bold" }}>{earned.toFixed(1)}</td>
+                {mode === "review" && previousRoles.map((role) => (
+                  <td key={role} style={{ ...tdCenter, fontWeight: "bold" }}>
+                    {sectionTotalScore(rows, role).toFixed(1)}
                   </td>
                 ))}
-                {section.key === "feedback" && <td style={tdCenter}>{row.fb1 || row.fb2 ? feedbackAverage(row).toFixed(2) : ""}</td>}
-                {section.key !== "courseFile" && <td style={tdStyle}><DocCell id={`${section.doc}-${index}`} docs={docs} setDocs={setDocs} readOnly={!editableSelf || notApplicable || selfLocked || socRowLocked} /></td>}
-                <td style={tdCenter}>
-                  {mode === "self"
-                    ? section.key === "feedback"
-                      ? <RO value={row.fb1 || row.fb2 ? feedbackRowScore(row, section.max).toFixed(1) : ""} center />
-                        : <TI value={row.score} type="number" center max={section.rowMax ? (typeof section.rowMax === "function" ? section.rowMax(row) : section.rowMax) : section.max} readOnly={!editableSelf || section.selfReadOnlyScore || notApplicable || selfLocked || socRowLocked} onChange={(value) => updateRow(index, "score", value)} />
-                    : <RO value={rowSelfScore(row) ? rowSelfScore(row).toFixed(1) : ""} center />}
-                </td>
-                {mode === "review" && previousRoles.map((role) => <td key={role} style={tdCenter}><RO value={socRowLocked ? "0" : displayScore(row[role])} center /></td>)}
                 {mode === "review" && (
-                  <td style={tdCenter}>
-                    <TI type="number" center max={currentRowMax} readOnly={reviewLocked || socRowLocked} value={socRowLocked ? "0" : displayScore(reviewRows[index]?.[currentRole] ?? row[currentRole] ?? "")} onChange={(value) => updateReview(index, value)} />
+                  <td style={{ ...tdCenter, fontWeight: "bold" }}>
+                    {sectionTotalScore(reviewRows.length ? reviewRows : rows, currentRole).toFixed(1)}
                   </td>
                 )}
               </tr>
-              );
-            })}
-            <tr style={{ background: "#eff6ff" }}>
-              <td style={{ ...tdCenter, fontWeight: "bold" }} colSpan={totalLabelColSpan}>{totalLabel}</td>
-              <td style={{ ...tdCenter, fontWeight: "bold" }}>{earned.toFixed(1)}</td>
-              {mode === "review" && previousRoles.map((role) => (
-                <td key={role} style={{ ...tdCenter, fontWeight: "bold" }}>
-                  {sectionTotalScore(rows, role).toFixed(1)}
-                </td>
-              ))}
-              {mode === "review" && (
-                <td style={{ ...tdCenter, fontWeight: "bold" }}>
-                  {sectionTotalScore(reviewRows.length ? reviewRows : rows, currentRole).toFixed(1)}
-                </td>
-              )}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      {editableSelf && !section.selfReadOnlyScore && (
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <button type="button" onClick={addRow} style={smallButton("#10b981")}>+ Add Row</button>
-          <button type="button" onClick={deleteRow} style={smallButton("#ef4444")}>Delete Last</button>
+            </tbody>
+          </table>
         </div>
-      )}
+        {editableSelf && !section.selfReadOnlyScore && (
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button type="button" onClick={addRow} style={smallButton("#10b981")}>+ Add Row</button>
+            <button type="button" onClick={deleteRow} style={smallButton("#ef4444")}>Delete Last</button>
+          </div>
+        )}
       </>)}
     </SectionShell>
   );
@@ -856,7 +856,7 @@ function InnovativeSection({ form, setForm, docs, setDocs, mode, locked, reviewe
   );
 }
 
-function MediaForm({ form, setForm, docs, setDocs, mode = "self", locked = false, reviewerRole = "", reviewData = {}, setReviewData = () => {}, previousRoles = [], sectionView = "partA" }) {
+function MediaForm({ form, setForm, docs, setDocs, mode = "self", locked = false, reviewerRole = "", reviewData = {}, setReviewData = () => { }, previousRoles = [], sectionView = "partA" }) {
   return (
     <>
       {(sectionView === "partA" || sectionView === "all") && (
@@ -982,8 +982,8 @@ function buildMediaSectionScores(person, reviewData, reviewerRole) {
       [reviewerRole]: key === "society" && societyRowLocked(row)
         ? "0"
         : key === "acr"
-        ? (String(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "").trim() ? String(clampScore(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole], SCORE_LIMITS.acrRow)) : "")
-        : reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
+          ? (String(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "").trim() ? String(clampScore(reviewRows[index]?.[reviewerRole] ?? row[reviewerRole], SCORE_LIMITS.acrRow)) : "")
+          : reviewRows[index]?.[reviewerRole] ?? row[reviewerRole] ?? "",
     }));
   });
   payload.innovativeTeaching = {
@@ -1133,7 +1133,7 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
       {(sectionView === "partA" || sectionView === "partB") && (
         <MediaForm
           form={form}
-          setForm={() => {}}
+          setForm={() => { }}
           docs={docs}
           setDocs={setDocs}
           mode="review"
@@ -1745,11 +1745,11 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr>
                         <td style={tdCenter}>(i)</td>
                         <td style={tdStyle}>
-                          <strong>Lectures, seminars, tutorials, practical, contact classes</strong> — based on verifiable records (JUNO record).<br/>
-                          No score should be assigned if a teacher has taken less than 70% of the assigned classes.<br/>
-                          Score will be 50 if teacher has taken 100% assigned classes to particular subject as specified by University.<br/>
-                          If a teacher has taken classes less than the allotted hours but above 80% limit of total, then 2 points will be deducted from 50 for each less hour of classes.<br/>
-                          <em>Maximum score of 50 if there is 100% performance | 91–99: 95% of 50 | 81–89: 85% | 70–79: 75%</em><br/>
+                          <strong>Lectures, seminars, tutorials, practical, contact classes</strong> — based on verifiable records (JUNO record).<br />
+                          No score should be assigned if a teacher has taken less than 70% of the assigned classes.<br />
+                          Score will be 50 if teacher has taken 100% assigned classes to particular subject as specified by University.<br />
+                          If a teacher has taken classes less than the allotted hours but above 80% limit of total, then 2 points will be deducted from 50 for each less hour of classes.<br />
+                          <em>Maximum score of 50 if there is 100% performance | 91–99: 95% of 50 | 81–89: 85% | 70–79: 75%</em><br />
                           <em>Note: For School of Applied Arts and Crafts, School of Design — 40 Marks can be claimed.</em>
                         </td>
                         <td style={tdCenter}>50</td>
@@ -1757,11 +1757,11 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr style={{ background: "#f8fafc" }}>
                         <td style={tdCenter}>(ii)</td>
                         <td style={tdStyle}>
-                          <strong>Course file of subject</strong> — All points covered as per IQAC index, full marks. Proportionate marking to percentage completion applicable up to 60% completion.<br/>
+                          <strong>Course file of subject</strong> — All points covered as per IQAC index, full marks. Proportionate marking to percentage completion applicable up to 60% completion.<br />
                           <table style={{ marginTop: 6, borderCollapse: "collapse", fontSize: 11 }}>
                             <thead><tr><th style={thStyle}>Sr No</th><th style={thStyle}>% Completion</th><th style={thStyle}>Score</th></tr></thead>
                             <tbody>
-                              {[["1","100%","20"],["2","90%","18"],["3","80%","16"],["4","70%","14"],["5","60%","12"],["6","Less than 60%","0"]].map(([n,p,s])=>(
+                              {[["1", "100%", "20"], ["2", "90%", "18"], ["3", "80%", "16"], ["4", "70%", "14"], ["5", "60%", "12"], ["6", "Less than 60%", "0"]].map(([n, p, s]) => (
                                 <tr key={n}><td style={tdCenter}>{n}</td><td style={tdCenter}>{p}</td><td style={tdCenter}>{s}</td></tr>
                               ))}
                             </tbody>
@@ -1773,7 +1773,7 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr>
                         <td style={tdCenter}>(iii)</td>
                         <td style={tdStyle}>
-                          <strong>Use of participatory and innovative teaching-learning methodologies</strong>; updating of subject content, course improvement etc. (Each activity carries 2 marks)<br/>
+                          <strong>Use of participatory and innovative teaching-learning methodologies</strong>; updating of subject content, course improvement etc. (Each activity carries 2 marks)<br />
                           1. Blended learning &nbsp; 2. Virtual Lab &nbsp; 3. Conceptual videos &nbsp; 4. Use of LMS &nbsp; 5. Project Based Learning &nbsp; 6. Open Course Ware (OCW) assignment &nbsp; 7. Quiz &nbsp; 8. Group Discussion &nbsp; 9. Flip classroom &nbsp; 10. Any other innovative teaching learning methods
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1781,8 +1781,8 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr style={{ background: "#f8fafc" }}>
                         <td style={tdCenter}>(iv)</td>
                         <td style={tdStyle}>
-                          <strong>Qualification Enhancement</strong><br/>
-                          Higher qualification during assessment period: 5 marks<br/>
+                          <strong>Qualification Enhancement</strong><br />
+                          Higher qualification during assessment period: 5 marks<br />
                           Add-on qualification / certification: 5 marks
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1790,9 +1790,9 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr>
                         <td style={tdCenter}>(v)</td>
                         <td style={tdStyle}>
-                          <strong>Guided Students Project</strong> (New schools or if there is no project batch allotted can mention as NA)<br/>
-                          Project guided: 3/group | Industrial collaboration/Sponsorship (Max 5 marks) | Project outcome: events/competitions (Max 5 marks)<br/>
-                          <em>Note: For School of Applied Arts and Crafts, School of Design — 20 Marks can be claimed.</em><br/>
+                          <strong>Guided Students Project</strong> (New schools or if there is no project batch allotted can mention as NA)<br />
+                          Project guided: 3/group | Industrial collaboration/Sponsorship (Max 5 marks) | Project outcome: events/competitions (Max 5 marks)<br />
+                          <em>Note: For School of Applied Arts and Crafts, School of Design — 20 Marks can be claimed.</em><br />
                           Guided students project other than curriculum: Project apart from curriculum: 5 | Industrial collaboration/Sponsorship: 5 | Any Award for project (Max 5 marks): 5
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1804,9 +1804,9 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr>
                         <td style={tdCenter}>B</td>
                         <td style={tdStyle}>
-                          <strong>Students' Feedback (Maximum Point 10)</strong><br/>
-                          Score will be linearly proportional to feedback. (Score = percentage / 10)<br/>
-                          Average score of first and second feedback will be considered per semester at the scale of 10.<br/>
+                          <strong>Students' Feedback (Maximum Point 10)</strong><br />
+                          Score will be linearly proportional to feedback. (Score = percentage / 10)<br />
+                          Average score of first and second feedback will be considered per semester at the scale of 10.<br />
                           If faculty is handling more than one subject, then average score of all the subjects will be considered. (Average Percentage / 10)
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1814,8 +1814,8 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr style={{ background: "#f8fafc" }}>
                         <td style={tdCenter}>C &amp; D</td>
                         <td style={tdStyle}>
-                          <strong>Department / School / University Activities (Max 20 / 30)</strong><br/>
-                          <em>Department/School Level (Max 20):</em> Short-term one-time activity: 3 marks | Semester/Term-based (3–6 months): 5 marks | Academic Year activity (&gt;6 months): 10 marks<br/>
+                          <strong>Department / School / University Activities (Max 20 / 30)</strong><br />
+                          <em>Department/School Level (Max 20):</em> Short-term one-time activity: 3 marks | Semester/Term-based (3–6 months): 5 marks | Academic Year activity (&gt;6 months): 10 marks<br />
                           <em>University Level (Max 30):</em> Short-term one-time activity: 10 marks | Semester/Term-based: 20 marks | Academic Year activity: 30 marks
                         </td>
                         <td style={tdCenter}>20 / 30</td>
@@ -1823,7 +1823,7 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr>
                         <td style={tdCenter}>E</td>
                         <td style={tdStyle}>
-                          <strong>Contribution to Society through institute/University (Social Activities): 5 marks/activity</strong><br/>
+                          <strong>Contribution to Society through institute/University (Social Activities): 5 marks/activity</strong><br />
                           Faculty involved in UGC/AICTE initiatives like Induction Program, Unnat Bharat Abhiyan, Yoga Classes, Blood Donation, Techno Social, NSS etc.
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1831,11 +1831,11 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr style={{ background: "#f8fafc" }}>
                         <td style={tdCenter}>F</td>
                         <td style={tdStyle}>
-                          <strong>Industry Connect Activities (Max 5 Marks)</strong><br/>
-                          1. Inviting company for campus placement: 5 marks/company (proof of invitation letter required, certified by TPO)<br/>
-                          2. Providing internships to students: 2 marks/student<br/>
-                          3. Signing MOU with industry: 5 marks per active MOU (training institutes not considered)<br/>
-                          4. Industry visits: 2 marks per visit (documentary proof required)<br/>
+                          <strong>Industry Connect Activities (Max 5 Marks)</strong><br />
+                          1. Inviting company for campus placement: 5 marks/company (proof of invitation letter required, certified by TPO)<br />
+                          2. Providing internships to students: 2 marks/student<br />
+                          3. Signing MOU with industry: 5 marks per active MOU (training institutes not considered)<br />
+                          4. Industry visits: 2 marks per visit (documentary proof required)<br />
                           5. Establishing centre of excellence with Industry: 5 marks
                         </td>
                         <td style={tdCenter}>5</td>
@@ -1843,11 +1843,11 @@ export default function MediaCommDashboard({ fixedRole }) {
                       <tr>
                         <td style={tdCenter}>G</td>
                         <td style={tdStyle}>
-                          <strong>Annual Confidential Report (Maximum Point 25)</strong><br/>
-                          1. Self-motivation (5): List activities/initiatives other than regular load/duties.<br/>
-                          2. Punctuality (5): Number of late marks, punctuality in lecture/practical, timely completion of daily report, absentee without intimation.<br/>
-                          3. Target based work (5): List tasks allotted, timely completion of allotted work — observed by HOD.<br/>
-                          4. Effectiveness (5): Work done without errors &amp; least follow-up — observed by HOD.<br/>
+                          <strong>Annual Confidential Report (Maximum Point 25)</strong><br />
+                          1. Self-motivation (5): List activities/initiatives other than regular load/duties.<br />
+                          2. Punctuality (5): Number of late marks, punctuality in lecture/practical, timely completion of daily report, absentee without intimation.<br />
+                          3. Target based work (5): List tasks allotted, timely completion of allotted work — observed by HOD.<br />
+                          4. Effectiveness (5): Work done without errors &amp; least follow-up — observed by HOD.<br />
                           5. Obedience (5): To be observed by HOD and Director.
                         </td>
                         <td style={tdCenter}>25</td>
@@ -1868,23 +1868,23 @@ export default function MediaCommDashboard({ fixedRole }) {
                     <tbody>
                       <tr>
                         <td style={tdCenter}>1</td>
-                        <td style={tdStyle}><strong>Research Papers (Published in Journals)</strong><br/><em>(With institute affiliation, Maxi. 4 papers can be claimed)</em></td>
+                        <td style={tdStyle}><strong>Research Papers (Published in Journals)</strong><br /><em>(With institute affiliation, Maxi. 4 papers can be claimed)</em></td>
                         <td style={tdStyle}>
-                          Refereed Journals — SCI/SCIE/WoS Q1 &amp; Q2: 30/publication + Impact factor score<br/>
-                          Refereed Journals — Scopus Q3, Q4: 15/publication + Impact factor score<br/>
-                          UGC care listed: 10/publication<br/>
-                          Submitted and under review: 5/publication | Submitted and rejected after 1–2 reviews: 10/publication (max 2 in this category)<br/>
+                          Refereed Journals — SCI/SCIE/WoS Q1 &amp; Q2: 30/publication + Impact factor score<br />
+                          Refereed Journals — Scopus Q3, Q4: 15/publication + Impact factor score<br />
+                          UGC care listed: 10/publication<br />
+                          Submitted and under review: 5/publication | Submitted and rejected after 1–2 reviews: 10/publication (max 2 in this category)<br />
                           <strong>Instructions:</strong> Multiple DYPIU authors: 70% first author, 30% each co-author. Additional marks for Impact Factor: up to 5 → 3 marks; 5–10 → 5 marks; above 10 → 10 marks. Joint/collaborative publication: full marks.
                         </td>
                         <td style={tdCenter}>80 / 120</td>
                       </tr>
                       <tr style={{ background: "#f8fafc" }}>
                         <td style={tdCenter}>2</td>
-                        <td style={tdStyle}><strong>Publications</strong><br/><em>(other than Research papers, Maxi. 2 book chapters)</em></td>
+                        <td style={tdStyle}><strong>Publications</strong><br /><em>(other than Research papers, Maxi. 2 book chapters)</em></td>
                         <td style={tdStyle}>
-                          Books by international publishers: 15/publication | National publishers: 10/publication | Local publisher with ISBN/ISSN: 5/publication<br/>
-                          Chapter in Edited Book: 5/publication | Editor of Book (International): 10 | (National): 8 | (Local with ISBN/ISSN): 3<br/>
-                          Translation works: Chapter/Research paper: 3 | Book: 8<br/>
+                          Books by international publishers: 15/publication | National publishers: 10/publication | Local publisher with ISBN/ISSN: 5/publication<br />
+                          Chapter in Edited Book: 5/publication | Editor of Book (International): 10 | (National): 8 | (Local with ISBN/ISSN): 3<br />
+                          Translation works: Chapter/Research paper: 3 | Book: 8<br />
                           <strong>Instructions:</strong> Multiple DYPIU authors: 70% first author, 30% each co-author. SoMCS/SoD/SAA: Max 60 marks; Other schools: Max 50.
                         </td>
                         <td style={tdCenter}>50 / 60</td>
@@ -1893,9 +1893,9 @@ export default function MediaCommDashboard({ fixedRole }) {
                         <td style={tdCenter}>3</td>
                         <td style={tdStyle}><strong>Creation of ICT mediated Teaching Learning pedagogy and content</strong></td>
                         <td style={tdStyle}>
-                          (a) Development of Innovative pedagogy which does not exist globally: 5<br/>
-                          (b) MOOCs / Course Builder / Coursera Course: 5/course<br/>
-                          (c) E-Content (available online publicly) — video lecture, blog, website etc.: 5<br/>
+                          (a) Development of Innovative pedagogy which does not exist globally: 5<br />
+                          (b) MOOCs / Course Builder / Coursera Course: 5/course<br />
+                          (c) E-Content (available online publicly) — video lecture, blog, website etc.: 5<br />
                           <em>Note: SoMCS max 30; SoD &amp; SAA max 50; Other schools max 20.</em>
                         </td>
                         <td style={tdCenter}>20 / 30 / 50</td>
@@ -1904,10 +1904,10 @@ export default function MediaCommDashboard({ fixedRole }) {
                         <td style={tdCenter}>4</td>
                         <td style={tdStyle}><strong>Research Guidance (Maxi. marks 75)</strong></td>
                         <td style={tdStyle}>
-                          (a) Research Guidance (Max 30, if applicable): PhD — 20 for degree awarded, 10 for thesis submitted; PG degree awarded to batch candidate. Joint supervision: 70% supervisor, 30% co-supervisor (7 marks each).<br/>
-                          (b) Research Projects Completed (Maxi. 15): Internal Project — Grant received 100% marks.<br/>
-                          (c) Research Projects Ongoing (Maxi. 30): &gt;10 lakhs → 15 marks; &lt;10 lakhs → 10 marks.<br/>
-                          Consultancy/Testing/Training: up to ₹50k → 3; ₹51k–2L → 5; ₹2L–5L → 10; ₹5L–10L → 15; above ₹10L → 15+3/per 5L.<br/>
+                          (a) Research Guidance (Max 30, if applicable): PhD — 20 for degree awarded, 10 for thesis submitted; PG degree awarded to batch candidate. Joint supervision: 70% supervisor, 30% co-supervisor (7 marks each).<br />
+                          (b) Research Projects Completed (Maxi. 15): Internal Project — Grant received 100% marks.<br />
+                          (c) Research Projects Ongoing (Maxi. 30): &gt;10 lakhs → 15 marks; &lt;10 lakhs → 10 marks.<br />
+                          Consultancy/Testing/Training: up to ₹50k → 3; ₹51k–2L → 5; ₹2L–5L → 10; ₹5L–10L → 15; above ₹10L → 15+3/per 5L.<br />
                           <em>Note: If no PG/PhD students enrolled, max marks deducted from denominator.</em>
                         </td>
                         <td style={tdCenter}>75</td>
@@ -1916,10 +1916,10 @@ export default function MediaCommDashboard({ fixedRole }) {
                         <td style={tdCenter}>5</td>
                         <td style={tdStyle}><strong>Patents (a) + (b) (Maximum marks 50)</strong></td>
                         <td style={tdStyle}>
-                          (a) Patent/Product development:<br/>
-                          Grant (National): 30/patent | Grant (International): 15/patent | Published: 5/patent | Design Patent: 10/patent | Copyright/Trademark: 3/copyright | Product/Equipment developed/commercialized: 10/product<br/>
-                          <em>Max 40 marks</em><br/>
-                          (b) Awards/Fellowship/Research awards (Maxi. 10):<br/>
+                          (a) Patent/Product development:<br />
+                          Grant (National): 30/patent | Grant (International): 15/patent | Published: 5/patent | Design Patent: 10/patent | Copyright/Trademark: 3/copyright | Product/Equipment developed/commercialized: 10/product<br />
+                          <em>Max 40 marks</em><br />
+                          (b) Awards/Fellowship/Research awards (Maxi. 10):<br />
                           International fellowship: 10 | National/state fellowship: 7 | Research excellence awards (External/Internal: 7/5) | Best paper award (International/National): 5
                         </td>
                         <td style={tdCenter}>50</td>
@@ -1928,11 +1928,11 @@ export default function MediaCommDashboard({ fixedRole }) {
                         <td style={tdCenter}>6</td>
                         <td style={tdStyle}><strong>Paper presentation in Seminars/Conferences/full paper in Conference Proceeding</strong></td>
                         <td style={tdStyle}>
-                          Paper Publication in Scopus indexed conference: 10/paper<br/>
-                          Invited lectures / Resource Person: 10/session<br/>
-                          Conference attended: 5/conference<br/>
-                          Attended FDP of one week duration or more (Maxi. 2): 5/FDP<br/>
-                          Industrial training of minimum 3 days duration: 5 marks<br/>
+                          Paper Publication in Scopus indexed conference: 10/paper<br />
+                          Invited lectures / Resource Person: 10/session<br />
+                          Conference attended: 5/conference<br />
+                          Organized FDP of one week duration or more (Maxi. 2): 5/FDP<br />
+                          Industrial training of minimum 3 days duration: 5 marks<br />
                           <em>* Paper presented in Seminars/Conferences and also published as full paper in Conference Proceedings will be counted only once.</em>
                         </td>
                         <td style={tdCenter}>30</td>
@@ -1941,8 +1941,8 @@ export default function MediaCommDashboard({ fixedRole }) {
                         <td style={tdCenter}>7</td>
                         <td style={tdStyle}><strong>Other research and development activities (Maxi. 20 marks)</strong></td>
                         <td style={tdStyle}>
-                          (i) Research proposal submitted: &gt;20 Lacs → 10 marks; &lt;20 Lacs → 5 marks<br/>
-                          (ii) Product development in Lab/commercialized (Maximum 10)<br/>
+                          (i) Research proposal submitted: &gt;20 Lacs → 10 marks; &lt;20 Lacs → 5 marks<br />
+                          (ii) Product development in Lab/commercialized (Maximum 10)<br />
                           <em>Note: SAA &amp; SoD max 10; SoMCS max 30; Other schools max 20.</em>
                         </td>
                         <td style={tdCenter}>10 / 20 / 30</td>
@@ -1951,8 +1951,8 @@ export default function MediaCommDashboard({ fixedRole }) {
                         <td style={tdCenter}>8</td>
                         <td style={tdStyle}><strong>Self Development (Max. marks 10)</strong></td>
                         <td style={tdStyle}>
-                          (a) Attended FDP of one week duration or more (Max 10 marks): 5/FDP<br/>
-                          (b) Industrial training (Maximum marks 5)<br/>
+                          (a) Attended FDP of one week duration or more (Max 10 marks): 5/FDP<br />
+                          (b) Industrial training (Maximum marks 5)<br />
                           <em>Total B8 score maximum marks 10.</em>
                         </td>
                         <td style={tdCenter}>10</td>
@@ -1973,25 +1973,25 @@ export default function MediaCommDashboard({ fixedRole }) {
                     </thead>
                     <tbody>
                       {[
-                        ["","Part A — 360 Degree Feedback","","",""],
-                        ["A","Teaching Process (i+ii+iii+iv+v)","100","100","100"],
-                        ["B","Students' Feedback","10","10","10"],
-                        ["C","Departmental Activities","20","20","20"],
-                        ["D","University Activity","30","30","30"],
-                        ["E","Contribution to Society","10","10","10"],
-                        ["F","Industry Connect","5","5","5"],
-                        ["G","Annual Confidential Report","25","25","25"],
-                        ["","Marks obtained in Part A","200","200","200"],
-                        ["","Part B — Research and Academic Contribution","","",""],
-                        ["1","Research papers / journal publication","80","120","120"],
-                        ["2","Books authored / edited / book chapter","60","60","50"],
-                        ["3","ICT, Teaching learning Pedagogy","50","30","20"],
-                        ["4","Research guide / PG guide / Consultancy","75","75","75"],
-                        ["5","Patents, Awards, Fellowship","50","10","50"],
-                        ["6","Conference attended / paper presented / session chair etc.","30","30","30"],
-                        ["7","Research proposal in process","10","30","20"],
-                        ["8","Self Development","20","20","10"],
-                        ["","Total score","375","375","375"],
+                        ["", "Part A — 360 Degree Feedback", "", "", ""],
+                        ["A", "Teaching Process (i+ii+iii+iv+v)", "100", "100", "100"],
+                        ["B", "Students' Feedback", "10", "10", "10"],
+                        ["C", "Departmental Activities", "20", "20", "20"],
+                        ["D", "University Activity", "30", "30", "30"],
+                        ["E", "Contribution to Society", "10", "10", "10"],
+                        ["F", "Industry Connect", "5", "5", "5"],
+                        ["G", "Annual Confidential Report", "25", "25", "25"],
+                        ["", "Marks obtained in Part A", "200", "200", "200"],
+                        ["", "Part B — Research and Academic Contribution", "", "", ""],
+                        ["1", "Research papers / journal publication", "80", "120", "120"],
+                        ["2", "Books authored / edited / book chapter", "60", "60", "50"],
+                        ["3", "ICT, Teaching learning Pedagogy", "50", "30", "20"],
+                        ["4", "Research guide / PG guide / Consultancy", "75", "75", "75"],
+                        ["5", "Patents, Awards, Fellowship", "50", "10", "50"],
+                        ["6", "Conference attended / paper presented / session chair etc.", "30", "30", "30"],
+                        ["7", "Research proposal in process", "10", "30", "20"],
+                        ["8", "Self Development", "20", "20", "10"],
+                        ["", "Total score", "375", "375", "375"],
                       ].map(([sn, criteria, saa, mcs, other], i) => (
                         <tr key={i} style={criteria.startsWith("Part") ? { background: "#dbeafe", fontWeight: 700 } : criteria === "Marks obtained in Part A" || criteria === "Total score" ? { background: "#d1fae5", fontWeight: 700 } : i % 2 === 0 ? {} : { background: "#f8fafc" }}>
                           <td style={tdCenter}>{sn}</td>
@@ -2018,7 +2018,7 @@ export default function MediaCommDashboard({ fixedRole }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {[["Part A","200","180","180","180"],["Part B","375","150","190","220"]].map(([part,max,ap,asc,prof])=>(
+                      {[["Part A", "200", "180", "180", "180"], ["Part B", "375", "150", "190", "220"]].map(([part, max, ap, asc, prof]) => (
                         <tr key={part}>
                           <td style={tdStyle}><strong>{part}</strong></td>
                           <td style={tdCenter}>{max}</td>
@@ -2042,13 +2042,13 @@ export default function MediaCommDashboard({ fixedRole }) {
                     </thead>
                     <tbody>
                       {[
-                        ["1","A+","Above 350","Above 380","Above 400","#059669","#d1fae5"],
-                        ["2","A","331 to 340","360 to 379","375 to 399","#0284c7","#dbeafe"],
-                        ["3","B++","321 to 330","340 to 359","350 to 374","#7c3aed","#ede9fe"],
-                        ["4","B+","311 to 320","320 to 339","325 to 349","#d97706","#fef3c7"],
-                        ["5","B","300 to 310","300 to 319","300 to 324","#ea580c","#fff7ed"],
-                        ["6","C","Below 300","Below 300","Below 300","#dc2626","#fee2e2"],
-                      ].map(([sn,grade,ap,asc,prof,color,bg])=>(
+                        ["1", "A+", "Above 350", "Above 380", "Above 400", "#059669", "#d1fae5"],
+                        ["2", "A", "331 to 340", "360 to 379", "375 to 399", "#0284c7", "#dbeafe"],
+                        ["3", "B++", "321 to 330", "340 to 359", "350 to 374", "#7c3aed", "#ede9fe"],
+                        ["4", "B+", "311 to 320", "320 to 339", "325 to 349", "#d97706", "#fef3c7"],
+                        ["5", "B", "300 to 310", "300 to 319", "300 to 324", "#ea580c", "#fff7ed"],
+                        ["6", "C", "Below 300", "Below 300", "Below 300", "#dc2626", "#fee2e2"],
+                      ].map(([sn, grade, ap, asc, prof, color, bg]) => (
                         <tr key={sn} style={{ background: bg }}>
                           <td style={tdCenter}>{sn}</td>
                           <td style={{ ...tdCenter, fontWeight: 800, color }}>{grade}</td>

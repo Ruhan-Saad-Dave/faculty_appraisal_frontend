@@ -339,6 +339,7 @@ export const validateCompleteRows = (sections = [], defaultDocs) => {
   sections.forEach(({ label, rows = [], fields = [], skip = false, rowMax, maxScore, scoreField = "score", docs = defaultDocs, docPrefix, docKey, requireAttachment }) => {
     if (skip) return;
     const labelText = normalizedText(label);
+    const isB8Section = /^b8(?:\(|\.)/.test(labelText);
     const inferredRowMax = rowMax ?? (labelText.includes("fdp") || labelText.includes("industrial training") ? SCORE_LIMITS.fdpRow : undefined);
     const resolvedDocPrefix = docPrefix ?? (docs ? docPrefixForSectionLabel(label) : "");
     const shouldRequireAttachment = requireAttachment ?? Boolean(resolvedDocPrefix || docKey);
@@ -370,7 +371,7 @@ export const validateCompleteRows = (sections = [], defaultDocs) => {
       }
     });
 
-    if (maxScore && rows.length) {
+    if (maxScore && rows.length && !isB8Section) {
       const total = rows.reduce((sum, row, index) => {
         const maxForRow = rowMaxValue(inferredRowMax, row, index);
         const score = maxForRow ? clampScore(row?.[scoreField], maxForRow) : toNumber(row?.[scoreField]);
