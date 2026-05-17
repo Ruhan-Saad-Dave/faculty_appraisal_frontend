@@ -3,6 +3,7 @@ import { storeUserSession } from "../auth/session";
 import { getDeanTrack, getReviewChain, normalizeRoleForWorkflow, pendingStatusFor } from "../utils/hierarchy";
 import { DEAN_TRACKS } from "../constants/universityHierarchy";
 import { attachSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
+import { filesForDocValue } from "../utils/appraisalFormUtils";
 
 const SNAPSHOT_SETTERS = {
   info: "setInfo",
@@ -61,9 +62,14 @@ const applySnapshotToSetters = (snapshotPayload, setters) => {
   });
 
   if (snapshotPayload?.docs) {
-    setters.setDocs?.(snapshotPayload.docs);
+    setters.setDocs?.(normalizeDocsMap(snapshotPayload.docs));
   }
 };
+
+const normalizeDocsMap = (docs = {}) =>
+  Object.fromEntries(
+    Object.entries(docs || {}).map(([key, files]) => [key, filesForDocValue(files)]),
+  );
 
 export const loadAppraisalSnapshot = async ({ facultyEmail, academicYear }) => {
   if (!facultyEmail || !academicYear) return null;
@@ -97,7 +103,7 @@ export const saveAppraisalDraftSection = async ({
       submitterProfile,
       savedAt: new Date().toISOString(),
     },
-    docs,
+    docs: normalizeDocsMap(docs),
   });
 };
 
@@ -109,7 +115,7 @@ export const docsToRows = (docs, facultyEmail, academicYear) => {
   };
 
   return Object.entries(docs || {}).flatMap(([docKey, files]) =>
-    (files || []).slice(0, 1)
+    filesForDocValue(files)
       .filter((file) => file?.url && !String(file.url).startsWith("blob:"))
       .map((file) => ({
         faculty_email: facultyEmail,
@@ -1168,7 +1174,7 @@ export const submitAppraisal = async ({
     academic_year: academicYear,
     form: mapFormForSubmit(form),
     totals,
-    docs,
+    docs: normalizeDocsMap(docs),
     submitter_profile: submitterProfile || activeProfile,
   };
 

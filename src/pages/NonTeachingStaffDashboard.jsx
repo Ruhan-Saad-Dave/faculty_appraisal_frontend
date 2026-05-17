@@ -193,10 +193,11 @@ function RatingPicker({ value, onChange, readOnly = false }) {
 function DocCell({ id, docs, setDocs, readOnly = false }) {
   const ref = useRef(null);
   const [uploading, setUploading] = useState(false);
-  const files = docs?.[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
 
   const handleFiles = async (selectedFiles) => {
-    const fileList = Array.from(selectedFiles || []).slice(0, 1);
+    if (readOnly) return;
+    const fileList = Array.from(selectedFiles || []);
     if (!fileList.length) return;
     const unsupported = fileList.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
@@ -207,11 +208,18 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", fileList[0]);
-      fd.append("folder", `non-teaching-appraisal/${id}`);
-      const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setDocs((current) => ({ ...current, [id]: [uploaded] }));
+      const uploadedFiles = [];
+      for (const file of fileList) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("folder", `non-teaching-appraisal/${id}`);
+        const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        uploadedFiles.push(uploaded);
+      }
+      setDocs((current) => ({
+        ...current,
+        [id]: [...(Array.isArray(current[id]) ? current[id] : current[id] ? [current[id]] : []), ...uploadedFiles],
+      }));
     } catch (err) {
       console.error("Upload error:", err);
       alert(`Unable to upload file.\n\n${err.message}`);
@@ -244,8 +252,8 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
       ))}
       {!readOnly && (
         <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", borderRadius: 5, padding: "5px 8px", color: "#64748b", cursor: uploading ? "wait" : "pointer", fontSize: 10, fontFamily: "inherit" }}>
-          {uploading ? "Uploading..." : "Attach supporting document"}
-          <input ref={ref} type="file" accept="image/*,.pdf,application/pdf" onChange={(event) => handleFiles(event.target.files)} style={{ display: "none" }} />
+          {uploading ? "Uploading..." : "Attach supporting documents"}
+          <input ref={ref} type="file" multiple accept="image/*,.pdf,application/pdf" onChange={(event) => handleFiles(event.target.files)} style={{ display: "none" }} />
         </button>
       )}
     </div>
@@ -528,7 +536,8 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
     const attachmentErrors = SELF_ITEMS.flatMap((item) => {
       const row = form[item.key] || {};
       const rowHasData = isFilled(row.text) || isFilled(row.marks);
-      const files = form.docs?.[item.key] || [];
+      const docValue = form.docs?.[item.key];
+      const files = Array.isArray(docValue) ? docValue : docValue ? [docValue] : [];
       if (!rowHasData) return [];
       if (!files.length) return [`${item.label}: attach an image or PDF.`];
       if (files.some((file) => !isAllowedAttachmentFile(file))) return [`${item.label}: attachment must be an image or PDF up to 10 MB.`];

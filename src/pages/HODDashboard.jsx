@@ -124,7 +124,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
   const handleFiles = async (files) => {
     if (readOnly) return;
-    const selectedFiles = Array.from(files || []).slice(0, 1);
+    const selectedFiles = Array.from(files || []);
     if (!selectedFiles.length) return;
 
     const unsupported = selectedFiles.find((file) => !isAllowedAttachmentFile(file));
@@ -149,7 +149,10 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
         formData.append("folder", `faculty-appraisal/${id}`);
         uploadedFiles.push(await api.post("/upload", formData, { headers: { "Content-Type": "multipart/form-data" } }));
       }
-      setDocs((p) => ({ ...p, [id]: uploadedFiles.slice(0, 1) }));
+      setDocs((p) => ({
+        ...p,
+        [id]: [...(Array.isArray(p[id]) ? p[id] : p[id] ? [p[id]] : []), ...uploadedFiles],
+      }));
     } catch (err) {
       console.error("Upload error:", err);
       alert(`Unable to upload file.\n\n${err.message}`);
@@ -167,7 +170,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
     });
   };
 
-  const files = docs[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -182,6 +185,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
         <span style={{ fontSize: 10, color: "#64748b" }}>📎 Attach</span>
         <input
           ref={ref} type="file"
+          multiple
           accept="image/*,.pdf,application/pdf"
           style={{ display: "none" }}
           disabled={readOnly}
@@ -194,7 +198,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
 // ─── ViewCell: shows links to uploaded docs ───────────────────────────────────
 function ViewCell({ id, docs }) {
-  const files = docs[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {files.map((f, idx) => (
@@ -236,7 +240,7 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
 }
 
 function ViewDocsCell({ docKey, docs }) {
-  const files = docs[docKey] || [];
+  const files = Array.isArray(docs?.[docKey]) ? docs[docKey] : docs?.[docKey] ? [docs[docKey]] : [];
   if (!files.length) return <span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>

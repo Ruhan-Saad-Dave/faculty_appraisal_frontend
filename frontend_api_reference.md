@@ -677,7 +677,7 @@ folder — storage sub-folder, e.g. "faculty-appraisal/<doc_key>" or "non-teachi
 }
 ```
 
-Only one file per section slot is kept. If the user uploads again for the same slot, the new file replaces the old one on the frontend before submitting.
+Multiple files can be stored for the same section slot. The frontend keeps each slot as an array of uploaded file objects.
 
 ---
 

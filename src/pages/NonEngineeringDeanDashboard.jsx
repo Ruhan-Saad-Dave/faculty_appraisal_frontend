@@ -152,7 +152,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
   const [uploadError, setUploadError] = useState("");
   const handleFiles = async (files) => {
     if (readOnly) return;
-    const selectedFiles = Array.from(files || []).slice(0, 1);
+    const selectedFiles = Array.from(files || []);
     if (!selectedFiles.length) return;
 
     const unsupported = selectedFiles.find((file) => !isAllowedAttachmentFile(file));
@@ -177,7 +177,10 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
         formData.append("folder", `faculty-appraisal/${id}`);
         uploadedFiles.push(await api.post("/upload", formData, { headers: { "Content-Type": "multipart/form-data" } }));
       }
-      setDocs((p) => ({ ...p, [id]: uploadedFiles.slice(0, 1) }));
+      setDocs((p) => ({
+        ...p,
+        [id]: [...(Array.isArray(p[id]) ? p[id] : p[id] ? [p[id]] : []), ...uploadedFiles],
+      }));
     } catch (err) {
       console.error("Upload error:", err);
       alert(`Unable to upload file.\n\n${err.message}`);
@@ -193,7 +196,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
       return { ...p, [id]: updated };
     });
   };
-  const files = docs[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {files.map((f, idx) => (
@@ -204,14 +207,14 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
       ))}
       <div style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", padding: "4px 6px", border: "1px dashed #cbd5e1", borderRadius: 4, background: "#f8fafc" }} onClick={() => !readOnly && ref.current.click()}>
         <span style={{ fontSize: 10, color: "#64748b" }}>?? Attach</span>
-        <input ref={ref} type="file" accept="image/*,.pdf,application/pdf" style={{ display: "none" }} disabled={readOnly} onChange={(e) => handleFiles(e.target.files)} />
+        <input ref={ref} type="file" multiple accept="image/*,.pdf,application/pdf" style={{ display: "none" }} disabled={readOnly} onChange={(e) => handleFiles(e.target.files)} />
       </div>
     </div>
   );
 }
 
 function ViewCell({ id, docs }) {
-  const files = docs[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {files.map((f, idx) => (
@@ -250,7 +253,7 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
 }
 
 function ViewDocsCell({ docKey, docs }) {
-  const files = docs?.[docKey] || [];
+  const files = Array.isArray(docs?.[docKey]) ? docs[docKey] : docs?.[docKey] ? [docs[docKey]] : [];
   if (!files.length) return <span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>

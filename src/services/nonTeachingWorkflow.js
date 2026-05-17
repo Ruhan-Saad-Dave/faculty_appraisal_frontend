@@ -146,6 +146,16 @@ const initialsFor = (name = "", fallback = "U") =>
     .slice(0, 2)
     .toUpperCase() || "U";
 
+const normalizeDocsMap = (docs = {}) => {
+  if (!docs || typeof docs !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(docs).map(([key, value]) => [
+      key,
+      (Array.isArray(value) ? value : value ? [value] : []).filter(Boolean),
+    ]),
+  );
+};
+
 export const nonTeachingRoleLabel = (role) =>
   role === "vc"
     ? "VC"
@@ -271,7 +281,7 @@ export const normalizeNonTeachingForm = (
         partBPayload.regularity ||
         base.partB.regular,
     },
-    docs: form.docs || base.docs,
+    docs: normalizeDocsMap(form.docs || base.docs),
   };
 
   merged.status = normalizeNonTeachingStatus(form.status || base.status);

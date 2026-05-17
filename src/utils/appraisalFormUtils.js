@@ -301,10 +301,13 @@ export const isAllowedAttachmentFile = (file = {}) => {
   return validType && validSize;
 };
 
+export const filesForDocValue = (value) =>
+  (Array.isArray(value) ? value : value ? [value] : []).filter(Boolean);
+
 export const docsForRow = (docs = {}, docPrefix = "", index = 0, docKey) => {
-  if (docKey) return docs?.[docKey] || [];
+  if (docKey) return filesForDocValue(docs?.[docKey]);
   if (!docPrefix) return [];
-  return docs?.[`${docPrefix}-${index}`] || [];
+  return filesForDocValue(docs?.[`${docPrefix}-${index}`]);
 };
 
 const docPrefixForSectionLabel = (label = "") => {
@@ -414,7 +417,7 @@ export const normalizeSingleFileDocs = (docs = {}) =>
   Object.fromEntries(
     Object.entries(docs || {}).map(([key, files]) => [
       key,
-      Array.isArray(files) ? files.slice(0, 1) : [],
+      filesForDocValue(files),
     ]),
   );
 

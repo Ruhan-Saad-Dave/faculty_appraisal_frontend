@@ -99,7 +99,7 @@ function VCInput({ val, onChange, max, disabled = false }) {
   );
 }
 function ViewDocsCell({ docKey, docs }) {
-  const files = docs?.[docKey] || [];
+  const files = Array.isArray(docs?.[docKey]) ? docs[docKey] : docs?.[docKey] ? [docs[docKey]] : [];
   if (!files.length) return <span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>

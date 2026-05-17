@@ -338,7 +338,7 @@ function DocCell({ id, docs, setDocs, readOnly }) {
   const ref = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const files = docs?.[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
 
   const handleFiles = async (fileList) => {
     const selected = Array.from(fileList || []);
@@ -357,11 +357,18 @@ function DocCell({ id, docs, setDocs, readOnly }) {
     }
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", selected[0]);
-      fd.append("folder", `faculty-appraisal/${id}`);
-      const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setDocs((prev) => ({ ...prev, [id]: [uploaded] }));
+      const uploadedFiles = [];
+      for (const file of selected) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("folder", `faculty-appraisal/${id}`);
+        const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        uploadedFiles.push(uploaded);
+      }
+      setDocs((prev) => ({
+        ...prev,
+        [id]: [...(Array.isArray(prev[id]) ? prev[id] : prev[id] ? [prev[id]] : []), ...uploadedFiles],
+      }));
     } catch (err) {
       alert(`Upload failed.\n\n${err.message}`);
     } finally {
@@ -389,7 +396,7 @@ function DocCell({ id, docs, setDocs, readOnly }) {
       {!readOnly && (
         <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", color: "#475569", borderRadius: 4, padding: "5px", cursor: "pointer", fontSize: 10 }}>
           {uploading ? "Uploading..." : "Attach"}
-          <input ref={ref} type="file" accept="image/*,.pdf,application/pdf" style={{ display: "none" }} onChange={(event) => handleFiles(event.target.files)} />
+          <input ref={ref} type="file" multiple accept="image/*,.pdf,application/pdf" style={{ display: "none" }} onChange={(event) => handleFiles(event.target.files)} />
         </button>
       )}
       {readOnly && !files.length && <span style={{ color: "#94a3b8", fontSize: 10 }}>No docs</span>}
