@@ -164,8 +164,73 @@ export const nonTeachingRoleLabel = (role) =>
 export const createEmptyPartB = () =>
   Object.fromEntries(RATING_SECTIONS.map((section) => [section.key, {}]));
 
-export const nonTeachingReportsToRegistrar = (source = {}) =>
-  isTruthyFlag(firstNonEmpty(
+const reportingHeadFor = (source = {}) =>
+  firstNonEmpty(
+    source.reportingHead,
+    source.reporting_head,
+    source.reportingOfficer,
+    source.reporting_officer,
+    source.reportingOfficerName,
+    source.reporting_officer_name,
+    source.profile?.reportingHead,
+    source.profile?.reporting_head,
+    source.profile?.reportingOfficer,
+    source.profile?.reporting_officer,
+    source.profile?.reportingOfficerName,
+    source.profile?.reporting_officer_name,
+    source.info?.reportingHead,
+    source.info?.reporting_head,
+    source.form?.info?.reportingHead,
+    source.form?.info?.reporting_head,
+    source.payload?.info?.reportingHead,
+    source.payload?.info?.reporting_head,
+  );
+
+const subjectRoleFor = (source = {}) =>
+  normalizeNonTeachingRole(
+    firstNonEmpty(
+      source.appraisalRole,
+      source.appraisal_role,
+      source.role,
+      source.submittedByRole,
+      source.profile?.appraisal_role,
+      source.profile?.role,
+      source.form?.submittedByRole,
+      source.form?.appraisalRole,
+      source.form?.appraisal_role,
+      source.payload?.submittedByRole,
+      source.payload?.appraisalRole,
+      source.payload?.appraisal_role,
+    ),
+    "",
+  );
+
+const hasReportingOfficerReviewData = (source = {}) => {
+  const form = source.form || source.payload || source;
+  if (!form || typeof form !== "object") return false;
+  if (clean(form.roRemarks)) return true;
+  if (n(source.roTotal || source.ro_total) > 0) return true;
+
+  const hasPartAMarks = SELF_ITEMS.some(({ key }) => clean(form[key]?.roMarks));
+  if (hasPartAMarks) return true;
+
+  return RATING_SECTIONS.some(({ key, params }) => {
+    const rows = form.partB?.[key] || {};
+    return params.some((_label, index) => clean(rows[`p${index}_ro`]));
+  });
+};
+
+const statusSkippedReportingOfficer = (source = {}) =>
+  [
+    NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
+    NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+    NON_TEACHING_STATUS.VC_APPROVED,
+  ].includes(normalizeNonTeachingStatus(
+    firstNonEmpty(source.status, source.form?.status, source.payload?.status),
+  ));
+
+export const nonTeachingReportsToRegistrar = (source = {}) => {
+  const explicitDirectToRegistrar = isTruthyFlag(firstNonEmpty(
     source.reports_to_registrar,
     source.reportsToRegistrar,
     source.direct_to_registrar,
@@ -187,6 +252,16 @@ export const nonTeachingReportsToRegistrar = (source = {}) =>
     source.payload?.info?.reports_to_registrar,
     source.payload?.info?.reportsToRegistrar,
   ));
+  if (explicitDirectToRegistrar) return true;
+
+  const subjectRole = subjectRoleFor(source);
+  return (
+    subjectRole === "non_teaching_staff" &&
+    !clean(reportingHeadFor(source)) &&
+    statusSkippedReportingOfficer(source) &&
+    !hasReportingOfficerReviewData(source)
+  );
+};
 
 export const emptyNonTeachingForm = (
   profile = profileFromsessionStorage(),
@@ -204,6 +279,7 @@ export const emptyNonTeachingForm = (
     submittedByRole: normalizedRole,
     reports_to_registrar: normalizedRole === "non_teaching_staff" && nonTeachingReportsToRegistrar({
       ...profile,
+      appraisal_role: normalizedRole,
       reports_to_registrar: firstNonEmpty(
         profile.reports_to_registrar,
         profile.reportsToRegistrar,
@@ -226,7 +302,7 @@ export const emptyNonTeachingForm = (
         nonTeachingRoleLabel(normalizedRole),
       department:
         profile.department || sessionStorage.getItem("department") || "",
-      reportingHead: "",
+      reportingHead: reportingHeadFor(profile),
       ay: academicYear(
         profile.academic_year || profile.ay || APP_INFO.DEFAULT_AY,
       ),

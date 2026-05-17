@@ -263,53 +263,47 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 function WorkflowTracker({ status, role, form }) {
   const normalizedRole = normalizeNonTeachingRole(role, role);
   const normalizedStatus = normalizeNonTeachingStatus(status);
-  const directToRegistrar =
-    normalizedRole === "non_teaching_staff" &&
-    !nonTeachingReviewFlow({
-      ...form,
-      appraisalRole: normalizedRole,
-      submittedByRole: normalizedRole,
-    }).includes("ro");
-  const registrarPendingStage =
-    directToRegistrar || normalizedRole === "reporting_officer";
-  const allStages = [
-    { id: "draft", label: "Draft", status: NON_TEACHING_STATUS.DRAFT },
-    { id: "submitted", label: "Pending RO Review", status: NON_TEACHING_STATUS.PENDING_RO_REVIEW },
-    {
-      id: "ro",
-      label: registrarPendingStage ? "Pending Registrar Review" : "RO Reviewed",
-      status: registrarPendingStage
-        ? NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW
-        : NON_TEACHING_STATUS.RO_REVIEWED,
-    },
-    { id: "registrar", label: "Registrar Reviewed", status: NON_TEACHING_STATUS.REGISTRAR_REVIEWED },
-    { id: "vc", label: "VC Approved", status: NON_TEACHING_STATUS.VC_APPROVED },
+  const flow = nonTeachingReviewFlow({
+    ...form,
+    appraisalRole: normalizedRole,
+    submittedByRole: normalizedRole,
+  });
+  const stages = [
+    { id: "draft", label: "Draft" },
+    ...(flow.includes("ro") ? [{ id: "ro", label: "RO Reviewed" }] : []),
+    ...(flow.includes("registrar") ? [{ id: "registrar", label: "Registrar Reviewed" }] : []),
+    ...(flow.includes("vc") ? [{ id: "vc", label: "VC Approved" }] : []),
   ];
-  const stageIds = normalizedRole === "registrar"
-    ? ["draft", "registrar", "vc"]
-    : normalizedRole === "reporting_officer"
-      ? ["draft", "ro", "registrar", "vc"]
-      : directToRegistrar
-        ? ["draft", "ro", "registrar", "vc"]
-      : ["draft", "submitted", "ro", "registrar", "vc"];
-  const stages = allStages.filter((stage) => stageIds.includes(stage.id));
-  const order = [
-    NON_TEACHING_STATUS.DRAFT,
-    NON_TEACHING_STATUS.PENDING_RO_REVIEW,
-    NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
-    NON_TEACHING_STATUS.RO_REVIEWED,
-    NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
-    NON_TEACHING_STATUS.VC_APPROVED,
-  ];
-  const currentIndex = Math.max(0, order.indexOf(normalizedStatus));
+  const doneByStatus = {
+    draft: normalizedStatus !== NON_TEACHING_STATUS.DRAFT,
+    ro: [
+      NON_TEACHING_STATUS.RO_REVIEWED,
+      NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
+      NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+      NON_TEACHING_STATUS.VC_APPROVED,
+    ].includes(normalizedStatus),
+    registrar: [
+      NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+      NON_TEACHING_STATUS.VC_APPROVED,
+    ].includes(normalizedStatus),
+    vc: normalizedStatus === NON_TEACHING_STATUS.VC_APPROVED,
+  };
+  const activeByStatus = {
+    draft: normalizedStatus === NON_TEACHING_STATUS.DRAFT,
+    ro: normalizedStatus === NON_TEACHING_STATUS.PENDING_RO_REVIEW,
+    registrar: [
+      NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
+      NON_TEACHING_STATUS.RO_REVIEWED,
+    ].includes(normalizedStatus),
+    vc: normalizedStatus === NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+  };
 
   return (
     <SectionCard title="Approval Workflow" accent="#0f172a">
       <div style={{ display: "flex", gap: 8 }}>
         {stages.map((stage) => {
-          const stageIndex = order.indexOf(stage.status);
-          const done = stageIndex < currentIndex;
-          const active = stageIndex === currentIndex;
+          const done = doneByStatus[stage.id];
+          const active = !done && activeByStatus[stage.id];
           return (
             <div key={stage.id} style={{ flex: 1, minHeight: 62, border: "1px solid #e2e8f0", borderRadius: 8, background: done ? "#f0fdf4" : active ? "#eff6ff" : "#f8fafc", padding: "10px 8px", textAlign: "center" }}>
               <div style={{ margin: "0 auto 6px", width: 24, height: 24, borderRadius: "50%", background: done ? "#10b981" : active ? ACCENT : "#cbd5e1", color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>
