@@ -3,7 +3,7 @@ import { HodInput } from "../components/Inputs";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 
-import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
+import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
@@ -279,6 +279,7 @@ const REVIEW_ARRAY_KEYS = ["lectures", "courseFile", "projects", "quals", "feedb
 const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
 const preserveSavedReviewScores = (form = {}, source = {}) => {
   const merged = { ...form };
+  merged.info = mergeFacultyInfo(form.info, source, form);
   REVIEW_ARRAY_KEYS.forEach((key) => {
     if (!Array.isArray(form[key])) return;
     const sourceRows = Array.isArray(source[key]) ? source[key] : [];
@@ -379,7 +380,8 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData, 
   };
   const getDirS = (key) => dirData[key] ?? faculty.innovDirector ?? faculty.innovDir ?? "";
 
-  const { info, lectures, courseFile, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, docs } = faculty;
+  const info = mergeFacultyInfo(faculty.info, faculty);
+  const { lectures, courseFile, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, docs } = faculty;
   const rows = (arr) => arr && arr.length > 0 ? arr : [{}];
 
   return (

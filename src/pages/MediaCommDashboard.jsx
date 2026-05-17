@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { FORM_SCHOOL_CODES, FORM_TYPES } from "../constants/formRouting";
 import { getSchoolKey } from "../constants/universityHierarchy";
-import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
+import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { buildReviewRemarks, generateMediaCommReport } from "../utils/fullFormReport";
@@ -156,6 +156,7 @@ const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
 
 const preserveSavedReviewScores = (form = {}, source = {}) => {
   const merged = { ...form };
+  merged.info = mergeFacultyInfo(form.info, source, form);
   ALL_ARRAY_KEYS.forEach((key) => {
     if (!Array.isArray(form[key])) return;
     const sourceRows = Array.isArray(source[key]) ? source[key] : [];

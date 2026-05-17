@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { HodInput } from "../components/Inputs";
-import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
+import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
@@ -316,7 +316,8 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
   };
   const getS = (key) => hodData[key] ?? faculty[key] ?? "";
 
-  const { info, lectures, courseFile, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, docs } = faculty;
+  const info = mergeFacultyInfo(faculty.info, faculty);
+  const { lectures, courseFile, projects, quals, feedback, deptActs, uniActs, society, industry, acr, journals, books, ict, research, projects2, externalProjects, patents, awards, confs, proposals, products, fdps, training, docs } = faculty;
 
   const rows = (arr) => arr && arr.length > 0 ? arr : [{}];
 
@@ -1101,6 +1102,7 @@ const DEAN_REVIEW_ARRAY_KEYS = [...DEAN_REVIEW_PART_A_KEYS, ...DEAN_REVIEW_PART_
 const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
 const preserveSavedReviewScores = (form = {}, source = {}) => {
   const merged = { ...form };
+  merged.info = mergeFacultyInfo(form.info, source, form);
   DEAN_REVIEW_ARRAY_KEYS.forEach((key) => {
     if (!Array.isArray(form[key])) return;
     const sourceRows = Array.isArray(source[key]) ? source[key] : [];
@@ -1243,6 +1245,7 @@ function ReviewTable({ title, accent = "#4c1d95", sectionKey, columns, docPrefix
 }
 
 function DeanReviewScoreForm({ approval, deanData, setDeanData, sectionView = "partA" }) {
+  const info = mergeFacultyInfo(approval.info, approval);
   const docs = approval.docs || {};
   const rows = (key) => Array.isArray(approval[key]) ? approval[key] : [];
   const cell = (value, center = false) => <RO val={value} center={center} />;
@@ -1264,7 +1267,7 @@ function DeanReviewScoreForm({ approval, deanData, setDeanData, sectionView = "p
         <SC title="Faculty Information" accent="#4c1d95">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <tbody>
-              {[["Name", approval.info?.name || approval.name], ["Qualification", approval.info?.qual], ["Designation", approval.info?.desig || approval.designation], ["Academic Year", approval.academicYear || approval.info?.ay]].map(([label, value]) => (
+              {[["Name", info.name || approval.name], ["Qualification", info.qual], ["Designation", info.desig || approval.designation], ["Academic Year", approval.academicYear || info.ay]].map(([label, value]) => (
                 <tr key={label}>
                   <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%" }}>{label}</td>
                   <td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{value || "-"}</td>

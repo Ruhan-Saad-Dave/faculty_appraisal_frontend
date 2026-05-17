@@ -276,8 +276,11 @@ const infoFromProfileSources = (...sources) => {
     source?.profile,
     source?.faculty,
     source?.facultyProfile,
+    source?.faculty_profile,
     source?.submitterProfile,
+    source?.submitter_profile,
     source?.payload?.submitterProfile,
+    source?.payload?.submitter_profile,
   ]).filter(Boolean);
 
   const pick = (...keys) => firstPresent(
@@ -306,6 +309,9 @@ const normalizeInfo = (info = {}, ...fallbackSources) => {
     ay: firstPresent(info.ay, info.academic_year, info.academicYear, fallback.ay) || "",
   };
 };
+
+export const mergeFacultyInfo = (info = {}, ...fallbackSources) =>
+  normalizeInfo(info || {}, ...fallbackSources);
 
 const parseMaybeJson = (value) => {
   if (typeof value !== "string") return value;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { fetchSavedAppraisal } from "../services/appraisalPersistence";
+import { fetchSavedAppraisal, mergeFacultyInfo } from "../services/appraisalPersistence";
 import { fetchNonTeachingQueueForRole, isPendingForNonTeachingReviewer, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
 import { ACR_DETAIL_POINTS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 
@@ -264,6 +264,7 @@ const VC_REVIEW_ARRAY_KEYS = ["lectures", "courseFile", "projects", "quals", "fe
 const REVIEW_SCORE_FIELDS = ["hod", "director", "dean", "vc"];
 const preserveSavedReviewScores = (form = {}, source = {}) => {
   const merged = { ...form };
+  merged.info = mergeFacultyInfo(form.info, source, form);
   VC_REVIEW_ARRAY_KEYS.forEach((key) => {
     if (!Array.isArray(form[key])) return;
     const sourceRows = Array.isArray(source[key]) ? source[key] : [];
@@ -332,6 +333,7 @@ const buildVcSectionScores = (person, vcData) => {
 // ─── VC Review Form ───────────────────────────────────────────────────────────
 // personMode: "dean" | "director" | "hod" | "faculty"
 function VCReviewForm({ person, vcData, setVcData, personMode = "director", sectionView = "partA" }) {
+  const info = mergeFacultyInfo(person.info, person);
   const reviewRoles = vcPreviousRolesFor(person, personMode);
   const selfScoreLabel = personMode === "faculty" ? "Faculty Score" : "Self Score";
 
@@ -424,7 +426,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director", sect
       <SC title="Personal Information" accent="#7c3aed">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <tbody>
-            {Object.entries(person.info).map(([k, v]) => (
+            {Object.entries(info).map(([k, v]) => (
               <tr key={k}>
                 <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%", textTransform: "capitalize" }}>{k}</td>
                 <td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{v}</td>
@@ -726,17 +728,18 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
   const selfTotal = vcSelfTotalForPerson(person);
   const vcReviewCompleted = person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) > 0;
   const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
+  const personInfo = mergeFacultyInfo(person.info, person);
 
   const generateVcReport = () => {
     if (!vcReviewCompleted) return;
     const reportForm = {
       ...person,
       info: {
-        ...(person.info || {}),
-        name: person.info?.name || person.name,
-        ay: person.info?.ay || person.academicYear || APP_INFO.DEFAULT_AY,
-        desig: person.info?.desig || person.designation || personMode,
-        school: person.info?.school || person.schoolName || person.school,
+        ...personInfo,
+        name: personInfo.name || person.name,
+        ay: personInfo.ay || person.academicYear || APP_INFO.DEFAULT_AY,
+        desig: personInfo.desig || person.designation || personMode,
+        school: personInfo.school || person.schoolName || person.school,
       },
       docs: person.docs || {},
     };

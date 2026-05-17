@@ -80,6 +80,28 @@ function ProfileLoader() {
 
 // ─── App Routes ───────────────────────────────────────────────────────────────
 export default function App() {
+  useEffect(() => {
+    const isNumberInput = (target) => target?.tagName === "INPUT" && target?.type === "number";
+    const preventWheelChange = (event) => {
+      if (isNumberInput(event.target) && document.activeElement === event.target) {
+        event.preventDefault();
+        event.target.blur();
+      }
+    };
+    const preventArrowKeyChange = (event) => {
+      if (isNumberInput(event.target) && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener("wheel", preventWheelChange, { capture: true, passive: false });
+    document.addEventListener("keydown", preventArrowKeyChange, true);
+    return () => {
+      document.removeEventListener("wheel", preventWheelChange, { capture: true });
+      document.removeEventListener("keydown", preventArrowKeyChange, true);
+    };
+  }, []);
+
   return (
     <BrowserRouter>
       <ErrorBoundary>

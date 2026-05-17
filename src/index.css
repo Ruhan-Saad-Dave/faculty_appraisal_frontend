@@ -77,10 +77,16 @@ aside > button:hover {
   background: rgba(255,255,255,0.09) !important;
 }
 
-/* ── Number input: dim spinners ─────────────────────────────────────────── */
+/* ── Number input: hide spinners ────────────────────────────────────────── */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
-  opacity: 0.45;
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 /* ── Status / grade badge pill ──────────────────────────────────────────── */
