@@ -730,12 +730,21 @@ function calcVCScore(person, vcData) {
  };
  const sectionMax = { lectures: 50, courseFile: 20, projects: 10, quals: 10, feedback: 10, deptActs: 20, uniActs: 30, society: 10, industry: 5, acr: 25, journals: 120, books: 50, ict: 20, research: 30, projects2: SCORE_LIMITS.researchInternalProjects, externalProjects: SCORE_LIMITS.researchExternalProjects, patents: 40, awards: 10, confs: 30, proposals: 10, products: 10, fdps: 10, training: 10 };
  const rowMax = { courseFile: () =>SCORE_LIMITS.courseFileRow, projects: projectGuidanceRowMax, quals: () =>SCORE_LIMITS.qualificationRow, feedback: () =>10, society: () =>SCORE_LIMITS.societyRow, acr: () =>SCORE_LIMITS.acrRow, research: researchGuidanceRowMax, fdps: () =>SCORE_LIMITS.fdpRow, training: () =>SCORE_LIMITS.fdpRow };
- const sum = (arr, s, f) =>clampScore((arr || []).reduce((a, row, i) =>{
+ const sum = (arr, s, f) =>{
+ if (s === "feedback") {
+ const feedbackRows = (arr || []).map((row, i) =>({
+ ...row,
+ [f]: vcData[s]?.[i]?.[f] ?? row?.[f] ?? "",
+ }));
+ return reviewSectionScore(s, feedbackRows, sectionMax[s] || 0, f);
+ }
+ return clampScore((arr || []).reduce((a, row, i) =>{
  if (s === "society" && societyRowLocked(row)) return a;
  if (!rowHasReviewableData(s, row)) return a;
  const limit = rowMax[s]?.(row);
  return a + (limit ? clampScore(get(s, i, f), limit) : get(s, i, f));
  }, 0), sectionMax[s] || 0);
+ };
  const innovRows = (person.innovRows || []).map((row, index) =>({
  ...row,
  vc: vcData.innovRows?.[index]?.vc ?? row.vc ?? "",

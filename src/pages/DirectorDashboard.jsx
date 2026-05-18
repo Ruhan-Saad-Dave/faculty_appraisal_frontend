@@ -1107,7 +1107,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const innov = clampScore(getS("innovHod"), 10);
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : sumReviewRows("projects", "hod", 10, projectGuidanceRowMax);
  const qual = sumReviewRows("quals", "hod", 10, SCORE_LIMITS.qualificationRow);
- const fb = sumReviewRows("feedback", "hod", 10, 10);
+ const fb = reviewSectionScore("feedback", faculty.feedback || [], 10, "hod");
  const dept = sumReviewRows("deptActs", "hod", 20);
  const uni = sumReviewRows("uniActs", "hod", 30);
  const soc = sumReviewRows("society", "hod", 10, SCORE_LIMITS.societyRow);
@@ -1170,10 +1170,14 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  ...row,
  director: dirData.innovRows?.[index]?.director ?? dirData.innovRows?.[index]?.dir ?? row.director ?? "",
  }));
+ const feedbackReviewRows = (faculty.feedback || []).map((row, index) =>({
+ ...row,
+ dir: dirData.feedback?.[index]?.dir ?? dirData.feedback?.[index]?.director ?? row.dir ?? row.director ?? "",
+ }));
  const innov = innovReviewRows.length ? reviewSectionScore("innovRows", innovReviewRows, 10, "director") : clampScore(getDirS("innovDir"), 10);
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : sumReviewRows("projects", "dir", 10, projectGuidanceRowMax);
  const qual = sumReviewRows("quals", "dir", 10, SCORE_LIMITS.qualificationRow);
- const fb = sumReviewRows("feedback", "dir", 10, 10);
+ const fb = reviewSectionScore("feedback", feedbackReviewRows, 10, "dir");
  const dept = sumReviewRows("deptActs", "dir", 20);
  const uni = sumReviewRows("uniActs", "dir", 30);
  const soc = sumReviewRows("society", "dir", 10, SCORE_LIMITS.societyRow);

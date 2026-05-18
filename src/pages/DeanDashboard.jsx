@@ -969,7 +969,11 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
  const innov = getS("innovHod");
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : (faculty.projects || []).reduce((a, _, i) =>a + get("projects", i, "hod"), 0);
  const qual = (faculty.quals || []).reduce((a, _, i) =>a + get("quals", i, "hod"), 0);
- const fb = (faculty.feedback || []).reduce((a, _, i) =>a + get("feedback", i, "hod"), 0);
+ const feedbackReviewRows = (faculty.feedback || []).map((row, i) =>({
+ ...row,
+ hod: hodData.feedback?.[i]?.hod ?? row.hod ?? "",
+ }));
+ const fb = reviewSectionScore("feedback", feedbackReviewRows, 10, "hod");
  const dept = (faculty.deptActs || []).reduce((a, _, i) =>a + get("deptActs", i, "hod"), 0);
  const uni = (faculty.uniActs || []).reduce((a, _, i) =>a + get("uniActs", i, "hod"), 0);
  const soc = (faculty.society || []).reduce((a, row, i) =>a + (societyRowLocked(row) ? 0 : get("society", i, "hod")), 0);
@@ -1167,12 +1171,15 @@ const deanScorePayload = (approval, deanData) =>{
 };
 
 const sumDeanRows = (payload, keys) =>
- keys.reduce((total, key) =>total + clampScore((payload[key] || []).reduce((sum, row) =>{
+ keys.reduce((total, key) =>{
+ if (key === "feedback") return total + reviewSectionScore(key, payload[key] || [], DEAN_SECTION_MAX[key] || 0, "dean");
+ return total + clampScore((payload[key] || []).reduce((sum, row) =>{
  if (key === "society" && societyRowLocked(row)) return sum;
  if (!rowHasReviewableData(key, row)) return sum;
  const rowMax = DEAN_ROW_MAX[key]?.(row);
  return sum + (rowMax ? clampScore(row.dean, rowMax) : n(row.dean));
- }, 0), DEAN_SECTION_MAX[key] || 0), 0);
+ }, 0), DEAN_SECTION_MAX[key] || 0);
+ }, 0);
 
 const deanScoreTotals = (payload) =>{
  const innovativeScore = Array.isArray(payload.innovRows) && payload.innovRows.length

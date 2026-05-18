@@ -193,7 +193,11 @@ export const rowMaxForSection = (sectionKey, row = {}, sectionMax = 0) =>{
 };
 
 export const scoreSectionRows = (sectionKey, rows = [], maxScore, scoreKey = "score") =>{
- if (sectionKey === "feedback" && scoreKey === "score") return feedbackSectionScore(rows, maxScore);
+ if (sectionKey === "feedback") {
+ return scoreKey === "score"
+ ? feedbackSectionScore(rows, maxScore)
+ : averageSectionScore(rows, maxScore, scoreKey);
+ }
  if (sectionKey === "courseFile" && scoreKey === "score") return sumCalculatedSectionScore(rows, maxScore, courseFileRowScore);
  if (sectionKey === "research" && scoreKey === "score") return sumCalculatedSectionScore(rows, maxScore, (row) =>{
  const stored = String(row?.score ?? "").trim();
@@ -334,7 +338,7 @@ export const reviewSectionScore = (sectionKey, rows = [], maxScore = 0, scoreKey
  const reviewableRows = rows.filter((row) =>rowHasReviewableData(sectionKey, row));
  if (!reviewableRows.length) return 0;
 
- if (sectionKey === "lectures" || sectionKey === "courseFile") {
+ if (sectionKey === "lectures" || sectionKey === "courseFile" || sectionKey === "feedback") {
  const scoredRows = reviewableRows.filter((row) =>isFilled(row?.[scoreKey]));
  if (!scoredRows.length) return 0;
  const total = scoredRows.reduce((sum, row) =>{

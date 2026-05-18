@@ -1076,13 +1076,17 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  ...row,
  hod: hodData.innovRows?.[index]?.hod ?? row.hod ?? "",
  }));
+ const feedbackReviewRows = (faculty.feedback || []).map((row, index) =>({
+ ...row,
+ hod: hodData.feedback?.[index]?.hod ?? row.hod ?? "",
+ }));
 
  const lec = avgReviewRows("lectures", "hod", 50);
  const cf = avgReviewRows("courseFile", "hod", 20, SCORE_LIMITS.courseFileRow);
  const innov = innovReviewRows.length ? reviewSectionScore("innovRows", innovReviewRows, 10, "hod") : clampScore(getS("innovHod"), 10);
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : sumReviewRows("projects", "hod", 10, projectGuidanceRowMax);
  const qual = sumReviewRows("quals", "hod", 10, SCORE_LIMITS.qualificationRow);
- const fb = sumReviewRows("feedback", "hod", 10, 10);
+ const fb = reviewSectionScore("feedback", feedbackReviewRows, 10, "hod");
  const dept = sumReviewRows("deptActs", "hod", 20);
  const uni = sumReviewRows("uniActs", "hod", 30);
  const soc = faculty.sectionApplicability?.society === "notApplicable" ? 0 : sumReviewRows("society", "hod", 10, SCORE_LIMITS.societyRow);

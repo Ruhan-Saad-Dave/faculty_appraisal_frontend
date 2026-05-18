@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { saveAppraisalDraftSection, submitAppraisal, loadSavedAppraisal, loadAppraisalDocuments } from "../services/appraisalPersistence";
 import { api } from "../services/api";
-import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
+import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import {
   getReviewChain,
   isRejectedStatus,
@@ -1096,7 +1096,11 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     const innov = getS("innovHod");
     const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
     const qual = (faculty.quals || []).reduce((a, _, i) => a + get("quals", i, "hod"), 0);
-    const fb = (faculty.feedback || []).reduce((a, _, i) => a + get("feedback", i, "hod"), 0);
+    const feedbackReviewRows = (faculty.feedback || []).map((row, i) => ({
+      ...row,
+      hod: hodData.feedback?.[i]?.hod ?? row.hod ?? "",
+    }));
+    const fb = reviewSectionScore("feedback", feedbackReviewRows, 10, "hod");
     const dept = (faculty.deptActs || []).reduce((a, _, i) => a + get("deptActs", i, "hod"), 0);
     const uni = (faculty.uniActs || []).reduce((a, _, i) => a + get("uniActs", i, "hod"), 0);
     const soc = faculty.sectionApplicability?.society === "notApplicable" ? 0 : (faculty.society || []).reduce((a, row, i) => a + (societyRowLocked(row) ? 0 : get("society", i, "hod")), 0);
@@ -3474,5 +3478,4 @@ export default function HODDashboard() {
     </div>
   );
 }
-
 
