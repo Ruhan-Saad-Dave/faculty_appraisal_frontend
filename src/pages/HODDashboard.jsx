@@ -5,7 +5,7 @@ import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formCon
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, clampReviewScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
+import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc } from "../utils/hierarchy";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
@@ -1061,28 +1061,25 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  }, 0),
  max,
  );
- const avgReviewRows = (section, field, max, rowMax) =>{
- const rows = faculty[section] || [];
- const filled = rows.filter((row) =>rowHasReviewableData(section, row));
- if (!filled.length) return 0;
- const sum = rows.reduce((total, row, index) =>{
- if (!rowHasReviewableData(section, row)) return total;
- const limit = typeof rowMax === "function" ? rowMax(row) : rowMax;
- return total + (limit ? clampScore(get(section, index, field), limit) : get(section, index, field));
- }, 0);
- return clampScore(sum / filled.length, max);
- };
  const innovReviewRows = (faculty.innovRows || []).map((row, index) =>({
  ...row,
  hod: hodData.innovRows?.[index]?.hod ?? row.hod ?? "",
+ }));
+ const lectureReviewRows = (faculty.lectures || []).map((row, index) =>({
+ ...row,
+ hod: hodData.lectures?.[index]?.hod ?? row.hod ?? "",
+ }));
+ const courseFileReviewRows = (faculty.courseFile || []).map((row, index) =>({
+ ...row,
+ hod: hodData.courseFile?.[index]?.hod ?? row.hod ?? "",
  }));
  const feedbackReviewRows = (faculty.feedback || []).map((row, index) =>({
  ...row,
  hod: hodData.feedback?.[index]?.hod ?? row.hod ?? "",
  }));
 
- const lec = avgReviewRows("lectures", "hod", 50);
- const cf = avgReviewRows("courseFile", "hod", 20, SCORE_LIMITS.courseFileRow);
+ const lec = reviewSectionScore("lectures", lectureReviewRows, 50, "hod");
+ const cf = reviewSectionScore("courseFile", courseFileReviewRows, 20, "hod");
  const innov = innovReviewRows.length ? reviewSectionScore("innovRows", innovReviewRows, 10, "hod") : clampScore(getS("innovHod"), 10);
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : sumReviewRows("projects", "hod", 10, projectGuidanceRowMax);
  const qual = sumReviewRows("quals", "hod", 10, SCORE_LIMITS.qualificationRow);
@@ -1490,8 +1487,8 @@ export default function HODDashboard({
  }, [info.ay]);
 
  // - Computed scores for HOD appraisal -
- const totalLecScore = sumSectionScore(lectures, 50);
- const courseFileScore = clampScore(courseFile.reduce((total, row) =>total + courseFileRowScore(row), 0), 20);
+ const totalLecScore = averageSectionScore(lectures, 50);
+ const courseFileScore = courseFileAverageScore(courseFile, 20);
  const hasInnovRows = innovRows.some((row) =>["method", "details", "score"].some((field) =>String(row?.[field] ?? "").trim() !== ""));
  const visibleInnovRows = hasInnovRows ? innovRows : [{ method: innovDetails, details: innovDetails, score: innovScore }];
  const innovTotal = hasInnovRows

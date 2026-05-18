@@ -198,7 +198,9 @@ export const scoreSectionRows = (sectionKey, rows = [], maxScore, scoreKey = "sc
  ? feedbackSectionScore(rows, maxScore)
  : averageSectionScore(rows, maxScore, scoreKey);
  }
- if (sectionKey === "courseFile" && scoreKey === "score") return sumCalculatedSectionScore(rows, maxScore, courseFileRowScore);
+ if (sectionKey === "lectures" || sectionKey === "courseFile") {
+ return reviewSectionScore(sectionKey, rows, maxScore, scoreKey);
+ }
  if (sectionKey === "research" && scoreKey === "score") return sumCalculatedSectionScore(rows, maxScore, (row) =>{
  const stored = String(row?.score ?? "").trim();
  return stored !== "" ? clampScore(stored, researchGuidanceRowMax(row)) : researchGuidanceScore(row);

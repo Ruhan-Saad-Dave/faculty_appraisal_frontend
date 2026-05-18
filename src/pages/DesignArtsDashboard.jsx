@@ -217,8 +217,9 @@ const calculateDesignArtsTotals = (form, scoreKey = "score") =>{
  const maxScores = getDesignArtsEffectiveMaxScores(form);
  const rowSum = (key, max) =>applicability[key] === "notApplicable" ? 0 : scoreSectionRows(key, form[key] || [], max, scoreKey);
  const lecturesScore = applicability["lectures"] === "notApplicable" ? 0 : averageSectionScore(form.lectures || [], 40, scoreKey);
+ const courseFileScore = applicability["courseFile"] === "notApplicable" ? 0 : scoreSectionRows("courseFile", form.courseFile || [], 20, scoreKey);
  const partA = clampScore(
- lecturesScore + rowSum("courseFile", 20) + (scoreKey === "score" && Array.isArray(form.innovRows) ? clampScore(form.innovRows.reduce((total, row) =>total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10) : scoreKey === "score" ? innovativeTeachingScore(form.innovDetails, form.innovScore, 10) : clampScore(form[scoreKeyForInnov(scoreKey)], 10)) +
+ lecturesScore + courseFileScore + (scoreKey === "score" && Array.isArray(form.innovRows) ? clampScore(form.innovRows.reduce((total, row) =>total + clampScore(row.score, SCORE_LIMITS.innovativeRow), 0), 10) : scoreKey === "score" ? innovativeTeachingScore(form.innovDetails, form.innovScore, 10) : clampScore(form[scoreKeyForInnov(scoreKey)], 10)) +
  rowSum("projects", 20) + rowSum("quals", 10) + (scoreKey === "score" ? feedbackSectionScore(form.feedback, 10) : reviewSectionScore("feedback", form.feedback || [], 10, scoreKey)) +
  rowSum("deptActs", 20) + rowSum("uniActs", 30) + rowSum("society", 10) + rowSum("industry", 5) + rowSum("acr", 25),
  maxScores.partA,

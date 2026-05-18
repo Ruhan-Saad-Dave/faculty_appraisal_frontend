@@ -6,7 +6,7 @@ import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows 
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, clampReviewScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
+import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, getSchoolKey, isAppraisalFinalisedByVc } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
@@ -1090,20 +1090,8 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  }, 0),
  max,
  );
- const avgReviewRows = (section, field, max, rowMax) =>{
- const rows = faculty[section] || [];
- const filled = rows.filter(rowHasReviewableData);
- if (!filled.length) return 0;
- const sum = rows.reduce((total, row, index) =>{
- if (!rowHasReviewableData(row)) return total;
- const limit = typeof rowMax === "function" ? rowMax(row) : rowMax;
- return total + (limit ? clampScore(get(section, index, field), limit) : get(section, index, field));
- }, 0);
- return clampScore(sum / filled.length, max);
- };
-
- const lec = avgReviewRows("lectures", "hod", 50);
- const cf = avgReviewRows("courseFile", "hod", 20, SCORE_LIMITS.courseFileRow);
+ const lec = reviewSectionScore("lectures", faculty.lectures || [], 50, "hod");
+ const cf = reviewSectionScore("courseFile", faculty.courseFile || [], 20, "hod");
  const innov = clampScore(getS("innovHod"), 10);
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : sumReviewRows("projects", "hod", 10, projectGuidanceRowMax);
  const qual = sumReviewRows("quals", "hod", 10, SCORE_LIMITS.qualificationRow);
@@ -1152,20 +1140,16 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  }, 0),
  max,
  );
- const avgReviewRows = (section, field, max, rowMax) =>{
- const rows = faculty[section] || [];
- const filled = rows.filter(rowHasReviewableData);
- if (!filled.length) return 0;
- const sum = rows.reduce((total, row, index) =>{
- if (!rowHasReviewableData(row)) return total;
- const limit = typeof rowMax === "function" ? rowMax(row) : rowMax;
- return total + (limit ? clampScore(getD(section, index, field), limit) : getD(section, index, field));
- }, 0);
- return clampScore(sum / filled.length, max);
- };
-
- const lec = avgReviewRows("lectures", "dir", 50);
- const cf = avgReviewRows("courseFile", "dir", 20, SCORE_LIMITS.courseFileRow);
+ const lectureReviewRows = (faculty.lectures || []).map((row, index) =>({
+ ...row,
+ dir: dirData.lectures?.[index]?.dir ?? dirData.lectures?.[index]?.director ?? row.dir ?? row.director ?? "",
+ }));
+ const courseFileReviewRows = (faculty.courseFile || []).map((row, index) =>({
+ ...row,
+ dir: dirData.courseFile?.[index]?.dir ?? dirData.courseFile?.[index]?.director ?? row.dir ?? row.director ?? "",
+ }));
+ const lec = reviewSectionScore("lectures", lectureReviewRows, 50, "dir");
+ const cf = reviewSectionScore("courseFile", courseFileReviewRows, 20, "dir");
  const innovReviewRows = (faculty.innovRows || []).map((row, index) =>({
  ...row,
  director: dirData.innovRows?.[index]?.director ?? dirData.innovRows?.[index]?.dir ?? row.director ?? "",
@@ -1581,8 +1565,8 @@ export default function DirectorDashboard() {
  }, [info.ay]);
 
  // - Computed scores for HOD appraisal -
- const totalLecScore = sumSectionScore(lectures, 50);
- const courseFileScore = clampScore(courseFile.reduce((total, row) =>total + courseFileRowScore(row), 0), 20);
+ const totalLecScore = averageSectionScore(lectures, 50);
+ const courseFileScore = courseFileAverageScore(courseFile, 20);
  const hasInnovRows = innovRows.some((row) =>["method", "details", "score"].some((field) =>String(row?.[field] ?? "").trim() !== ""));
  const visibleInnovRows = hasInnovRows ? innovRows : [{ method: innovDetails, details: innovDetails, score: innovScore }];
  const innovTotal = hasInnovRows

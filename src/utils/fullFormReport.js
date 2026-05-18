@@ -1,4 +1,4 @@
-﻿import { clampScore, researchGuidanceScore, rowMaxForSection, societyRowScore, SCORE_LIMITS, projectGuidanceRowMax } from "./appraisalFormUtils";
+﻿import { clampScore, researchGuidanceScore, reviewSectionScore, rowMaxForSection, societyRowScore, SCORE_LIMITS, projectGuidanceRowMax } from "./appraisalFormUtils";
 
 import { feedbackRowScore, feedbackSectionScore } from "./appraisalFormUtils";
 
@@ -151,10 +151,7 @@ const sectionTotalScore = (section, rows, role) => {
   if (section.key === "feedback" && role === "score") {
     return feedbackSectionScore(rows, section.max);
   }
-  if (section.key === "lectures" || section.key === "courseFile") {
-    const sum = rows.reduce((acc, row) => acc + n(row?.[role] ?? row?.score ?? 0), 0);
-    return clampScore(sum / rows.length, section.max);
-  }
+  if (section.key === "lectures" || section.key === "courseFile" || section.key === "feedback") return reviewSectionScore(section.key, rows, section.max, role);
   const sum = rows.reduce((acc, row) => acc + n(displaySectionScore(section, row, role)), 0);
   return clampScore(sum, section.max);
 };

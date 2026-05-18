@@ -5,7 +5,7 @@ import { HodInput } from "../components/Inputs";
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
-import { INNOVATIVE_METHODS, SCORE_LIMITS, clampScore, clampReviewScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
+import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { DEAN_TRACKS, getSchoolKey, getSchoolsByDeanTrack } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
 import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc } from "../utils/hierarchy";
@@ -956,14 +956,16 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
  };
  const getS = (key) =>n(hodData[key] ?? faculty[key]);
 
- const lec = (() =>{ const rows = faculty.lectures || []; const filled = rows.filter((_, i) =>get("lectures", i, "hod") >0); return filled.length ? clampScore(rows.reduce((a, _, i) =>a + get("lectures", i, "hod"), 0) / filled.length, 50) : 0; })();
- const cf = (() =>{
- const rows = Array.isArray(faculty.courseFile) ? faculty.courseFile : (faculty.courseFile ? [faculty.courseFile] : []);
- const filled = rows.filter((row, i) =>get("courseFile", i, "hod") >0 || row?.course || row?.title || row?.details);
- return filled.length
- ? clampScore(rows.reduce((a, _, i) =>a + clampScore(get("courseFile", i, "hod"), SCORE_LIMITS.courseFileRow), 0) / filled.length, 20)
- : 0;
- })();
+ const lectureReviewRows = (faculty.lectures || []).map((row, i) =>({
+ ...row,
+ hod: hodData.lectures?.[i]?.hod ?? row.hod ?? "",
+ }));
+ const courseFileReviewRows = (faculty.courseFile || []).map((row, i) =>({
+ ...row,
+ hod: hodData.courseFile?.[i]?.hod ?? row.hod ?? "",
+ }));
+ const lec = reviewSectionScore("lectures", lectureReviewRows, 50, "hod");
+ const cf = reviewSectionScore("courseFile", courseFileReviewRows, 20, "hod");
  const innov = getS("innovHod");
  const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : (faculty.projects || []).reduce((a, _, i) =>a + get("projects", i, "hod"), 0);
  const qual = (faculty.quals || []).reduce((a, _, i) =>a + get("quals", i, "hod"), 0);
@@ -1172,7 +1174,7 @@ const deanScorePayload = (approval, deanData) =>{
 
 const sumDeanRows = (payload, keys) =>
  keys.reduce((total, key) =>{
- if (key === "feedback") return total + reviewSectionScore(key, payload[key] || [], DEAN_SECTION_MAX[key] || 0, "dean");
+ if (key === "lectures" || key === "courseFile" || key === "feedback") return total + reviewSectionScore(key, payload[key] || [], DEAN_SECTION_MAX[key] || 0, "dean");
  return total + clampScore((payload[key] || []).reduce((sum, row) =>{
  if (key === "society" && societyRowLocked(row)) return sum;
  if (!rowHasReviewableData(key, row)) return sum;
@@ -2020,8 +2022,8 @@ export default function NonEngineeringDeanDashboard() {
  }, [info.ay]);
 
  // -- Computed scores for HOD appraisal --
- const totalLecScore = sumSectionScore(lectures, 50);
- const courseFileScore = clampScore(courseFile.reduce((total, row) =>total + courseFileRowScore(row), 0), 20);
+ const totalLecScore = averageSectionScore(lectures, 50);
+ const courseFileScore = courseFileAverageScore(courseFile, 20);
  const hasInnovRows = innovRows.some((row) =>["method", "details", "score"].some((field) =>String(row?.[field] ?? "").trim() !== ""));
  const visibleInnovRows = hasInnovRows ? innovRows : [{ method: innovDetails, details: innovDetails, score: innovScore }];
  const innovTotal = hasInnovRows

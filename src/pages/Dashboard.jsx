@@ -1087,12 +1087,16 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
     };
     const getS = (key) => n(hodData[key] ?? faculty[key]);
 
-    const lec = (faculty.lectures || []).reduce((a, _, i) => a + get("lectures", i, "hod"), 0);
-    const cfRows = Array.isArray(faculty.courseFile) ? faculty.courseFile : (faculty.courseFile ? [faculty.courseFile] : []);
-    const filledCfRows = cfRows.filter((row, i) => get("courseFile", i, "hod") > 0 || row?.course || row?.title || row?.details);
-    const cf = filledCfRows.length
-      ? clampScore(cfRows.reduce((a, _, i) => a + clampScore(get("courseFile", i, "hod"), SCORE_LIMITS.courseFileRow), 0) / filledCfRows.length, 20)
-      : 0;
+    const lectureReviewRows = (faculty.lectures || []).map((row, i) => ({
+      ...row,
+      hod: hodData.lectures?.[i]?.hod ?? row.hod ?? "",
+    }));
+    const courseFileReviewRows = (faculty.courseFile || []).map((row, i) => ({
+      ...row,
+      hod: hodData.courseFile?.[i]?.hod ?? row.hod ?? "",
+    }));
+    const lec = reviewSectionScore("lectures", lectureReviewRows, 50, "hod");
+    const cf = reviewSectionScore("courseFile", courseFileReviewRows, 20, "hod");
     const innov = getS("innovHod");
     const proj = faculty.sectionApplicability?.projects === "notApplicable" ? 0 : (faculty.projects || []).reduce((a, _, i) => a + get("projects", i, "hod"), 0);
     const qual = (faculty.quals || []).reduce((a, _, i) => a + get("quals", i, "hod"), 0);
@@ -3478,4 +3482,3 @@ export default function HODDashboard() {
     </div>
   );
 }
-
