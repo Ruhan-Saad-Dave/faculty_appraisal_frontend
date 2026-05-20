@@ -1239,7 +1239,6 @@ export default function HODDashboard() {
   const navigate = useNavigate();
   const [activeMainTab, setActiveMainTab] = useState("myAppraisal");
   const [hodAppraisalTab, setHodAppraisalTab] = useState("partA");
-  const [guidelinesTab, setGuidelinesTab] = useState("form");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // -- HOD's own appraisal form state --
@@ -2029,15 +2028,6 @@ export default function HODDashboard() {
               <option value="partA">Part A</option>
               <option value="partB" disabled={!isMyAppraisalSectionOpen("partB")}>Part B</option>
               <option value="summary" disabled={!isMyAppraisalSectionOpen("summary")}>Summary</option>
-            </select>
-          </div>
-        )}
-        {activeMainTab === "guidelines" && (
-          <div style={{ marginTop: 6, background: "#1e293b", borderRadius: 8, padding: "9px 10px" }}>
-            <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6 }}>Guidelines Section</div>
-            <select value={guidelinesTab} onChange={e => setGuidelinesTab(e.target.value)}
-              style={{ width: "100%", border: "1px solid #334155", borderRadius: 7, padding: "7px 8px", fontSize: 12, fontFamily: "inherit", color: "#e2e8f0", background: "#0f172a", outline: "none" }}>
-              <option value="form">Form Guidelines</option>
             </select>
           </div>
         )}
@@ -3117,13 +3107,14 @@ export default function HODDashboard() {
 
         {activeMainTab === "guidelines" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "inherit", width: "100%" }}>
-              <div style={{ background: "#fff", borderRadius: 9, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 16 }}>
-                <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#0f172a" }}>D Y PATIL INTERNATIONAL UNIVERSITY</h2>
-                <div style={{ color: "#64748b", fontSize: 13 }}>Akurdi, Pune</div>
-                <h3 style={{ margin: "12px 0 0", fontSize: 15, color: "#1e293b" }}>Guidelines for Faculty Appraisal Form - A.Y. 2025-2026</h3>
-              </div>
-              {guidelinesTab === "form" && (<>
+            <div style={{ background: "#fff", borderRadius: 9, boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" }}>
+              <iframe
+                src="/faculty-appraisal-guidelines.pdf"
+                title="Faculty Appraisal Guidelines AY 2025-26"
+                style={{ width: "100%", height: "calc(100vh - 120px)", border: "none", display: "block" }}
+              />
+            </div>
+            {false && (<>
                 <SC title="General Notes" accent="#0f172a">
                   <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, lineHeight: 2, color: "#334155" }}>
                     <li>Claim of points to be made only in one place for each activity.</li>
@@ -3416,7 +3407,6 @@ export default function HODDashboard() {
                   </table>
                 </SC>
               </>)}
-            </div>
           </div>
         )}
 
