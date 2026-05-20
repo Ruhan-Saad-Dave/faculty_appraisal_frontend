@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+﻿import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { FORM_SCHOOL_CODES, FORM_TYPES } from "../constants/formRouting";
@@ -1462,7 +1462,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
 </>
  )}
  {role !== "faculty" &&<button onClick={() =>{ setActiveTab("approvals"); setReviewing(null); }} style={navButton(activeTab === "approvals")}>Approvals ({pendingCount})</button>}
-<button onClick={() =>{ setActiveTab("guidelines"); setReviewing(null); }} style={navButton(activeTab === "guidelines")}>Guidelines</button>
+<button onClick={() =>{ window.open('/faculty-appraisal-guidelines.pdf', '_blank'); }} style={navButton(false)}>Guidelines</button>
 <div style={{ marginTop: "auto", borderTop: "1px solid #1e293b", paddingTop: 12, display: "grid", gap: 10 }}>
 <button
  type="button"
@@ -1679,18 +1679,6 @@ export default function DesignArtsDashboard({ fixedRole }) {
  onSubmit={handleSubmitReview}
  readOnly={isReviewerReviewComplete(reviewing, role)}
  />
- )}
-
- {activeTab === "guidelines" && (
-<div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-<div style={{ background: "#fff", borderRadius: 9, boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" }}>
-<iframe
-  src="/faculty-appraisal-guidelines.pdf"
-  title="Faculty Appraisal Guidelines AY 2025-26"
-  style={{ width: "100%", height: "calc(100vh - 120px)", border: "none", display: "block" }}
-/>
-</div>
-</div>
  )}
 </main>
  {showLogoutModal && (

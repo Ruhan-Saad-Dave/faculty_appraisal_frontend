@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, useEffect } from "react";
+﻿import { createContext, useContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { HodInput } from "../components/Inputs";
@@ -2399,7 +2399,7 @@ export default function NonEngineeringDeanDashboard() {
 
  {navItems.map(tab =>(
 <div key={tab.id} style={{ display: "grid", gap: 10 }}>
-<button onClick={() =>{ setActiveMainTab(tab.id); setReviewingApproval(null); setSelectedSchoolCode("all"); }}
+<button onClick={() =>{ if (tab.id === "guidelines") { window.open('/faculty-appraisal-guidelines.pdf', '_blank'); return; } setActiveMainTab(tab.id); setReviewingApproval(null); setSelectedSchoolCode("all"); }}
  style={{ background: activeMainTab === tab.id ? "rgba(99,102,241,0.18)" : "transparent", border: "none", borderRadius: 8, padding: "10px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, width: "100%", fontFamily: "inherit", transition: "background 0.15s" }}>
 <span style={{ fontSize: 16 }}>{tab.icon}</span>
 <div style={{ flex: 1, textAlign: "left" }}>
@@ -3699,18 +3699,6 @@ export default function NonEngineeringDeanDashboard() {
  readOnly={isDeanReviewed(reviewingApproval)}
  />
  )
- )}
-
- {activeMainTab === "guidelines" && (
-<div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-<div style={{ background: "#fff", borderRadius: 9, boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflow: "hidden" }}>
-<iframe
-  src="/faculty-appraisal-guidelines.pdf"
-  title="Faculty Appraisal Guidelines AY 2025-26"
-  style={{ width: "100%", height: "calc(100vh - 120px)", border: "none", display: "block" }}
-/>
-</div>
-</div>
  )}
 </main>
 
