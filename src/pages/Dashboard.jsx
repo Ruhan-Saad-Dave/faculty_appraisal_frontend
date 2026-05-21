@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { saveAppraisalDraftSection, submitAppraisal, loadSavedAppraisal, loadAppraisalDocuments } from "../services/appraisalPersistence";
@@ -1239,7 +1239,6 @@ export default function HODDashboard() {
   const navigate = useNavigate();
   const [activeMainTab, setActiveMainTab] = useState("myAppraisal");
   const [hodAppraisalTab, setHodAppraisalTab] = useState("partA");
-  const [guidelinesTab, setGuidelinesTab] = useState("form");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // -- HOD's own appraisal form state --
@@ -1444,6 +1443,7 @@ export default function HODDashboard() {
   const societyScore = sectionApplicability.society === "notApplicable" ? 0 : clampScore(society.reduce((total, row) => total + societyRowScore(row), 0), 10);
   const industryScore = sumSectionScore(industry, 5);
   const acrScore = sumSectionScore(acr, 25, "score", SCORE_LIMITS.acrRow);
+  const teachingMax = sectionApplicability.projects === "notApplicable" ? 90 : 100;
   const effectivePartAMax = effectiveMaxScore(200, sectionApplicability, [{ key: "projects", max: 10 }, { key: "society", max: 10 }]);
   const partATotal = clampScore(teachingRaw + stuFeedbackScore + deptScore + uniScore + societyScore + industryScore + acrScore, effectivePartAMax);
 
@@ -1461,10 +1461,14 @@ export default function HODDashboard() {
   const fdpScore = fdps.reduce((s, r) => s + clampScore(parseFloat(r.score) || 0, SCORE_LIMITS.fdpRow), 0);
   const trainScore = training.reduce((s, r) => s + clampScore(parseFloat(r.score) || 0, SCORE_LIMITS.fdpRow), 0);
   const b8Score = clampScore(fdpScore + trainScore, 10);
+  const researchGuidanceProjectMax = sectionApplicability.research === "notApplicable" ? 45 : 75;
   const effectivePartBMax = effectiveMaxScore(375, sectionApplicability, [{ key: "research", max: 30 }]);
   const effectiveGrandMax = effectivePartAMax + effectivePartBMax;
   const partBTotal = clampScore(journalScore + bookScore + ictScore + researchScore + projectBScore + externalProjectScore + patentScore + awardScore + confScore + proposalScore + productScore + b8Score, effectivePartBMax);
   const grandTotal = clampScore(partATotal + partBTotal, effectiveGrandMax);
+  const partAMarksPercentage = effectivePartAMax > 0 ? ((partATotal / effectivePartAMax) * 100).toFixed(2) : "0.00";
+  const partBMarksPercentage = effectivePartBMax > 0 ? ((partBTotal / effectivePartBMax) * 100).toFixed(2) : "0.00";
+  const totalMarksPercentage = effectiveGrandMax > 0 ? ((grandTotal / effectiveGrandMax) * 100).toFixed(2) : "0.00";
 
   const gradeFunc = () => {
     const p = pct(grandTotal, effectiveGrandMax);
@@ -1584,7 +1588,7 @@ export default function HODDashboard() {
         facultyEmail: userEmail,
         academicYear: info.ay,
         form: buildSelfDraftForm(nextStatus),
-        totals: { partATotal, partBTotal, grandTotal },
+        totals: { partATotal, partBTotal, grandTotal, effectivePartAMax, effectivePartBMax, effectiveGrandMax },
         docs,
         submitterProfile: profileFromsessionStorage(),
         sectionSaveStatus: nextStatus,
@@ -1648,7 +1652,7 @@ export default function HODDashboard() {
         facultyEmail: userEmail,
         academicYear: info.ay,
         form: buildSelfDraftForm(),
-        totals: { partATotal, partBTotal, grandTotal },
+        totals: { partATotal, partBTotal, grandTotal, effectivePartAMax, effectivePartBMax, effectiveGrandMax },
         docs,
         submitterProfile,
         activeProfile: submitterProfile,
@@ -1805,7 +1809,7 @@ export default function HODDashboard() {
 
     <table class="st">
       <tr><th>Part A Summary</th><th>Max</th><th>Faculty Score</th></tr>
-      <tr><td>Teaching Process (i+ii+iii+iv+v)</td><td class="c">100</td><td class="c">${teachingRaw.toFixed(1)}</td></tr>
+      <tr><td>Teaching Process (i+ii+iii+iv+v)</td><td class="c">${teachingMax}</td><td class="c">${teachingRaw.toFixed(1)}</td></tr>
       <tr><td>Students' Feedback</td><td class="c">10</td><td class="c">${stuFeedbackScore.toFixed(1)}</td></tr>
       <tr><td>Departmental Activities</td><td class="c">20</td><td class="c">${deptScore.toFixed(1)}</td></tr>
       <tr><td>University Activity</td><td class="c">30</td><td class="c">${uniScore.toFixed(1)}</td></tr>
@@ -1813,6 +1817,7 @@ export default function HODDashboard() {
       <tr><td>Industry Connect</td><td class="c">5</td><td class="c">${industryScore.toFixed(1)}</td></tr>
       <tr><td>Annual Confidential Report</td><td class="c">25</td><td class="c">${acrScore.toFixed(1)}</td></tr>
       <tr class="tr"><td class="b">PART A TOTAL</td><td class="c b">${effectivePartAMax}</td><td class="c b">${partATotal.toFixed(1)}</td></tr>
+      <tr class="tr"><td class="b">PART A MARKS OBTAINED (%)</td><td colspan="2" class="c b">${partAMarksPercentage}%</td></tr>
     </table>
 
     <div class="pb"></div>
@@ -1915,7 +1920,7 @@ export default function HODDashboard() {
     <table class="st">
       <tr><th>Sr.No.</th><th>Criteria</th><th>Max Score</th><th>Faculty Score</th></tr>
       <tr><td colspan="4" class="b" style="background:#d9d9d9;text-align:center">Part A - Teaching Process</td></tr>
-      <tr><td class="c">A</td><td>Teaching Process (i+ii+iii+iv+v)</td><td class="c">100</td><td class="c">${teachingRaw.toFixed(1)}</td></tr>
+      <tr><td class="c">A</td><td>Teaching Process (i+ii+iii+iv+v)</td><td class="c">${teachingMax}</td><td class="c">${teachingRaw.toFixed(1)}</td></tr>
       <tr><td class="c">B</td><td>Students' Feedback</td><td class="c">10</td><td class="c">${stuFeedbackScore.toFixed(1)}</td></tr>
       <tr><td class="c">C</td><td>Departmental Activities</td><td class="c">20</td><td class="c">${deptScore.toFixed(1)}</td></tr>
       <tr><td class="c">D</td><td>University Activity</td><td class="c">30</td><td class="c">${uniScore.toFixed(1)}</td></tr>
@@ -1923,17 +1928,20 @@ export default function HODDashboard() {
       <tr><td class="c">F</td><td>Industry Connect</td><td class="c">5</td><td class="c">${industryScore.toFixed(1)}</td></tr>
       <tr><td class="c">G</td><td>Annual Confidential Report</td><td class="c">25</td><td class="c">${acrScore.toFixed(1)}</td></tr>
       <tr class="tr"><td colspan="2" class="c b">Part A Total</td><td class="c b">${effectivePartAMax}</td><td class="c b">${partATotal.toFixed(1)}</td></tr>
+      <tr class="tr"><td colspan="2" class="c b">Part A Marks Obtained (%)</td><td colspan="2" class="c b">${partAMarksPercentage}%</td></tr>
       <tr><td colspan="4" class="b" style="background:#d9d9d9;text-align:center">Part B - Research and Academic Contribution</td></tr>
       <tr><td class="c">1</td><td>Research papers / journal publication</td><td class="c">120</td><td class="c">${journalScore.toFixed(1)}</td></tr>
       <tr><td class="c">2</td><td>Books authored / edited / book chapter</td><td class="c">50</td><td class="c">${bookScore.toFixed(1)}</td></tr>
       <tr><td class="c">3</td><td>ICT Teaching Learning Pedagogy</td><td class="c">20</td><td class="c">${ictScore.toFixed(1)}</td></tr>
-      <tr><td class="c">4</td><td>Research guidance / projects / consultancy</td><td class="c">75</td><td class="c">${(researchScore + projectBScore + externalProjectScore).toFixed(1)}</td></tr>
+      <tr><td class="c">4</td><td>Research guidance / projects / consultancy</td><td class="c">${researchGuidanceProjectMax}</td><td class="c">${(researchScore + projectBScore + externalProjectScore).toFixed(1)}</td></tr>
       <tr><td class="c">5</td><td>Patents, Awards, Fellowship</td><td class="c">50</td><td class="c">${(patentScore + awardScore).toFixed(1)}</td></tr>
       <tr><td class="c">6</td><td>Conferences / paper presentations</td><td class="c">30</td><td class="c">${confScore.toFixed(1)}</td></tr>
       <tr><td class="c">7</td><td>Research proposals / product development</td><td class="c">20</td><td class="c">${(proposalScore + productScore).toFixed(1)}</td></tr>
       <tr><td class="c">8</td><td>Self Development (FDP / Industrial Training)</td><td class="c">10</td><td class="c">${b8Score.toFixed(1)}</td></tr>
       <tr class="tr"><td colspan="2" class="c b">Part B Total</td><td class="c b">${effectivePartBMax}</td><td class="c b">${partBTotal.toFixed(1)}</td></tr>
+      <tr class="tr"><td colspan="2" class="c b">Part B Marks Obtained (%)</td><td colspan="2" class="c b">${partBMarksPercentage}%</td></tr>
       <tr style="background:#bfbfbf;font-weight:bold;font-size:13px"><td colspan="2" class="c">Grand Total (Part A + Part B)</td><td class="c">${effectiveGrandMax}</td><td class="c">${grandTotal.toFixed(1)}</td></tr>
+      <tr style="background:#bfbfbf;font-weight:bold;font-size:13px"><td colspan="2" class="c">Marks Obtained (%)</td><td colspan="2" class="c">${totalMarksPercentage}%</td></tr>
     </table>
 
     <h3 style="text-align:center;font-size:14px;background:#d9d9d9;padding:6px;margin:16px 0 10px">DECLARATION BY FACULTY</h3>
@@ -1974,12 +1982,12 @@ export default function HODDashboard() {
       </tbody>
     </table>` : ""}
 
+  <script>window.addEventListener('load', function(){ window.focus(); window.print(); });</script>
   </body>
   </html>`;
 
     win.document.write(html);
     win.document.close();
-    win.print();
   };
   const navItems = [
     { id: "myAppraisal", icon: "", label: "My Appraisal", sub: "View your self-appraisal form" },
@@ -2004,7 +2012,7 @@ export default function HODDashboard() {
         <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
 
         {navItems.map(tab => (
-          <button key={tab.id} onClick={() => { setActiveMainTab(tab.id); }}
+          <button key={tab.id} onClick={() => { if (tab.id === "guidelines") { window.open('/faculty-appraisal-guidelines.pdf', '_blank'); return; } setActiveMainTab(tab.id); }}
             style={{ background: activeMainTab === tab.id ? "rgba(99,102,241,0.18)" : "transparent", border: "none", borderRadius: 8, padding: "10px 11px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, width: "100%", fontFamily: "inherit", transition: "background 0.15s" }}>
             <span style={{ fontSize: 16 }}>{tab.icon}</span>
             <div style={{ flex: 1, textAlign: "left" }}>
@@ -2029,15 +2037,6 @@ export default function HODDashboard() {
               <option value="partA">Part A</option>
               <option value="partB" disabled={!isMyAppraisalSectionOpen("partB")}>Part B</option>
               <option value="summary" disabled={!isMyAppraisalSectionOpen("summary")}>Summary</option>
-            </select>
-          </div>
-        )}
-        {activeMainTab === "guidelines" && (
-          <div style={{ marginTop: 6, background: "#1e293b", borderRadius: 8, padding: "9px 10px" }}>
-            <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 6 }}>Guidelines Section</div>
-            <select value={guidelinesTab} onChange={e => setGuidelinesTab(e.target.value)}
-              style={{ width: "100%", border: "1px solid #334155", borderRadius: 7, padding: "7px 8px", fontSize: 12, fontFamily: "inherit", color: "#e2e8f0", background: "#0f172a", outline: "none" }}>
-              <option value="form">Form Guidelines</option>
             </select>
           </div>
         )}
@@ -3111,311 +3110,6 @@ export default function HODDashboard() {
                   </SC>
                 )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {activeMainTab === "guidelines" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ maxWidth: 900, margin: "0 auto", fontFamily: "inherit", width: "100%" }}>
-              <div style={{ background: "#fff", borderRadius: 9, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 16 }}>
-                <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800, color: "#0f172a" }}>D Y PATIL INTERNATIONAL UNIVERSITY</h2>
-                <div style={{ color: "#64748b", fontSize: 13 }}>Akurdi, Pune</div>
-                <h3 style={{ margin: "12px 0 0", fontSize: 15, color: "#1e293b" }}>Guidelines for Faculty Appraisal Form - A.Y. 2025-2026</h3>
-              </div>
-              {guidelinesTab === "form" && (<>
-                <SC title="General Notes" accent="#0f172a">
-                  <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, lineHeight: 2, color: "#334155" }}>
-                    <li>Claim of points to be made only in one place for each activity.</li>
-                    <li>All information in Appraisal form is to be filled for A.Y. 2025-2026, 1st July 2025 to 30th June 2026.</li>
-                    <li>For every claimed score, authentic documents are to be attached with Appraisal Form. Score claimed without authentic documents will not be considered.</li>
-                    <li>Wherever possible, LMS JUNO record can be shown through login. No need to reprint hard copy of records available in JUNO. The data filled in JUNO must be examined and approved by competent authority.</li>
-                    <li>All annexure and authentic documents must be attached in sequence as per appraisal form.</li>
-                    <li>Not Applicable (NA) points marks will be deducted from denominator of concerned part total. However, this NA point must be approved by reporting authority.</li>
-                    <li>For Research Papers, Book Chapters, Patent only first page with journal &amp; author details to be submitted.</li>
-                  </ul>
-                  <div style={{ marginTop: 12, fontWeight: 700, fontSize: 12, color: "#1e293b" }}>The 360 Degree Score shall be determined on the basis of following parameters:</div>
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 20, fontSize: 12, lineHeight: 1.9, color: "#334155" }}>
-                    <li>a. Teaching Process (Maximum Point 25)</li>
-                    <li>b. Students' Feedback (Maximum Point 10)</li>
-                    <li>c. Department, School, University level Activities (Maximum Point 30)</li>
-                    <li>d. ACR (Maximum Point 25)</li>
-                    <li>e. Out-reach activity / Contribution to Society (Maximum Point 10)</li>
-                  </ul>
-                </SC>
-                <SC title="PART A - Teaching & Academic Activities (Maximum Marks 200)" accent="#6366f1">
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th style={TH}>SN</th>
-                        <th style={TH}>Nature of Activity</th>
-                        <th style={TH}>Max. Score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={TDC}>(i)</td>
-                        <td style={TD}>
-                          <strong>Lectures, seminars, tutorials, practical, contact classes</strong> - based on verifiable records (JUNO record).<br />
-                          No score should be assigned if a teacher has taken less than 70% of the assigned classes.<br />
-                          Score will be 50 if teacher has taken 100% assigned classes to particular subject as specified by University.<br />
-                          If a teacher has taken classes less than the allotted hours but above 80% limit of total, then 2 points will be deducted from 50 for each less hour of classes.<br />
-                          <em>Maximum score of 50 if there is 100% performance | 91-99: 95% of 50 | 81-89: 85% | 70-79: 75%</em><br />
-                          <em>Note: For School of Applied Arts and Crafts, School of Design - 40 Marks can be claimed.</em>
-                        </td>
-                        <td style={TDC}>50</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>(ii)</td>
-                        <td style={TD}>
-                          <strong>Course file of subject</strong> - All points covered as per IQAC index, full marks. Proportionate marking to percentage completion applicable up to 60% completion.<br />
-                          <table style={{ marginTop: 6, borderCollapse: "collapse", fontSize: 11 }}>
-                            <thead><tr><th style={TH}>Sr No</th><th style={TH}>% Completion</th><th style={TH}>Score</th></tr></thead>
-                            <tbody>
-                              {[["1", "100%", "20"], ["2", "90%", "18"], ["3", "80%", "16"], ["4", "70%", "14"], ["5", "60%", "12"], ["6", "Less than 60%", "0"]].map(([n, p, s]) => (
-                                <tr key={n}><td style={TDC}>{n}</td><td style={TDC}>{p}</td><td style={TDC}>{s}</td></tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          <em>Less than 60% - no score claimed.</em>
-                        </td>
-                        <td style={TDC}>20</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>(iii)</td>
-                        <td style={TD}>
-                          <strong>Use of participatory and innovative teaching-learning methodologies</strong>; updating of subject content, course improvement etc. (Each activity carries 2 marks)<br />
-                          1. Blended learning &nbsp; 2. Virtual Lab &nbsp; 3. Conceptual videos &nbsp; 4. Use of LMS &nbsp; 5. Project Based Learning &nbsp; 6. Open Course Ware (OCW) assignment &nbsp; 7. Quiz &nbsp; 8. Group Discussion &nbsp; 9. Flip classroom &nbsp; 10. Any other innovative teaching learning methods
-                        </td>
-                        <td style={TDC}>10</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>(iv)</td>
-                        <td style={TD}>
-                          <strong>Qualification Enhancement</strong><br />
-                          Higher qualification during assessment period: 5 marks<br />
-                          Add-on qualification / certification: 5 marks
-                        </td>
-                        <td style={TDC}>10</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>(v)</td>
-                        <td style={TD}>
-                          <strong>Guided Students Project</strong> (New schools or if there is no project batch allotted can mention as NA)<br />
-                          Project guided: 3/group | Industrial collaboration/Sponsorship (Max 5 marks) | Project outcome: events/competitions (Max 5 marks)<br />
-                          <em>Note: For School of Applied Arts and Crafts, School of Design - 20 Marks can be claimed.</em><br />
-                          Guided students project other than curriculum: Project apart from curriculum: 5 | Industrial collaboration/Sponsorship: 5 | Any Award for project (Max 5 marks): 5
-                        </td>
-                        <td style={TDC}>10</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc", fontWeight: 700 }}>
-                        <td style={TDC} colSpan={2}>Total Part A (i+ii+iii+iv+v)</td>
-                        <td style={TDC}>100</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>B</td>
-                        <td style={TD}>
-                          <strong>Students' Feedback (Maximum Point 10)</strong><br />
-                          Score will be linearly proportional to feedback. (Score = percentage / 10)<br />
-                          Average score of first and second feedback will be considered per semester at the scale of 10.<br />
-                          If faculty is handling more than one subject, then average score of all the subjects will be considered. (Average Percentage / 10)
-                        </td>
-                        <td style={TDC}>10</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>C &amp; D</td>
-                        <td style={TD}>
-                          <strong>Department / School / University Activities (Max 20 / 30)</strong><br />
-                          <em>Department/School Level (Max 20):</em> Short-term one-time activity: 3 marks | Semester/Term-based (3-6 months): 5 marks | Academic Year activity (&gt;6 months): 10 marks<br />
-                          <em>University Level (Max 30):</em> Short-term one-time activity: 10 marks | Semester/Term-based: 20 marks | Academic Year activity: 30 marks
-                        </td>
-                        <td style={TDC}>20 / 30</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>E</td>
-                        <td style={TD}>
-                          <strong>Contribution to Society through institute/University (Social Activities): 5 marks/activity</strong><br />
-                          Faculty involved in UGC/AICTE initiatives like Induction Program, Unnat Bharat Abhiyan, Yoga Classes, Blood Donation, Techno Social, NSS etc.
-                        </td>
-                        <td style={TDC}>10</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>F</td>
-                        <td style={TD}>
-                          <strong>Industry Connect Activities (Max 5 Marks)</strong><br />
-                          1. Inviting company for campus placement: 5 marks/company (proof of invitation letter required, certified by TPO)<br />
-                          2. Providing internships to students: 2 marks/student<br />
-                          3. Signing MOU with industry: 5 marks per active MOU (training institutes not considered)<br />
-                          4. Industry visits: 2 marks per visit (documentary proof required)<br />
-                          5. Establishing centre of excellence with Industry: 5 marks
-                        </td>
-                        <td style={TDC}>5</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>G</td>
-                        <td style={TD}>
-                          <strong>Annual Confidential Report (Maximum Point 25)</strong><br />
-                          1. Self-motivation (5): List activities/initiatives other than regular load/duties.<br />
-                          2. Punctuality (5): Number of late marks, punctuality in lecture/practical, timely completion of daily report, absentee without intimation.<br />
-                          3. Target based work (5): List tasks allotted, timely completion of allotted work - observed by HOD.<br />
-                          4. Effectiveness (5): Work done without errors &amp; least follow-up - observed by HOD.<br />
-                          5. Obedience (5): To be observed by HOD and Director.
-                        </td>
-                        <td style={TDC}>25</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </SC>
-                <SC title="PART B - Research & Academic Contributions (Maximum Marks 375)" accent="#7c3aed">
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th style={TH}>S.N.</th>
-                        <th style={TH}>APIs</th>
-                        <th style={TH}>Particular</th>
-                        <th style={TH}>Max. Marks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={TDC}>1</td>
-                        <td style={TD}><strong>Research Papers (Published in Journals)</strong><br /><em>(With institute affiliation, Maxi. 4 papers can be claimed)</em></td>
-                        <td style={TD}>
-                          Refereed Journals - SCI/SCIE/WoS Q1 &amp; Q2: 30/publication + Impact factor score<br />
-                          Refereed Journals - Scopus Q3, Q4: 15/publication + Impact factor score<br />
-                          UGC care listed: 10/publication<br />
-                          Submitted and under review: 5/publication | Submitted and rejected after 1-2 reviews: 10/publication (max 2 in this category)<br />
-                          <strong>Instructions:</strong> Multiple DYPIU authors: 70% first author, 30% each co-author. Additional marks for Impact Factor: up to 5 gives 3 marks; 5-10 gives 5 marks; above 10 gives 10 marks. Joint/collaborative publication: full marks.
-                        </td>
-                        <td style={TDC}>80 / 120</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>2</td>
-                        <td style={TD}><strong>Publications</strong><br /><em>(other than Research papers, Maxi. 2 book chapters)</em></td>
-                        <td style={TD}>
-                          Books by international publishers: 15/publication | National publishers: 10/publication | Local publisher with ISBN/ISSN: 5/publication<br />
-                          Chapter in Edited Book: 5/publication | Editor of Book (International): 10 | (National): 8 | (Local with ISBN/ISSN): 3<br />
-                          Translation works: Chapter/Research paper: 3 | Book: 8<br />
-                          <strong>Instructions:</strong> Multiple DYPIU authors: 70% first author, 30% each co-author. SoMCS/SoD/SAA: Max 60 marks; Other schools: Max 50.
-                        </td>
-                        <td style={TDC}>50 / 60</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>3</td>
-                        <td style={TD}><strong>Creation of ICT mediated Teaching Learning pedagogy and content</strong></td>
-                        <td style={TD}>
-                          (a) Development of Innovative pedagogy which does not exist globally: 5<br />
-                          (b) MOOCs / Course Builder / Coursera Course: 5/course<br />
-                          (c) E-Content (available online publicly) - video lecture, blog, website etc.: 5<br />
-                          <em>Note: SoMCS max 30; SoD &amp; SAA max 50; Other schools max 20.</em>
-                        </td>
-                        <td style={TDC}>20 / 30 / 50</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>4</td>
-                        <td style={TD}><strong>Research Guidance (Maxi. marks 75)</strong></td>
-                        <td style={TD}>
-                          (a) Research Guidance (Max 30, if applicable): PhD - 20 for degree awarded, 10 for thesis submitted; PG degree awarded to batch candidate. Joint supervision: 70% supervisor, 30% co-supervisor (7 marks each).<br />
-                          (b) Research Projects Completed (Maxi. 15): Internal Project - Grant received 100% marks.<br />
-                          (c) Research Projects Ongoing (Maxi. 30): &gt;10 lakhs gives 15 marks; &lt;10 lakhs gives 10 marks.<br />
-                          Consultancy/Testing/Training: up to Rs50k gives 3; Rs51k-2L gives 5; Rs2L-5L gives 10; Rs5L-10L gives 15; above Rs10L gives 15+3/per 5L.<br />
-                          <em>Note: If no PG/PhD students enrolled, max marks deducted from denominator.</em>
-                        </td>
-                        <td style={TDC}>75</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>5</td>
-                        <td style={TD}><strong>Patents (a) + (b) (Maximum marks 50)</strong></td>
-                        <td style={TD}>
-                          (a) Patent/Product development:<br />
-                          Grant (National): 30/patent | Grant (International): 15/patent | Published: 5/patent | Design Patent: 10/patent | Copyright/Trademark: 3/copyright | Product/Equipment developed/commercialized: 10/product<br />
-                          <em>Max 40 marks</em><br />
-                          (b) Awards/Fellowship/Research awards (Maxi. 10):<br />
-                          International fellowship: 10 | National/state fellowship: 7 | Research excellence awards (External/Internal: 7/5) | Best paper award (International/National): 5
-                        </td>
-                        <td style={TDC}>50</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>6</td>
-                        <td style={TD}><strong>Paper presentation in Seminars/Conferences/full paper in Conference Proceeding</strong></td>
-                        <td style={TD}>
-                          Paper Publication in Scopus indexed conference: 10/paper<br />
-                          Invited lectures / Resource Person: 10/session<br />
-                          Conference attended: 5/conference<br />
-                          Organized FDP of one week duration or more / Conference/Symposium/workshop  (Maxi. 2 can be claimed)<br />
-                          Industrial training of minimum 3 days duration: 5 marks<br />
-                          <em>* Paper presented in Seminars/Conferences and also published as full paper in Conference Proceedings will be counted only once.</em>
-                        </td>
-                        <td style={TDC}>30</td>
-                      </tr>
-                      <tr>
-                        <td style={TDC}>7</td>
-                        <td style={TD}><strong>Other research and development activities (Maxi. 20 marks)</strong></td>
-                        <td style={TD}>
-                          (i) Research proposal submitted: &gt;20 Lacs gives 10 marks; &lt;20 Lacs gives 5 marks<br />
-                          (ii) Product development in Lab/commercialized (Maximum 10)<br />
-                          <em>Note: SAA &amp; SoD max 10; SoMCS max 30; Other schools max 20.</em>
-                        </td>
-                        <td style={TDC}>10 / 20 / 30</td>
-                      </tr>
-                      <tr style={{ background: "#f8fafc" }}>
-                        <td style={TDC}>8</td>
-                        <td style={TD}><strong>Self Development (Max. marks 10)</strong></td>
-                        <td style={TD}>
-                          (a) Attended FDP of one week duration or more (Max 10 marks): 5/FDP<br />
-                          (b) Industrial training (Maximum marks 5)<br />
-                          <em>Total B8 score maximum marks 10.</em>
-                        </td>
-                        <td style={TDC}>10</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </SC>
-                <SC title="Maximum Marks Distribution by School" accent="#0ea5e9">
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                    <thead>
-                      <tr>
-                        <th style={TH}>Sr. No</th>
-                        <th style={TH}>Criteria</th>
-                        <th style={TH}>SAA and SoD (Max Score)</th>
-                        <th style={TH}>SoMCS (Max Score)</th>
-                        <th style={TH}>SoEMR, SCoE, SCM, SoCSEA, SoBB (Max Score)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["", "Part A - 360 Degree Feedback", "", "", ""],
-                        ["A", "Teaching Process (i+ii+iii+iv+v)", "100", "100", "100"],
-                        ["B", "Students' Feedback", "10", "10", "10"],
-                        ["C", "Departmental Activities", "20", "20", "20"],
-                        ["D", "University Activity", "30", "30", "30"],
-                        ["E", "Contribution to Society", "10", "10", "10"],
-                        ["F", "Industry Connect", "5", "5", "5"],
-                        ["G", "Annual Confidential Report", "25", "25", "25"],
-                        ["", "Marks obtained in Part A", "200", "200", "200"],
-                        ["", "Part B - Research and Academic Contribution", "", "", ""],
-                        ["1", "Research papers / journal publication", "80", "120", "120"],
-                        ["2", "Books authored / edited / book chapter", "60", "60", "50"],
-                        ["3", "ICT, Teaching learning Pedagogy", "50", "30", "20"],
-                        ["4", "Research guide / PG guide / Consultancy", "75", "75", "75"],
-                        ["5", "Patents, Awards, Fellowship", "50", "10", "50"],
-                        ["6", "Conference attended / paper presented / session chair etc.", "30", "30", "30"],
-                        ["7", "Research proposal in process", "10", "30", "20"],
-                        ["8", "Self Development", "20", "20", "10"],
-                        ["", "Total score", "375", "375", "375"],
-                      ].map(([sn, criteria, saa, mcs, other], i) => (
-                        <tr key={i} style={criteria.startsWith("Part") ? { background: "#dbeafe", fontWeight: 700 } : criteria === "Marks obtained in Part A" || criteria === "Total score" ? { background: "#d1fae5", fontWeight: 700 } : i % 2 === 0 ? {} : { background: "#f8fafc" }}>
-                          <td style={TDC}>{sn}</td>
-                          <td style={TD}>{criteria}</td>
-                          <td style={TDC}>{saa}</td>
-                          <td style={TDC}>{mcs}</td>
-                          <td style={TDC}>{other}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </SC>
-              </>)}
             </div>
           </div>
         )}
