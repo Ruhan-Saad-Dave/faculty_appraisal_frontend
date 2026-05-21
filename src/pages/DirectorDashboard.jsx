@@ -2408,7 +2408,7 @@ export default function DirectorDashboard() {
  {(ACR_DETAIL_POINTS[row.label] || []).map((point) =><li key={point}>{point}</li>)}
 </ul>
 </td>
-<td style={TDC}>Not counted</td>
+<td style={TDC}>-</td>
 </tr>
  ))}
 </tbody>

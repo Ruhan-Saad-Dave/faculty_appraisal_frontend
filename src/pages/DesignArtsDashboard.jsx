@@ -516,7 +516,7 @@ function SectionTable({ section, form, setForm, docs, setDocs, mode, locked, rev
  {(ACR_DETAIL_POINTS[row.label] || []).map((point) =><li key={point}>{point}</li>)}
 </ul>
 </td>
-<td style={tdCenter}>Not counted</td>
+<td style={tdCenter}>-</td>
 </tr>
  ))}
 </tbody>
