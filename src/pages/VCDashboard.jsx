@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { fetchSavedAppraisal, mergeFacultyInfo } from "../services/appraisalPersistence";
-import { fetchNonTeachingQueueForRole, isPendingForNonTeachingReviewer, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
+import { fetchNonTeachingQueueForRole, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
 import { ACR_DETAIL_POINTS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 
 import { DEAN_TRACKS, UNIVERSITY_SCHOOLS, normalizeHierarchyText } from "../constants/universityHierarchy";
@@ -251,12 +251,6 @@ const vcScoreForRole = (row = {}, role) =>{
  row?.[`${role}_marks`] ??
  row?.[`${role}Marks`];
 };
-const vcInnovScoreForRole = (person = {}, role) =>{
- if (role === "hod" || role === "center_head") return person.innovHod;
- if (role === "director") return person.innovDirector ?? person.innovDir;
- if (role === "dean") return person.innovDean;
- return "";
-};
 const vcTotalForRole = (person = {}, role) =>{
  if (role === "hod" || role === "center_head") return n(person.hodTotal ?? person.hodScore);
  if (role === "director") return n(person.directorTotal ?? person.directorScore);
@@ -378,7 +372,6 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director", sect
  return updated;
  });
  };
- const setScalar = (key, val) =>setVcData(prev =>({ ...prev, [key]: val }));
  const get = (section, idx, field) =>{
  if (vcData[section]) {
  const s = vcData[section];
@@ -392,7 +385,6 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director", sect
  }
  return person[section]?.[idx]?.[field] ?? "";
  };
- const getS = (key) =>vcData[key] ?? person[key] ?? "";
  const { docs } = person;
  const rows = (arr) =>arr && arr.length >0 ? arr : [{}];
  const vcRowMax = (section, row = {}) =>reviewRowMaxForSection(section, row, VC_SECTION_MAX[section] || 0);
@@ -1146,7 +1138,6 @@ function NonTeachingCard({ item, onReview }) {
 <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>{item.roleLabel} - {item.designation}</div>
 <div style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace", marginTop: 1 }}>{item.employeeId}</div>
 </div>
-<StatusBadge status={item.status} />
 </div>
 
 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, background: "#f8fafc", borderRadius: 7, padding: "10px 12px" }}>
@@ -1154,7 +1145,7 @@ function NonTeachingCard({ item, onReview }) {
  ["Self", item.selfTotal, "#1d4ed8"],
  ["RO", item.roTotal, "#0891b2"],
  ["Registrar", item.registrarTotal, "#155e75"],
- ["VC", item.vcTotal, "#6d28d9"],
+ ["Vice Chancellor", item.vcTotal, "#6d28d9"],
  ].map(([label, value, color]) =>(
 <div key={label}>
 <div style={{ fontSize: 9, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>{label}</div>
@@ -1189,9 +1180,24 @@ function NonTeachingCard({ item, onReview }) {
  );
 }
 
-function NonTeachingPanel({ items, onReview }) {
- const pending = items.filter((item) =>isPendingForNonTeachingReviewer(item, "vc")).length;
- const reviewed = items.filter(isNonTeachingReviewComplete).length;
+const nonTeachingItemKey = (item = {}) =>
+ item.id || item.email || item.staff_email || item.form?.info?.email || item.staffEmail;
+
+const upsertNonTeachingItem = (items = [], nextItem = {}) =>{
+ const nextKey = nonTeachingItemKey(nextItem);
+ if (!nextKey) return [nextItem, ...items];
+ const withoutExisting = items.filter((item) =>nonTeachingItemKey(item) !== nextKey);
+ return [nextItem, ...withoutExisting];
+};
+
+function NonTeachingPanel({ pendingItems = [], reviewedItems = [], onReview }) {
+ const pending = pendingItems.length;
+ const reviewed = reviewedItems.length;
+ const renderCards = (items) =>(
+<div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+ {items.map((item) =><NonTeachingCard key={nonTeachingItemKey(item)} item={item} onReview={onReview} />)}
+</div>
+ );
 
  return (
 <div>
@@ -1202,18 +1208,30 @@ function NonTeachingPanel({ items, onReview }) {
 <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Registrar - Reporting Officer - Staff branch</div>
 </div>
  {pending >0 &&<div style={{ background: "#fef3c7", color: "#92400e", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800 }}>{pending} Pending</div>}
- {reviewed >0 &&<div style={{ background: "#fdf4ff", color: "#6b21a8", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800 }}>{reviewed} VC Reviewed</div>}
+ {reviewed >0 &&<div style={{ background: "#fdf4ff", color: "#6b21a8", borderRadius: 8, padding: "6px 12px", fontSize: 11, fontWeight: 800 }}>{reviewed} Vice Chancellor Reviewed</div>}
 </div>
 
- {items.length === 0 ? (
+<div style={{ marginBottom: 18 }}>
+<div style={{ fontWeight: 900, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>Pending Reviews</div>
+ {pendingItems.length === 0 ? (
 <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8", background: "#fff", borderRadius: 10 }}>
-<div style={{ fontWeight: 700 }}>No non-teaching submissions pending VC review</div>
+<div style={{ fontWeight: 700 }}>No non-teaching submissions pending Vice Chancellor review</div>
 </div>
  ) : (
-<div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
- {items.map((item) =><NonTeachingCard key={item.id} item={item} onReview={onReview} />)}
-</div>
+ renderCards(pendingItems)
  )}
+</div>
+
+<div>
+<div style={{ fontWeight: 900, fontSize: 13, color: "#0f172a", marginBottom: 8 }}>Reviewed</div>
+ {reviewedItems.length === 0 ? (
+<div style={{ textAlign: "center", padding: "28px", color: "#94a3b8", background: "#fff", borderRadius: 10 }}>
+<div style={{ fontWeight: 700 }}>No reviewed non-teaching submissions yet</div>
+</div>
+ ) : (
+ renderCards(reviewedItems)
+ )}
+</div>
 </div>
  );
 }
@@ -1307,6 +1325,7 @@ export default function VCDashboard() {
  const [centerHeadList, setCenterHeadList] = useState([]);
  const [facList, setFacList] = useState([]);
  const [nonTeachingList, setNonTeachingList] = useState([]);
+ const [nonTeachingReviewedList, setNonTeachingReviewedList] = useState([]);
 
  useEffect(() =>{
  let active = true;
@@ -1338,12 +1357,14 @@ export default function VCDashboard() {
  setCenterHeadList(routedItems.filter(item =>item.appraisalRole === "center_head"));
  setDirList(routedItems.filter(item =>item.appraisalRole === "director"));
  setDeanList(routedItems.filter(item =>item.appraisalRole === "dean"));
- setNonTeachingList(nonTeachingItems);
+ setNonTeachingList(nonTeachingItems.filter((item) =>!isNonTeachingReviewComplete(item)));
+ setNonTeachingReviewedList(nonTeachingItems.filter(isNonTeachingReviewComplete));
  } catch (err) {
  console.error("Could not load VC review queue:", err);
  if (!active) return;
  setFacList([]); setHodList([]); setCenterHeadList([]); setDirList([]); setDeanList([]);
  setNonTeachingList([]);
+ setNonTeachingReviewedList([]);
  }
  };
  loadReviewQueue();
@@ -1440,9 +1461,9 @@ export default function VCDashboard() {
 
  const teachingItems = [...deanList, ...dirList, ...hodList, ...centerHeadList, ...facList];
  const totalPending = teachingItems.filter(p =>!isVcReviewed(p)).length +
- nonTeachingList.filter(item =>!isNonTeachingReviewComplete(item)).length;
+ nonTeachingList.length;
  const totalReviewed = teachingItems.filter(isVcReviewed).length +
- nonTeachingList.filter(isNonTeachingReviewComplete).length;
+ nonTeachingReviewedList.length;
 
  return (
 <div style={{ display: "flex", minHeight: "100vh", fontFamily: "inherit", background: "#f0ede8", color: "#1e293b" }}>
@@ -1551,7 +1572,7 @@ export default function VCDashboard() {
 </div>
 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
 <div style={{ fontSize: 11, color: "#64748b", background: "#fff", padding: "8px 14px", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
- {deanList.length + dirList.length + hodList.length + centerHeadList.length + facList.length + nonTeachingList.length} total submissions
+ {deanList.length + dirList.length + hodList.length + centerHeadList.length + facList.length + nonTeachingList.length + nonTeachingReviewedList.length} total submissions
 </div>
 <AppraisalHeaderImage />
 </div>
@@ -1566,7 +1587,7 @@ export default function VCDashboard() {
  { key: "non-teaching", label: "Non-Teaching Staff", color: "#1d4ed8", bg: "#dbeafe" },
  ].map(({ key, label, color, bg }) =>{
  const schoolPending = key === "non-teaching"
- ? nonTeachingList.filter(item =>!isNonTeachingReviewComplete(item)).length
+ ? nonTeachingList.length
  : (HIERARCHY_SCHOOLS[key] || []).reduce((a, s) =>a + getSchoolPending(s), 0);
  const isActive = deanTypeFilter === key;
  return (
@@ -1604,7 +1625,8 @@ export default function VCDashboard() {
 
  {deanTypeFilter === "non-teaching" ? (
 <NonTeachingPanel
- items={nonTeachingList}
+ pendingItems={nonTeachingList}
+ reviewedItems={nonTeachingReviewedList}
  onReview={(person) =>setReviewing({ person, personMode: "non_teaching" })}
  />
  ) : activeSchool ? (
@@ -1630,7 +1652,8 @@ export default function VCDashboard() {
  onBack={() =>setReviewing(null)}
  readOnly={isNonTeachingReviewComplete(reviewing.person)}
  onSubmitted={(updated) =>{
- setNonTeachingList((current) =>current.map((item) =>item.id === updated.id ? updated : item));
+ setNonTeachingList((current) =>current.filter((item) =>nonTeachingItemKey(item) !== nonTeachingItemKey(updated)));
+ setNonTeachingReviewedList((current) =>upsertNonTeachingItem(current, updated));
  setReviewing(null);
  }}
  />

@@ -9,7 +9,6 @@ import { clampScore } from "../utils/appraisalFormUtils";
 import {
   WORKFLOW_STATUSES,
   normalizeApprovalWorkflow,
-  normalizeWorkflowStatus,
   workflowSourceFrom,
 } from "../utils/workflow";
 import { api } from "./api";
@@ -18,7 +17,9 @@ export const NON_TEACHING_STATUS = {
   DRAFT: "Draft",
   PENDING_RO_REVIEW: "Pending RO Review",
   PENDING_REGISTRAR_REVIEW: "Pending Registrar Review",
-  RO_REVIEWED: "RO Reviewed",
+  PENDING_VC_REVIEW: "Pending VC Review",
+  RO_REVIEWED: "Reporting Officer Reviewed",
+  REPORTING_OFFICER_REVIEWED: "Reporting Officer Reviewed",
   REGISTRAR_REVIEWED: "Registrar Reviewed",
   VC_APPROVED: "VC Approved",
 };
@@ -103,6 +104,7 @@ export const RATING_SECTIONS = [
 
 const n = (value) => parseFloat(value) || 0;
 const clean = (value) => String(value ?? "").trim();
+const DEFAULT_WORKFLOW_TITLE = "Approval Workflow";
 const clampOptionalScore = (value, max) =>
   clean(value) === "" ? "" : clampScore(value, max);
 const clampOptionalRating = (value) => {
@@ -130,6 +132,8 @@ const NON_TEACHING_STATUS_ALIASES = {
   submitted: NON_TEACHING_STATUS.PENDING_RO_REVIEW,
   "pending ro review": NON_TEACHING_STATUS.PENDING_RO_REVIEW,
   "pending reporting officer review": NON_TEACHING_STATUS.PENDING_RO_REVIEW,
+  "pending vc review": NON_TEACHING_STATUS.PENDING_VC_REVIEW,
+  "pending vice chancellor review": NON_TEACHING_STATUS.PENDING_VC_REVIEW,
   "reporting officer reviewed": NON_TEACHING_STATUS.RO_REVIEWED,
   "ro reviewed": NON_TEACHING_STATUS.RO_REVIEWED,
   "pending registrar review": NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
@@ -168,7 +172,7 @@ const normalizeDocsMap = (docs = {}) => {
 
 export const nonTeachingRoleLabel = (role) =>
   role === "vc"
-    ? "VC"
+    ? "Vice Chancellor"
     : NON_TEACHING_ROLE_LABELS[normalizeNonTeachingRole(role, role)] || role;
 
 const workflowDesignationForRole = (role) =>{
@@ -203,7 +207,10 @@ const workflowStepStatusForRole = (status, role) =>{
         : WORKFLOW_STATUSES.WAITING;
   }
   if (role === "vc") {
-    return normalizedStatus === NON_TEACHING_STATUS.REGISTRAR_REVIEWED
+    return [
+      NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
+      NON_TEACHING_STATUS.PENDING_VC_REVIEW,
+    ].includes(normalizedStatus)
       ? WORKFLOW_STATUSES.PENDING
       : WORKFLOW_STATUSES.WAITING;
   }
@@ -427,12 +434,6 @@ export const normalizeNonTeachingForm = (
     });
   merged.reports_to_registrar = reportsToRegistrar;
   merged.reportsToRegistrar = reportsToRegistrar;
-  if (
-    reportsToRegistrar &&
-    merged.status === NON_TEACHING_STATUS.PENDING_RO_REVIEW
-  ) {
-    merged.status = NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW;
-  }
   merged.info.ay = academicYear(merged.info.ay || profile.academic_year);
   merged.info.email = emailKey(
     merged.info.email || profile.email || sessionStorage.getItem("username"),
@@ -575,7 +576,7 @@ export const expectedPendingStatus = (role) => {
     return NON_TEACHING_STATUS.PENDING_RO_REVIEW;
   if (normalizedRole === "registrar")
     return NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW;
-  if (normalizedRole === "vc") return NON_TEACHING_STATUS.REGISTRAR_REVIEWED;
+  if (normalizedRole === "vc") return NON_TEACHING_STATUS.PENDING_VC_REVIEW;
   return NON_TEACHING_STATUS.DRAFT;
 };
 
@@ -585,6 +586,12 @@ export const expectedPendingStatuses = (role) => {
     return [
       NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
       NON_TEACHING_STATUS.RO_REVIEWED,
+    ];
+  }
+  if (normalizedRole === "vc") {
+    return [
+      NON_TEACHING_STATUS.PENDING_VC_REVIEW,
+      NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
     ];
   }
   return [expectedPendingStatus(normalizedRole)];
@@ -607,6 +614,8 @@ const roleKeyForWorkflowStep = (step = {}, index = 0, steps = []) =>{
   const normalizedDesignation = normalizeStatusText(step.designation);
   if (normalizedDesignation.includes("reporting officer")) return "ro";
   if (["vc", "vice chancellor"].some((value) =>normalizedDesignation.includes(value))) return "vc";
+  if (normalizedDesignation.includes("department head") || normalizedDesignation.includes("dept head")) return "ro";
+  if (normalizedDesignation.includes("head") && !normalizedDesignation.includes("registrar")) return "ro";
   if (normalizedDesignation.includes("registrar")) return "registrar";
   if (index === steps.length - 1) return "vc";
   return index === 0 && steps.length >2 ? "ro" : "registrar";
@@ -777,6 +786,29 @@ export const loadNonTeachingAppraisal = async ({
   }
 };
 
+export const loadNonTeachingWorkflow = async ({
+  email = sessionStorage.getItem("username"),
+  academicYear: ay = APP_INFO.DEFAULT_AY,
+  includeInitial = true,
+} = {}) => {
+  const staffEmail = emailKey(email);
+  if (!staffEmail) {
+    return normalizeApprovalWorkflow(
+      { workflowName: DEFAULT_WORKFLOW_TITLE, status: "NOT_STARTED", steps: [] },
+      { includeInitial, initialDesignation: "Staff" },
+    );
+  }
+
+  const data = await api.get(`/non-teaching/workflow/${encodeURIComponent(staffEmail)}`, {
+    params: { academic_year: academicYear(ay) },
+  });
+  return normalizeApprovalWorkflow(data || {}, {
+    includeInitial,
+    initialDesignation: "Staff",
+    workflowName: data?.workflowName || data?.workflow_name || DEFAULT_WORKFLOW_TITLE,
+  });
+};
+
 export const saveNonTeachingDraft = async ({
   form,
   role = sessionStorage.getItem("role"),
@@ -788,12 +820,8 @@ export const saveNonTeachingDraft = async ({
     profile,
     normalizedRole,
   );
-  const staffEmail = emailKey(
-    draftForm.info.email || profile.email || sessionStorage.getItem("username"),
-  );
   const ay = academicYear(draftForm.info.ay);
   const data = await api.put("/non-teaching/appraisal", {
-    staff_email: staffEmail,
     academic_year: ay,
     payload: draftForm,
     status: NON_TEACHING_STATUS.DRAFT,
@@ -815,7 +843,7 @@ export const submitNonTeachingSelfAppraisal = async ({
     profile,
     normalizedRole,
   );
-  const status = statusAfterSelfSubmit(normalizedRole, normalizedForm);
+  const status = NON_TEACHING_STATUS.PENDING_RO_REVIEW;
   const finalForm = stripSelfPartBRatings(
     normalizeNonTeachingForm(
       { ...normalizedForm, status },
@@ -826,18 +854,12 @@ export const submitNonTeachingSelfAppraisal = async ({
 
   validateNonTeachingForm(finalForm, "self", false);
 
-  const staffEmail = emailKey(
-    finalForm.info.email || profile.email || sessionStorage.getItem("username"),
-  );
   const ay = academicYear(finalForm.info.ay);
   const requestPayload = {
-    staff_email: staffEmail,
     academic_year: ay,
     payload: finalForm,
     status,
   };
-
-  console.log("PUT /non-teaching/appraisal payload", requestPayload);
 
   const data = await api.put("/non-teaching/appraisal", requestPayload);
 
@@ -868,6 +890,7 @@ export const decorateNonTeachingRow = (row, profile = {}) => {
     form,
     payload: row.payload,
   });
+  const workflowSource = workflowSourceFrom(row);
 
   return {
     id: `${row.staff_email}:${row.academic_year}`,
@@ -894,7 +917,9 @@ export const decorateNonTeachingRow = (row, profile = {}) => {
           ? "#0891b2"
           : "#1d4ed8",
     status: row.status || form.status,
-    workflow: nonTeachingWorkflowFor({ ...row, form, status: row.status || form.status }, { includeInitial: true }),
+    workflow: workflowSource
+      ? nonTeachingWorkflowFor({ workflow: workflowSource, status: row.status || form.status }, { includeInitial: true })
+      : null,
     submittedOn: row.submitted_at
       ? new Date(row.submitted_at).toLocaleDateString()
       : "",
@@ -938,13 +963,7 @@ const normalizeNonTeachingQueueItem = (item = {}) => {
     form,
     payload: item.payload,
   });
-  if (
-    reportsToRegistrar &&
-    status === NON_TEACHING_STATUS.PENDING_RO_REVIEW
-  ) {
-    status = NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW;
-  }
-
+  const workflowSource = workflowSourceFrom(item);
   return {
     ...item,
     id: firstNonEmpty(item.id, `${staffEmail}:${ay}`),
@@ -966,43 +985,14 @@ const normalizeNonTeachingQueueItem = (item = {}) => {
     avatarColor: item.avatarColor ||
       (role === "registrar" ? "#7c3aed" : role === "reporting_officer" ? "#0891b2" : "#1d4ed8"),
     status,
-    workflow: nonTeachingWorkflowFor({ ...item, form: { ...form, status } }, { includeInitial: true }),
+    workflow: workflowSource
+      ? nonTeachingWorkflowFor({ workflow: workflowSource, status }, { includeInitial: true })
+      : null,
     selfTotal: firstPositiveNumber(item.selfTotal, item.self_total, selfTotals.total),
     roTotal: firstPositiveNumber(item.roTotal, item.ro_total, roTotals.total),
     registrarTotal: firstPositiveNumber(item.registrarTotal, item.registrar_total, registrarTotals.total),
     vcTotal: firstPositiveNumber(item.vcTotal, item.vc_total, vcTotals.total),
   };
-};
-
-const nonTeachingStatusIndex = (status) => [
-  NON_TEACHING_STATUS.DRAFT,
-  NON_TEACHING_STATUS.PENDING_RO_REVIEW,
-  NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW,
-  NON_TEACHING_STATUS.RO_REVIEWED,
-  NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
-  NON_TEACHING_STATUS.VC_APPROVED,
-].indexOf(normalizeNonTeachingStatus(status));
-
-const nonTeachingReachedReviewer = (item = {}, reviewerRole) => {
-  const expectedIndex = Math.min(
-    ...expectedPendingStatuses(reviewerRole)
-      .map(nonTeachingStatusIndex)
-      .filter((index) => index >= 0),
-  );
-  const currentIndex = nonTeachingStatusIndex(item.status);
-  return expectedIndex >= 0 && currentIndex >= expectedIndex;
-};
-
-const isSubmittedNonTeachingQueueItem = (item = {}) => {
-  const currentIndex = nonTeachingStatusIndex(item.status);
-  const submittedIndex = nonTeachingStatusIndex(NON_TEACHING_STATUS.PENDING_RO_REVIEW);
-  return currentIndex >= submittedIndex ||
-    Boolean(clean(firstNonEmpty(
-      item.submittedOn,
-      item.submitted_at,
-      item.declaration?.submitted_at,
-      item.form?.submitted_at,
-    )));
 };
 
 export const fetchNonTeachingQueueForRole = async ({
@@ -1016,13 +1006,7 @@ export const fetchNonTeachingQueueForRole = async ({
     const params = { academic_year: academicYear(ay) };
 
     const items = await api.get("/non-teaching/subordinates", { params });
-    return (items || [])
-      .map(normalizeNonTeachingQueueItem)
-      .filter((item) =>
-        isSubmittedNonTeachingQueueItem(item) &&
-        canReviewNonTeachingItem(item, role) &&
-        nonTeachingReachedReviewer(item, role)
-      );
+    return (items || []).map(normalizeNonTeachingQueueItem);
   } catch (err) {
     throw new Error(err?.message || "Could not load non-teaching review queue.", { cause: err });
   }
@@ -1066,26 +1050,10 @@ export const submitNonTeachingReview = async ({
   remarks = "",
 } = {}) => {
   const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
-  const status = reviewerStatus(role);
-  const pendingStatuses = expectedPendingStatuses(role);
-  const currentStatus = normalizeNonTeachingStatus(item?.status || form?.status);
-
-  if (!pendingStatuses.includes(currentStatus) && currentStatus !== status) {
-    throw new Error(
-      `This appraisal is not pending ${nonTeachingRoleLabel(role)} review.`,
-    );
-  }
-  if (!canReviewNonTeachingItem(item, role)) {
-    throw new Error(
-      `${nonTeachingRoleLabel(role)} is not authorized to review this appraisal.`,
-    );
-  }
-
   const authority = role === "vc" ? "vc" : role;
   const finalForm = normalizeNonTeachingForm(
     {
       ...form,
-      status,
       roRemarks: role === "reporting_officer" ? remarks : form.roRemarks,
       registrarRemarks: role === "registrar" ? remarks : form.registrarRemarks,
       vcRemarks: role === "vc" ? remarks : form.vcRemarks,
@@ -1100,15 +1068,9 @@ export const submitNonTeachingReview = async ({
   const ay = academicYear(item?.academicYear || finalForm.info.ay);
   const requestPayload = {
     academic_year: ay,
+    total_score: calculateNonTeachingTotals(finalForm, authority).total,
     payload: finalForm,
-    status,
-    remarks,
   };
-
-  console.log(
-    `PUT /non-teaching/review/${staffEmail} request body`,
-    requestPayload,
-  );
 
   const data = await api.put(
     `/non-teaching/review/${encodeURIComponent(staffEmail)}`,
@@ -1204,7 +1166,7 @@ export const openNonTeachingReport = ({
       partA: (key) => reportForm[key]?.vcMarks,
       partB: (row, index) => row[`p${index}_vc`],
       remarks: reportForm.vcRemarks,
-      remarksLabel: labelForRole("vc"),
+      remarksLabel: "Vice Chancellor Remarks and Grade",
     },
   };
   const docsFor = (key) =>
@@ -1307,7 +1269,7 @@ export const openNonTeachingReport = ({
         </div>
 
         <div class="totals" style="grid-template-columns: repeat(${reportRoles.length}, 1fr);">
-          ${reportRoles.map((role) => `<div class="total"><div class="label">${escapeHtml(reportColumns[role].remarksLabel)}</div><div class="score">${reportColumns[role].total.toFixed(1)} / ${maxForRole(role)}</div></div>`).join("")}
+          ${reportRoles.map((role) => `<div class="total"><div class="label">${escapeHtml(reportColumns[role].label)}</div><div class="score">${reportColumns[role].total.toFixed(1)} / ${maxForRole(role)}</div></div>`).join("")}
         </div>
 
         <h2>Part A - Self Appraisal</h2>

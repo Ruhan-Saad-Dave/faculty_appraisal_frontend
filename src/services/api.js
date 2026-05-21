@@ -28,7 +28,7 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // Normalize every API error so err.message is always a user-safe string.
-// Priority: user_message to detail to generic fallback.
+// Backend detail fields are developer-facing; show user_message when present.
 // 401 clears the session and redirects to /login automatically.
 apiClient.interceptors.response.use(
   (response) => response,
@@ -37,9 +37,7 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
 
     const userMessage =
-      data?.user_message ??
-      (typeof data?.detail === "string" ? data.detail : null) ??
-      "Something went wrong. Please try again.";
+      data?.user_message ?? "Something went wrong. Please try again.";
 
     error.message = userMessage;
     error.userMessage = userMessage;
@@ -88,4 +86,3 @@ export const fetchFormData = async () => {
 export const saveFormData = async (data) => {
   sessionStorage.setItem("formData", JSON.stringify(data));
 };
-

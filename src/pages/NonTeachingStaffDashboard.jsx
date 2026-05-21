@@ -15,9 +15,8 @@ import {
   calculateNonTeachingTotals,
   emptyNonTeachingForm,
   fetchNonTeachingQueueForRole,
-  isPendingForNonTeachingReviewer,
   loadNonTeachingAppraisal,
-  nonTeachingWorkflowFor,
+  loadNonTeachingWorkflow,
   nonTeachingRoleLabel,
   normalizeNonTeachingStatus,
   openNonTeachingReport,
@@ -31,11 +30,7 @@ import {
 } from "../services/nonTeachingWorkflow";
 import { clampScore, scoreRemaining } from "../utils/appraisalFormUtils";
 import { profileFromsessionStorage } from "../utils/hierarchy";
-import { currentWorkflowStep } from "../utils/workflow";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
-import ApprovalHistoryTable from "../components/workflow/ApprovalHistoryTable";
-import CurrentApproverCard from "../components/workflow/CurrentApproverCard";
-import WorkflowTimeline from "../components/workflow/WorkflowTimeline";
 import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
 
 const ACCENT = "#1d4ed8";
@@ -67,37 +62,20 @@ const initials = (name = "User") =>
     .slice(0, 2)
     .toUpperCase();
 
-const workflowTextFor = (form, role) =>
-  nonTeachingWorkflowFor({
-    ...form,
-    appraisalRole: role,
-    submittedByRole: role,
-  }).steps.map((stage) =>stage.designation).join(" to ");
+const emptyWorkflow = {
+  workflowId: null,
+  workflowName: "Approval Workflow",
+  currentStep: null,
+  status: "NOT_STARTED",
+  steps: [],
+  approvalSteps: [],
+};
 
 function Avatar({ name, color = ACCENT, size = 38 }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: `linear-gradient(135deg,${color},${color}99)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.34, flexShrink: 0 }}>
       {initials(name)}
     </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const normalizedStatus = normalizeNonTeachingStatus(status);
-  const map = {
-    [NON_TEACHING_STATUS.DRAFT]: { bg: "#f1f5f9", color: "#475569", dot: "#94a3b8" },
-    [NON_TEACHING_STATUS.PENDING_RO_REVIEW]: { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
-    [NON_TEACHING_STATUS.PENDING_REGISTRAR_REVIEW]: { bg: "#ccfbf1", color: "#155e75", dot: "#14b8a6" },
-    [NON_TEACHING_STATUS.RO_REVIEWED]: { bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" },
-    [NON_TEACHING_STATUS.REGISTRAR_REVIEWED]: { bg: "#cffafe", color: "#155e75", dot: "#06b6d4" },
-    [NON_TEACHING_STATUS.VC_APPROVED]: { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
-  };
-  const current = map[normalizedStatus] || map[NON_TEACHING_STATUS.DRAFT];
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: current.bg, color: current.color, fontSize: 10, fontWeight: 800, padding: "4px 9px", borderRadius: 20 }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: current.dot }} />
-      {normalizedStatus || NON_TEACHING_STATUS.DRAFT}
-    </span>
   );
 }
 
@@ -257,17 +235,6 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
   );
 }
 
-function WorkflowTracker({ status, role, form }) {
-  const normalizedRole = normalizeNonTeachingRole(role, role);
-  const workflow = nonTeachingWorkflowFor({
-    ...form,
-    status,
-    appraisalRole: normalizedRole,
-    submittedByRole: normalizedRole,
-  });
-  return <WorkflowTimeline workflow={workflow} />;
-}
-
 function SelfAppraisalTable({ form, setForm, readOnly, accent }) {
   const setItem = (key, field, value) => {
     setForm((current) => ({
@@ -334,16 +301,10 @@ function SelfAppraisalTable({ form, setForm, readOnly, accent }) {
   );
 }
 
-function SummaryPanel({ form, role, onSubmit, onUpdateRemarks, onUpdateSummaryOtherInfo, onReport, submitting, locked, confirmed, setConfirmed, accent, showReport = true }) {
+function SummaryPanel({ form, onSubmit, onUpdateRemarks, onUpdateSummaryOtherInfo, onReport, submitting, locked, confirmed, setConfirmed, accent, showReport = true }) {
   const self = calculateNonTeachingTotals(form, "self");
   const selfMax = NON_TEACHING_MAX.partA;
   const scoreCards = [["Self Claimed", self.total, ACCENT]];
-  const workflow = nonTeachingWorkflowFor({
-    ...form,
-    appraisalRole: role,
-    submittedByRole: role,
-  });
-  const nextReviewer = currentWorkflowStep(workflow)?.designation || workflow.approvalSteps?.[0]?.designation || "Next Authority";
 
   return (
     <SectionCard title={`Summary of Total Score (Max ${selfMax})`} accent="#059669">
@@ -361,7 +322,6 @@ function SummaryPanel({ form, role, onSubmit, onUpdateRemarks, onUpdateSummaryOt
       <div style={{ marginBottom: 14, padding: "10px 12px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, color: "#1e3a8a", fontSize: 12, lineHeight: 1.6 }}>
         Current visible score: <strong>{self.total.toFixed(1)} / {selfMax}</strong>
       </div>
-      <CurrentApproverCard workflow={workflow} />
 
       <SummaryOtherInfoField
         value={form.summaryOtherInfo}
@@ -393,7 +353,7 @@ function SummaryPanel({ form, role, onSubmit, onUpdateRemarks, onUpdateSummaryOt
         )}
         {!locked && (
           <button type="button" onClick={onSubmit} disabled={!confirmed || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: confirmed ? accent : "#94a3b8", color: "#fff", cursor: confirmed && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "inherit" }}>
-            {submitting ? "Submitting..." : `Submit to ${nextReviewer}`}
+            {submitting ? "Submitting..." : "Submit"}
           </button>
         )}
       </div>
@@ -412,8 +372,13 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
   const [draftSaved, setDraftSaved] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [workflow, setWorkflow] = useState(null);
   const accent = roleAccent(normalizedRole);
   const locked = form.status !== NON_TEACHING_STATUS.DRAFT;
+  const sidebarWorkflowText = (workflow?.approvalSteps || workflow?.steps || [])
+    .filter((stage) => !stage.isInitial)
+    .map((stage) => stage.designation)
+    .join(" to ") || "Submit your appraisal to begin the review process.";
 
   useEffect(() => {
     let active = true;
@@ -433,8 +398,13 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
           profile,
           role: normalizedRole,
         });
+        const liveWorkflow = await loadNonTeachingWorkflow({
+          email: profile.email,
+          academicYear: APP_INFO.DEFAULT_AY,
+        }).catch(() => null);
         if (!active) return;
         setForm(saved?.form || emptyNonTeachingForm(profile, normalizedRole));
+        setWorkflow(liveWorkflow);
       } catch (err) {
         console.error("Could not load non-teaching appraisal:", err);
       } finally {
@@ -467,6 +437,11 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         profile: profileFromsessionStorage(),
       });
       setForm(saved.form);
+      const liveWorkflow = await loadNonTeachingWorkflow({
+        email: saved.form?.info?.email || profileFromsessionStorage().email,
+        academicYear: saved.form?.info?.ay || APP_INFO.DEFAULT_AY,
+      }).catch(() => null);
+      setWorkflow(liveWorkflow);
       setDraftSaved(true);
     } catch (err) {
       if (err?.statusCode === 403 || err?.response?.status === 403) {
@@ -514,6 +489,11 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         profile: profileFromsessionStorage(),
       });
       setForm(saved.form);
+      const liveWorkflow = await loadNonTeachingWorkflow({
+        email: saved.form?.info?.email || profileFromsessionStorage().email,
+        academicYear: saved.form?.info?.ay || APP_INFO.DEFAULT_AY,
+      }).catch(() => null);
+      setWorkflow(liveWorkflow);
       setConfirmed(false);
       alert("Non-teaching appraisal submitted successfully.");
     } catch (err) {
@@ -553,12 +533,9 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button type="button" onClick={() => navigate("/edit-profile")} style={S.headerButton}>Edit Profile</button>
-              <StatusBadge status={form.status} />
               <AppraisalHeaderImage />
             </div>
           </div>
-
-          <WorkflowTracker status={form.status} role={normalizedRole} form={form} />
 
           <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
             {[
@@ -642,7 +619,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
           </div>
         </div>
         <div style={{ background: "#1e293b", borderRadius: 8, padding: "10px 12px", fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>
-          {workflowTextFor(form, normalizedRole)}
+          {sidebarWorkflowText}
         </div>
         <div style={{ margin: "8px 0", padding: "10px 12px", background: "rgba(37,99,235,0.15)", border: "1px solid #2563eb", borderRadius: 8 }}>
           <div style={{ color: "#94a3b8", fontWeight: 700, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>For any queries</div>
@@ -807,6 +784,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const [remarks, setRemarks] = useState(role === "vc" ? item.form?.vcRemarks : role === "registrar" ? item.form?.registrarRemarks : item.form?.roRemarks);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [workflow, setWorkflow] = useState(item.workflow || null);
   const finalisedByVc = role === "vc" && (
     normalizeNonTeachingStatus(item.status) === NON_TEACHING_STATUS.VC_APPROVED ||
     n(item.vcTotal) > 0
@@ -814,15 +792,29 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const [editingFinalised, setEditingFinalised] = useState(false);
   const locked = finalisedByVc
     ? !editingFinalised
-    : readOnly || !isPendingForNonTeachingReviewer(item, role);
+    : readOnly;
   const accent = roleAccent(role);
-  const visibleRoles = visibleNonTeachingReviewRoles(role, item);
-  const workflow = nonTeachingWorkflowFor({ ...item, form, status: item.status }, { includeInitial: true });
-  const reviewerDesignation = workflowDesignationForNonTeachingRole({ ...item, form }, role);
+  useEffect(() => {
+    let active = true;
+    loadNonTeachingWorkflow({
+      email: item.email || item.staff_email,
+      academicYear: item.academicYear || item.academic_year || form.info?.ay || APP_INFO.DEFAULT_AY,
+    })
+      .then((liveWorkflow) => {
+        if (active) setWorkflow(liveWorkflow);
+      })
+      .catch(() => {
+        if (active) setWorkflow(item.workflow || emptyWorkflow);
+      });
+    return () => { active = false; };
+  }, [item, form.info?.ay]);
+  const displayWorkflow = workflow || emptyWorkflow;
+  const visibleRoles = visibleNonTeachingReviewRoles(role, { ...item, workflow: displayWorkflow });
+  const reviewerDesignation = workflowDesignationForNonTeachingRole({ ...item, form, workflow: displayWorkflow }, role);
   const selfTotals = calculateNonTeachingTotals(form, "self");
   const totals = calculateNonTeachingTotals(form, role === "vc" ? "vc" : role);
-  const authorityScoreLabel = `${reviewerDesignation} Score`;
-  const remarksLabel = `${reviewerDesignation} Remarks`;
+  const authorityScoreLabel = role === "vc" ? "Vice Chancellor Score" : `${reviewerDesignation} Score`;
+  const remarksLabel = role === "vc" ? "Vice Chancellor Remarks and Grade" : `${reviewerDesignation} Remarks`;
 
   const handleSubmit = async () => {
     if (!confirmed) {
@@ -881,15 +873,11 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
           <div style={{ color: "#f8fafc", fontSize: 15, fontWeight: 800 }}>{item.name}</div>
           <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.roleLabel} | {item.designation} | {item.employeeId}</div>
         </div>
-        <StatusBadge status={item.status} />
         <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", color: "#e2e8f0", textAlign: "center" }}>
           <div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{reviewerDesignation} Total</div>
           <div style={{ color: accent, fontWeight: 900, fontSize: 16 }}>{totals.total.toFixed(1)}</div>
         </div>
       </div>
-
-      <CurrentApproverCard workflow={workflow} />
-      <WorkflowTimeline workflow={workflow} />
 
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         {[
@@ -930,7 +918,6 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
 
       {tab === "remarks" && (
         <SectionCard title={locked ? "Submitted Review" : `${reviewerDesignation} Remarks & Submission`} accent={accent}>
-          <ApprovalHistoryTable workflow={workflow} />
           {role === "vc" && visibleRoles.includes("ro") && form.roRemarks && <PriorRemark label={`${workflowDesignationForNonTeachingRole({ ...item, form }, "reporting_officer")} Remarks`} value={form.roRemarks} color={ACCENT} />}
           {role === "vc" && visibleRoles.includes("registrar") && form.registrarRemarks && <PriorRemark label={`${workflowDesignationForNonTeachingRole({ ...item, form }, "registrar")} Remarks`} value={form.registrarRemarks} color={REG_ACCENT} />}
 
@@ -979,7 +966,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
             )}
             {!locked && (
               <button type="button" onClick={handleSubmit} disabled={!confirmed || !remarks.trim() || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: (confirmed && remarks.trim()) ? accent : "#94a3b8", color: "#fff", cursor: confirmed && remarks.trim() && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "inherit" }}>
-                {submitting ? "Submitting..." : finalisedByVc ? "Edit & Resubmit" : "Confirm & Submit"}
+                {submitting ? "Submitting..." : "Submit"}
               </button>
             )}
           </div>
@@ -1003,7 +990,6 @@ function QueueCard({ item, active, onClick, accent }) {
     <button type="button" onClick={onClick} style={{ width: "100%", border: "none", borderLeft: active ? `3px solid ${accent}` : "3px solid transparent", borderRadius: 8, padding: "10px 11px", textAlign: "left", background: active ? `${accent}22` : "transparent", cursor: "pointer", marginBottom: 6, fontFamily: "inherit" }}>
       <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: 12 }}>{item.name}</div>
       <div style={{ color: "#94a3b8", fontSize: 10, marginTop: 2 }}>{item.roleLabel}</div>
-      <div style={{ marginTop: 7 }}><StatusBadge status={item.status} /></div>
     </button>
   );
 }
@@ -1045,7 +1031,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
   }, [reviewerRole]);
 
   const selected = items.find((item) => item.id === selectedId);
-  const pendingCount = items.filter((item) => isPendingForNonTeachingReviewer(item, reviewerRole)).length;
+  const pendingCount = items.length;
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", color: "#0f172a", fontFamily: "inherit" }}>
@@ -1118,7 +1104,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
           <NonTeachingAuthorityReviewPanel
             item={selected}
             reviewerRole={reviewerRole}
-            readOnly={!isPendingForNonTeachingReviewer(selected, reviewerRole)}
+            readOnly={false}
             onBack={() => setSelectedId("")}
             onSubmitted={(updated) => {
               setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
