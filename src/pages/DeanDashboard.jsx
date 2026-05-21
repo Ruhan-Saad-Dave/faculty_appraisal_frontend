@@ -7,11 +7,11 @@ import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { DEAN_TRACKS, getSchoolKey, getSchoolsByDeanTrack } from "../constants/universityHierarchy";
-import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
-import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
+import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 
 const ENGINEERING_SCHOOLS = getSchoolsByDeanTrack(DEAN_TRACKS.ENGINEERING);
 const ENGINEERING_SCHOOL_VALUES = ENGINEERING_SCHOOLS.flatMap((school) =>[
@@ -1653,6 +1653,7 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(approval);
  const reviewLocked = finalisedByVc || readOnly || approval?.status === "Reviewed" || /Dean\s*(Reviewed|Approved|Rejected)/i.test(approval?.status || "");
+ const canReject = canReviewerRejectProfile("dean", approval);
  const sectionScores = deanScorePayload(approval, deanData);
  const deanScores = deanScoreTotals(sectionScores);
  const hasSavedDeanScores = ["deanPartA", "deanPartB", "deanTotal"].some((key) =>String(approval?.[key] ?? "").trim() !== "");
@@ -1742,6 +1743,8 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
 </table>
 </div>
 
+<SummaryOtherInfoField value={summaryOtherInfoValueFrom(approval)} readOnly rows={4} />
+
 <div style={{ marginBottom: 18 }}>
 <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Dean Remarks</div>
 <textarea value={remarks} onChange={(e) =>setRemarks(e.target.value)} rows={7} readOnly={reviewLocked}
@@ -1768,7 +1771,22 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
 <div style={{ display: "flex", gap: 12 }}>
 <button onClick={onBack} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, cursor: "pointer" }}>{reviewLocked ? "Close" : "Cancel"}</button>
  {!reviewLocked && (
+<>
+ {canReject && (
+<button
+ onClick={() =>{
+ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) {
+ onSubmit(approval.id, deanScores, remarks, sectionScores, reviewConfirmed, "rejected");
+ }
+ }}
+ disabled={!reviewConfirmed || !remarks.trim()}
+ style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: (reviewConfirmed && remarks.trim()) ? "#dc2626" : "#94a3b8", color: "#f8fafc", fontWeight: 700, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed" }}
+>
+ Reject Form
+</button>
+ )}
 <button onClick={() =>onSubmit(approval.id, deanScores, remarks, sectionScores, reviewConfirmed)} disabled={!reviewConfirmed || !remarks.trim()} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: (reviewConfirmed && remarks.trim()) ? "#0f172a" : "#64748b", color: "#f8fafc", fontWeight: 700, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed" }}>Approve & Forward</button>
+</>
  )}
 </div>
 </>
@@ -2023,7 +2041,7 @@ export default function DeanDashboard() {
  }),
  ]);
 
- setAppraisalLocked(Boolean(declarationRow));
+ setAppraisalLocked(Boolean(declarationRow) && !isRejectedStatus(declarationRow?.status));
  } catch (err) {
  console.error("Could not load saved dean appraisal:", err);
  }
@@ -2350,7 +2368,7 @@ export default function DeanDashboard() {
  }
  };
 
- const handleSubmitReview = async (id, scores, remarks, sectionScores, reviewConfirmed = false) =>{
+ const handleSubmitReview = async (id, scores, remarks, sectionScores, reviewConfirmed = false, decision = "approved") =>{
  if (!reviewConfirmed) {
  alert("Please verify and confirm the accuracy declaration before submitting the review.");
  return;
@@ -2378,10 +2396,12 @@ export default function DeanDashboard() {
  remarks,
  sectionScores,
  subjectProfile: item,
+ decision,
  });
 
+ const status = decision === "rejected" ? rejectedStatusFor("dean") : reviewedStatusFor("dean");
  const markReviewed = (entry) =>entry.id === id
- ? { ...entry, ...sectionScores, innovDean: sectionScores?.innovativeTeaching?.dean ?? entry.innovDean, status: "Reviewed", workflowStatus: reviewedStatusFor("dean"), deanPartA: scores.partA, deanPartB: scores.partB, deanTotal: scores.total, deanRemarks: remarks }
+ ? { ...entry, ...sectionScores, innovDean: sectionScores?.innovativeTeaching?.dean ?? entry.innovDean, status, workflowStatus: status, deanPartA: scores.partA, deanPartB: scores.partB, deanTotal: scores.total, deanRemarks: remarks }
  : entry;
 
  if (activeMainTab === "facultyApprovals") {
@@ -2394,7 +2414,7 @@ export default function DeanDashboard() {
  setDirectorList(prev =>prev.map(markReviewed));
  }
  setReviewingApproval(null);
- alert("Dean review approved and forwarded to VC.");
+ alert(decision === "rejected" ? "Appraisal rejected and sent back for editing." : "Dean review approved and forwarded to VC.");
  } catch (err) {
  console.error("Could not submit Dean review:", err);
  alert(`Unable to submit Dean review.\n\n${err.message}`);

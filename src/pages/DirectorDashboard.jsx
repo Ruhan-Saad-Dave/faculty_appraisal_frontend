@@ -7,14 +7,14 @@ import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeF
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
-import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, getSchoolKey, isAppraisalFinalisedByVc } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, getSchoolKey, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
-import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
+import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 
 // - Helpers -
 const n = (v) =>parseFloat(v) || 0;
@@ -1072,6 +1072,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(faculty);
  const reviewLocked = finalisedByVc || readOnly || faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.directorTotal) >0 || String(faculty.directorRemarks || "").trim() !== "";
+ const canReject = canReviewerRejectProfile("director", faculty);
 
  // Compute HOD total from hodData
  const calcHodScore = () =>{
@@ -1286,6 +1287,9 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
 </tr>
 </tbody>
 </table>
+
+<SummaryOtherInfoField value={summaryOtherInfoValueFrom(faculty)} readOnly rows={4} />
+
  {/* Director Remarks - editable */}
 <label style={{ fontWeight: 700, fontSize: 13, color: "#065f46", display: "block", marginBottom: 6 }}>Director Remarks</label>
 <textarea value={dirRemarks} onChange={e =>setDirRemarks(e.target.value)} rows={4} readOnly={reviewLocked}
@@ -1307,11 +1311,26 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
 <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>{reviewLocked ? "Close" : "Cancel"}</button>
  {!reviewLocked && (
+<>
+{canReject && (
+<button
+ onClick={() =>{
+ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) {
+ onSubmit(faculty.id, { partA: dirPartA, partB: dirPartB, total: dirTotal }, dirRemarks, buildDirectorSectionScores(faculty, dirData), reviewConfirmed, "rejected");
+ }
+ }}
+ disabled={!reviewConfirmed || !dirRemarks.trim()}
+ style={{ padding: "10px 22px", background: (reviewConfirmed && dirRemarks.trim()) ? "#dc2626" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, cursor: (reviewConfirmed && dirRemarks.trim()) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}
+>
+ Reject Form
+</button>
+)}
 <button onClick={() =>onSubmit(faculty.id, { partA: dirPartA, partB: dirPartB, total: dirTotal }, dirRemarks, buildDirectorSectionScores(faculty, dirData), reviewConfirmed)}
  disabled={!reviewConfirmed || !dirRemarks.trim()}
  style={{ padding: "10px 28px", background: (reviewConfirmed && dirRemarks.trim()) ? "#059669" : "#64748b", color: "#fff", border: "none", borderRadius: 7, cursor: (reviewConfirmed && dirRemarks.trim()) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>
  Submit Director Review
 </button>
+</>
  )}
 </div>
 </div>
@@ -1559,7 +1578,7 @@ export default function DirectorDashboard() {
  setDocs,
  }),
  ]);
- setAppraisalLocked(Boolean(declarationRow));
+ setAppraisalLocked(Boolean(declarationRow) && !isRejectedStatus(declarationRow?.status));
  } catch (err) {
  console.error("Could not load saved director appraisal:", err);
  }
@@ -1856,7 +1875,7 @@ export default function DirectorDashboard() {
  })),
  });
 
- const handleSubmitReview = async (type, id, scores, remarks, sectionScores, reviewConfirmed = false) =>{
+ const handleSubmitReview = async (type, id, scores, remarks, sectionScores, reviewConfirmed = false, decision = "approved") =>{
  if (!reviewConfirmed) {
  alert("Please verify and confirm the accuracy declaration before submitting the review.");
  return;
@@ -1880,17 +1899,19 @@ export default function DirectorDashboard() {
  remarks,
  sectionScores,
  subjectProfile: item,
+ decision,
  });
 
+ const status = decision === "rejected" ? rejectedStatusFor("director") : reviewedStatusFor("director");
  if (type === "hod") {
- setHodList(prev =>prev.map(h =>h.id === id ? { ...h, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? h.innovDirector, status: "Reviewed", workflowStatus: reviewedStatusFor("director"), directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : h));
+ setHodList(prev =>prev.map(h =>h.id === id ? { ...h, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? h.innovDirector, status, workflowStatus: status, directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : h));
  setReviewingHod(null);
  } else {
- setFacultyList(prev =>prev.map(f =>f.id === id ? { ...f, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? f.innovDirector, status: "Reviewed", workflowStatus: reviewedStatusFor("director"), directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : f));
+ setFacultyList(prev =>prev.map(f =>f.id === id ? { ...f, ...sectionScores, innovDirector: sectionScores?.innovativeTeaching?.director ?? f.innovDirector, status, workflowStatus: status, directorPartA: scores.partA, directorPartB: scores.partB, directorTotal: scores.total, directorRemarks: remarks } : f));
  setReviewingFaculty(null);
  }
 
- alert("Director review approved and forwarded to Dean.");
+ alert(decision === "rejected" ? "Appraisal rejected and sent back for editing." : "Director review approved and forwarded to Dean.");
  } catch (err) {
  console.error("Could not submit Director review:", err);
  alert(`Unable to submit Director review.\n\n${err.message}`);
@@ -3167,7 +3188,7 @@ export default function DirectorDashboard() {
  person={reviewingFaculty}
  reviewerRole="director"
  onBack={() =>setReviewingFaculty(null)}
- onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed) =>handleSubmitReview("faculty", id, scores, remarks, sectionScores, reviewConfirmed)}
+ onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmitReview("faculty", id, scores, remarks, sectionScores, reviewConfirmed, decision)}
  readOnly={isDirectorReviewed(reviewingFaculty)}
  />
  ) : formTypeForSchool(getSchoolKey(reviewingFaculty.school)) === FORM_TYPES.DESIGN_ARTS ? (
@@ -3175,14 +3196,14 @@ export default function DirectorDashboard() {
  person={reviewingFaculty}
  reviewerRole="director"
  onBack={() =>setReviewingFaculty(null)}
- onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed) =>handleSubmitReview("faculty", id, scores, remarks, sectionScores, reviewConfirmed)}
+ onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmitReview("faculty", id, scores, remarks, sectionScores, reviewConfirmed, decision)}
  readOnly={isDirectorReviewed(reviewingFaculty)}
  />
  ) : (
 <ReviewPanel
  faculty={reviewingFaculty}
  onBack={() =>setReviewingFaculty(null)}
- onSubmit={(id, total, remarks, sectionScores, reviewConfirmed) =>handleSubmitReview("faculty", id, total, remarks, sectionScores, reviewConfirmed)}
+ onSubmit={(id, total, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmitReview("faculty", id, total, remarks, sectionScores, reviewConfirmed, decision)}
  readOnly={isDirectorReviewed(reviewingFaculty)}
  />
  )
@@ -3191,7 +3212,7 @@ export default function DirectorDashboard() {
 <ReviewPanel
  faculty={reviewingHod}
  onBack={() =>setReviewingHod(null)}
- onSubmit={(id, total, remarks, sectionScores, reviewConfirmed) =>handleSubmitReview("hod", id, total, remarks, sectionScores, reviewConfirmed)}
+ onSubmit={(id, total, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmitReview("hod", id, total, remarks, sectionScores, reviewConfirmed, decision)}
  readOnly={isDirectorReviewed(reviewingHod)}
  />
  )}

@@ -6,6 +6,7 @@ import {
   getReviewChain,
   isRejectedStatus,
   pendingStatusFor,
+  rejectedStatusFor,
   profileFromsessionStorage,
   reviewedStatusFor,
   roleLabel,
@@ -384,6 +385,18 @@ const workflowForwardingFor = (role, subjectProfile = {}) => {
   };
 };
 
+const workflowRejectionFor = (role) => {
+  const status = rejectedStatusFor(role);
+  return {
+    status,
+    workflow_status: status,
+    review_status: status,
+    next_reviewer: "",
+    next_reviewer_role: "",
+    decision: "rejected",
+  };
+};
+
 export const submitWorkflowReview = async ({
   subjectEmail,
   academicYear,
@@ -394,6 +407,7 @@ export const submitWorkflowReview = async ({
   remarks = "",
   sectionScores,
   subjectProfile,
+  decision = "approved",
 }) => {
   const role = normalizeRoleForWorkflow(reviewerRole);
 
@@ -419,15 +433,17 @@ export const submitWorkflowReview = async ({
     section_scores: sectionScores || {},
   };
   const endpointUrl = `/appraisal-remarks/${endpoint}/${encodeURIComponent(subjectEmail)}`;
-  const forwarding = workflowForwardingFor(role, subjectProfile || {});
+  const rejected = decision === "rejected";
+  const forwarding = rejected ? workflowRejectionFor(role) : workflowForwardingFor(role, subjectProfile || {});
   if (role === "vc") {
-    return await api.put(endpointUrl, basePayload) || {};
+    return await api.put(endpointUrl, rejected ? { ...basePayload, ...forwarding } : basePayload) || {};
   }
 
   let result;
   try {
     result = await api.put(endpointUrl, { ...basePayload, ...forwarding });
   } catch (err) {
+    if (rejected) throw err;
     if (![400, 422].includes(err?.response?.status)) throw err;
     result = await api.put(endpointUrl, basePayload);
   }

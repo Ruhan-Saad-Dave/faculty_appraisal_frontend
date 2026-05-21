@@ -14,7 +14,7 @@ import {
 } from "../utils/hierarchy";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
-import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
+import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 
 // --- Helpers ------------------------------------------------------------------
 const n = (v) => parseFloat(v) || 0;
@@ -1225,6 +1225,8 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
             </tbody>
           </table>
 
+          <SummaryOtherInfoField value={summaryOtherInfoValueFrom(faculty)} readOnly rows={4} />
+
           <label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>HOD Remarks</label>
           <textarea value={remarks} onChange={e => setRemarks(e.target.value)} rows={4}
             placeholder="Enter your remarks, observations, and recommendations for this faculty member..."
@@ -1415,7 +1417,7 @@ export default function HODDashboard() {
         const declaration = data?.declaration || null;
         setWorkflowDeclaration(declaration);
         setWorkflowReviews(data?.reviews || []);
-        setAppraisalLocked(Boolean(declaration));
+        setAppraisalLocked(Boolean(declaration) && !isRejectedStatus(declaration?.status));
 
         await Promise.all([
           loadSavedAppraisal({

@@ -38,9 +38,9 @@ import {
  toggleInnovativeMethod,
  validateCompleteRows,
 } from "../utils/appraisalFormUtils";
-import { getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError, isAppraisalFinalisedByVc } from "../utils/hierarchy";
+import { canReviewerRejectProfile, getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
-import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
+import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 
 const ACCENT = "#b45309";
 const ACCENT2 = "#0f766e";
@@ -1104,6 +1104,7 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  const [editingFinalised, setEditingFinalised] = useState(false);
  const finalisedVcReadOnly = reviewerRole === "vc" && finalisedByVc && !editingFinalised;
  const panelReadOnly = reviewerRole === "vc" ? finalisedVcReadOnly : (readOnly || finalisedByVc);
+ const canReject = canReviewerRejectProfile(reviewerRole, person);
 
  const reviewerForm = useMemo(() =>{
  const merged = { ...form };
@@ -1259,6 +1260,7 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  {sectionView === "summary" && (
 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
 <SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel="Faculty submitted score for the SoMCS media appraisal form." />
+<SummaryOtherInfoField value={summaryOtherInfoValueFrom(person)} readOnly rows={4} />
 <SummaryBox totals={reviewerSummaryTotals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the SoMCS media appraisal form.`} />
 <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
  {reviewerRole === "vc" ? "Vice Chancellor Remarks and Grade" : `${roleLabel(reviewerRole)} Remarks`}
@@ -1273,6 +1275,20 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
 </button>
  )}
  {!panelReadOnly && (
+<>
+ {canReject && (
+<button
+ onClick={() =>{
+ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) {
+ onSubmit(person.id, { partA: totals.partA, partB: totals.partB, total: totals.total }, remarks, buildMediaSectionScores(form, reviewData, reviewerRole), confirmed, "rejected");
+ }
+ }}
+ disabled={!confirmed || !remarks.trim()}
+ style={smallButton((confirmed && remarks.trim()) ? "#dc2626" : "#94a3b8")}
+>
+ Reject Form
+</button>
+ )}
 <button
  onClick={() =>onSubmit(person.id, { partA: totals.partA, partB: totals.partB, total: totals.total }, remarks, buildMediaSectionScores(form, reviewData, reviewerRole), confirmed)}
  disabled={!confirmed || !remarks.trim()}
@@ -1280,6 +1296,7 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  >
  {reviewerRole === "vc" && finalisedByVc ? "Edit & Resubmit" : `Submit ${roleLabel(reviewerRole)} Review`}
 </button>
+</>
  )}
 </div>
 </div>
@@ -1311,7 +1328,7 @@ export default function MediaCommDashboard({ fixedRole }) {
  const [reviews, setReviews] = useState([]);
  const userEmail = sessionStorage.getItem("username") || "";
  const academicYear = form.info?.ay || "2025-2026";
- const locked = Boolean(declaration);
+ const locked = Boolean(declaration) && !isRejectedStatus(declaration?.status);
  const totals = calculateMediaTotals(form, "score");
  const canSelfSubmit = role !== "vc";
 
@@ -1464,7 +1481,7 @@ export default function MediaCommDashboard({ fixedRole }) {
  }
  };
 
- const handleSubmitReview = async (id, scores, remarks, sectionScores, reviewConfirmed = false) =>{
+ const handleSubmitReview = async (id, scores, remarks, sectionScores, reviewConfirmed = false, decision = "approved") =>{
  if (!reviewConfirmed) {
  alert("Please verify and confirm the accuracy declaration before submitting the review.");
  return;
@@ -1486,10 +1503,11 @@ export default function MediaCommDashboard({ fixedRole }) {
  remarks,
  sectionScores,
  subjectProfile: item,
+ decision,
  });
  setReviewing(null);
  await loadQueue();
- alert(`${roleLabel(role)} review submitted successfully.`);
+ alert(decision === "rejected" ? "Appraisal rejected and sent back for editing." : `${roleLabel(role)} review submitted successfully.`);
  } catch (err) {
  alert(`Unable to submit review.\n\n${err.message}`);
  }

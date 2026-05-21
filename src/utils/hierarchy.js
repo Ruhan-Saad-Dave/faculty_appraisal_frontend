@@ -67,7 +67,7 @@ export const departmentHasHod = (school, department) => {
 };
 
 export const getReviewChain = (profile = {}) => {
-  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
+  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.appraisalRole || profile.role);
   const reportsToRegistrar = profile.reports_to_registrar === true ||
     profile.reportsToRegistrar === true ||
     String(profile.reports_to_registrar || profile.reportsToRegistrar || "").trim().toLowerCase() === "true";
@@ -141,8 +141,21 @@ export const isAppraisalFinalisedByVc = (item = {}) => {
 export const reviewStatusForDecision = (role, decision = "approved") =>
   decision === "rejected" ? rejectedStatusFor(role) : reviewedStatusFor(role);
 
+export const canReviewerRejectProfile = (reviewerRole, subjectProfile = {}) => {
+  const role = normalizeRoleForWorkflow(reviewerRole);
+  const subjectRole = normalizeRoleForWorkflow(subjectProfile.appraisal_role || subjectProfile.appraisalRole || subjectProfile.role);
+  const firstReviewer = getReviewChain(subjectProfile)[0];
+  if (firstReviewer !== role) return false;
+
+  if (subjectRole === "faculty") return ["hod", "center_head", "director"].includes(role);
+  if (subjectRole === "hod") return role === "director";
+  if (subjectRole === "director") return role === "dean";
+  if (subjectRole === "dean") return role === "vc";
+  return false;
+};
+
 export const workflowValidationError = (profile = {}) => {
-  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
+  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.appraisalRole || profile.role);
   const schoolKey = getSchoolKey(profile.school);
 
   if (isNonTeachingRole(role)) {
@@ -233,4 +246,3 @@ export const profileFromsessionStorage = () => ({
   reportsToRegistrar: sessionStorage.getItem("reports_to_registrar") === "true" ||
     sessionStorage.getItem("reportsToRegistrar") === "true",
 });
-

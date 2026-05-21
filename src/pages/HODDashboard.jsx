@@ -6,10 +6,10 @@ import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeF
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
-import { reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
-import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
+import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 
 // - Helpers -
 const n = (v) =>parseFloat(v) || 0;
@@ -1045,13 +1045,14 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
 }
 
 // - Full Review Panel (opened when HOD clicks Review) -
-function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabel = "HOD" }) {
+function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabel = "HOD", reviewerRole = "hod" }) {
  const [hodData, setHodData] = useState({});
  const [remarks, setRemarks] = useState(faculty.hodRemarks || "");
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(faculty);
  const reviewLocked = finalisedByVc || readOnly || faculty.status === "Reviewed" || /(?:HOD|Center Head)\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.hodTotal) >0 || String(faculty.hodRemarks || "").trim() !== "";
+ const canReject = canReviewerRejectProfile(reviewerRole, faculty);
 
  // Compute HOD total from hodData
  const calcHodScore = () =>{
@@ -1218,6 +1219,8 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
 </tbody>
 </table>
 
+<SummaryOtherInfoField value={summaryOtherInfoValueFrom(faculty)} readOnly rows={4} />
+
 <label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>{reviewerLabel} Remarks</label>
 <textarea value={remarks} onChange={e =>setRemarks(e.target.value)} rows={4} readOnly={reviewLocked}
  placeholder="Enter your remarks, observations, and recommendations for this faculty member..."
@@ -1238,11 +1241,26 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
 <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>{reviewLocked ? "Close" : "Cancel"}</button>
  {!reviewLocked && (
+<>
+{canReject && (
+<button
+ onClick={() =>{
+ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) {
+ onSubmit(faculty.id, { partA, partB, total }, remarks, buildHodSectionScores(faculty, hodData), reviewConfirmed, "rejected");
+ }
+ }}
+ disabled={!reviewConfirmed || !remarks.trim()}
+ style={{ padding: "10px 22px", background: (reviewConfirmed && remarks.trim()) ? "#dc2626" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}
+>
+ Reject Form
+</button>
+)}
 <button onClick={() =>onSubmit(faculty.id, { partA, partB, total }, remarks, buildHodSectionScores(faculty, hodData), reviewConfirmed)}
  disabled={!reviewConfirmed || !remarks.trim()}
  style={{ padding: "10px 28px", background: (reviewConfirmed && remarks.trim()) ? "#059669" : "#64748b", color: "#fff", border: "none", borderRadius: 7, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>
  Submit {reviewerLabel} Review
 </button>
+</>
  )}
 </div>
 </div>
@@ -1490,7 +1508,7 @@ export default function HODDashboard({
  setDocs,
  }),
  ]);
- setAppraisalLocked(Boolean(declarationRow));
+ setAppraisalLocked(Boolean(declarationRow) && !isRejectedStatus(declarationRow?.status));
  } catch (err) {
  console.error("Could not load saved HOD appraisal:", err);
  }
@@ -2088,7 +2106,7 @@ ${String(summaryOtherInfo ?? "").trim() ? `
  win.document.close();
  };
 
- const handleSubmitReview = async (id, scores, remarks, sectionScores, reviewConfirmed = false) =>{
+ const handleSubmitReview = async (id, scores, remarks, sectionScores, reviewConfirmed = false, decision = "approved") =>{
  if (!reviewConfirmed) {
  alert("Please verify and confirm the accuracy declaration before submitting the review.");
  return;
@@ -2111,11 +2129,13 @@ ${String(summaryOtherInfo ?? "").trim() ? `
  remarks,
  sectionScores,
  subjectProfile: item,
+ decision,
  });
 
- setFacultyList(prev =>prev.map(f =>f.id === id ? { ...f, ...sectionScores, innovHod: sectionScores?.innovativeTeaching?.hod ?? f.innovHod, status: "Reviewed", workflowStatus: reviewedStatusFor(reviewerRole), hodPartA: scores.partA, hodPartB: scores.partB, hodTotal: scores.total, hodRemarks: remarks } : f));
+ const status = decision === "rejected" ? rejectedStatusFor(reviewerRole) : reviewedStatusFor(reviewerRole);
+ setFacultyList(prev =>prev.map(f =>f.id === id ? { ...f, ...sectionScores, innovHod: sectionScores?.innovativeTeaching?.hod ?? f.innovHod, status, workflowStatus: status, hodPartA: scores.partA, hodPartB: scores.partB, hodTotal: scores.total, hodRemarks: remarks } : f));
  setReviewingFaculty(null);
- alert(`${reviewerLabel} review approved and forwarded to ${forwardedToLabel}.`);
+ alert(decision === "rejected" ? "Appraisal rejected and sent back for editing." : `${reviewerLabel} review approved and forwarded to ${forwardedToLabel}.`);
  } catch (err) {
  console.error(`Could not submit ${reviewerLabel} review:`, err);
  alert(`Unable to submit ${reviewerLabel} review.\n\n${err.message}`);
@@ -3365,6 +3385,7 @@ ${String(summaryOtherInfo ?? "").trim() ? `
  onSubmit={handleSubmitReview}
  readOnly={isHodReviewed(reviewingFaculty)}
  reviewerLabel={reviewerLabel}
+ reviewerRole={reviewerRole}
  />
  )}
 </main>

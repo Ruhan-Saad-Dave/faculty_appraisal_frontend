@@ -7,11 +7,12 @@ import { ACR_DETAIL_POINTS, MAX_SCORES, APP_INFO, createAcrRows } from "../const
 
 import { DEAN_TRACKS, UNIVERSITY_SCHOOLS, normalizeHierarchyText } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
-import { getSchoolKey, profileFromsessionStorage, visiblePreviousReviewRoles, isAppraisalFinalisedByVc } from "../utils/hierarchy";
+import { canReviewerRejectProfile, getSchoolKey, profileFromsessionStorage, rejectedStatusFor, visiblePreviousReviewRoles, isAppraisalFinalisedByVc } from "../utils/hierarchy";
 import { buildReviewRemarks, openFullFormReport } from "../utils/fullFormReport";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
 import { NonTeachingAuthorityReviewPanel } from "./NonTeachingStaffDashboard";
+import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 import { SCORE_LIMITS, clampScore, clampReviewScore, effectiveMaxScore, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewRowMaxForSection, reviewSectionScore, rowHasReviewableData, societyRowLocked, societyRowScore } from "../utils/appraisalFormUtils";
 import { standardReviewSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
@@ -781,6 +782,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const [editingFinalised, setEditingFinalised] = useState(false);
  const finalisedReadOnly = finalisedByVc && !editingFinalised;
  const reviewLocked = (readOnly && !finalisedByVc) || finalisedReadOnly;
+ const canReject = canReviewerRejectProfile("vc", person);
 
  const calculatedScores = calcVCScore(person, vcData);
  const partA = reviewLocked && n(person.vcPartA) >0 ? n(person.vcPartA) : calculatedScores.partA;
@@ -926,6 +928,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  {sectionView === "summary" && (
 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
 <SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel={`${personMode === "faculty" ? "Faculty submitted" : "Self"} score for the engineering appraisal form.`} />
+<SummaryOtherInfoField value={summaryOtherInfoValueFrom(person)} readOnly rows={4} />
 <SummaryBox totals={reviewerSummaryTotals} maxScores={reviewerSummaryTotals.maxScores} roleScoreLabel="VC score for the engineering appraisal form." />
 
 <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
@@ -952,11 +955,26 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  Generate Report
 </button>
  {!reviewLocked && (
+<>
+ {canReject && (
+<button
+ onClick={() =>{
+ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) {
+ onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData), reviewConfirmed, "rejected");
+ }
+ }}
+ disabled={!reviewConfirmed || !remarks.trim()}
+ style={{ padding: "8px 14px", background: (reviewConfirmed && remarks.trim()) ? "#dc2626" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}
+>
+ Reject Form
+</button>
+ )}
 <button onClick={() =>onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData), reviewConfirmed)}
  disabled={!reviewConfirmed || !remarks.trim()}
  style={{ padding: "8px 14px", background: (reviewConfirmed && remarks.trim()) ? "#059669" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}>
  {finalisedByVc ? "Edit & Resubmit" : "Submit VC Review"}
 </button>
+</>
  )}
 </div>
 </div>
@@ -1326,7 +1344,7 @@ export default function VCDashboard() {
  return () =>{ active = false; };
  }, []);
 
- const handleSubmit = async (id, scores, remarks, personMode, sectionScores, reviewConfirmed = false) =>{
+ const handleSubmit = async (id, scores, remarks, personMode, sectionScores, reviewConfirmed = false, decision = "approved") =>{
  if (!reviewConfirmed) {
  alert("Please verify and confirm the accuracy declaration before submitting the review.");
  return;
@@ -1350,9 +1368,11 @@ export default function VCDashboard() {
  remarks,
  sectionScores,
  subjectProfile: item,
+ decision,
  });
+ const status = decision === "rejected" ? rejectedStatusFor("vc") : "Reviewed";
  const upd = (list) =>list.map(p =>p.id === id
- ? { ...p, ...sectionScores, innovVc: sectionScores?.innovativeTeaching?.vc ?? p.innovVc, status: "Reviewed", workflowStatus: "Reviewed", declaration: { ...(p.declaration || {}), status: "Reviewed" }, vcPartA: scores.partA, vcPartB: scores.partB, vcTotal: scores.total, vcRemarks: remarks }
+ ? { ...p, ...sectionScores, innovVc: sectionScores?.innovativeTeaching?.vc ?? p.innovVc, status, workflowStatus: status, declaration: { ...(p.declaration || {}), status }, vcPartA: scores.partA, vcPartB: scores.partB, vcTotal: scores.total, vcRemarks: remarks }
  : p);
  if (personMode === "dean") setDeanList(upd);
  else if (personMode === "director") setDirList(upd);
@@ -1360,7 +1380,7 @@ export default function VCDashboard() {
  else if (personMode === "center_head") setCenterHeadList(upd);
  else if (personMode === "faculty") setFacList(upd);
  setReviewing(null);
- alert(wasFinalised ? "VC review updated." : "VC final approval submitted.");
+ alert(decision === "rejected" ? "Appraisal rejected and sent back for editing." : (wasFinalised ? "VC review updated." : "VC final approval submitted."));
  } catch (err) {
  console.error("Could not submit VC review:", err);
  alert(`Unable to submit VC review.\n\n${err.message}`);
@@ -1613,7 +1633,7 @@ export default function VCDashboard() {
  person={reviewing.person}
  reviewerRole="vc"
  onBack={() =>setReviewing(null)}
- onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed)}
+ onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed, decision)}
  readOnly={isVcReviewed(reviewing.person)}
  showReport
  />
@@ -1622,7 +1642,7 @@ export default function VCDashboard() {
  person={reviewing.person}
  reviewerRole="vc"
  onBack={() =>setReviewing(null)}
- onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed)}
+ onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed, decision)}
  readOnly={isVcReviewed(reviewing.person)}
  showReport
  />
