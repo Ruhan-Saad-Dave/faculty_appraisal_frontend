@@ -1144,14 +1144,7 @@ function ReviewPanel({ faculty, onBack, onSubmit }) {
 
   const { partA, partB, total } = calcHodScore();
   const g = grade(total, 575);
-  const facultySummary = {
-    partA: partATotal,
-    partB: partBTotal,
-    total: grandTotal,
-    partAMax: effectivePartAMax,
-    partBMax: effectivePartBMax,
-    grandMax: effectiveGrandMax,
-  };
+  const facultySummary = standardSubmittedScoreSummary(faculty);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 0, minHeight: "100%" }}>

@@ -437,9 +437,6 @@ export const openFullFormReport = async ({
   }
 
   const info = form.info || {};
-  const partAPercentage = percentOf(totals.partA, maxScores.partA);
-  const partBPercentage = percentOf(totals.partB, maxScores.partB);
-  const totalPercentage = percentOf(totals.total, maxScores.grand);
   const displayPartAMax = n(maxScores.partA || 0);
   const displayPartA = n(totals.partA || 0);
   const displayGrandMax = n(maxScores.grand || 0);

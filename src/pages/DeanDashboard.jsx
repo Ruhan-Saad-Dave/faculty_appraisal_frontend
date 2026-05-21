@@ -1984,6 +1984,11 @@ export default function DeanDashboard() {
  const [sectionSaveStatus, setSectionSaveStatus] = useState({ partA: false, partB: false });
  const [summaryOtherInfo, setSummaryOtherInfo] = useState("");
  const [savingSection, setSavingSection] = useState(null);
+ const [submitting, setSubmitting] = useState(false);
+ const [accuracyConfirmed, setAccuracyConfirmed] = useState(false);
+ const [attachmentsConfirmed, setAttachmentsConfirmed] = useState(false);
+ const [ownDeclaration, setOwnDeclaration] = useState(null);
+ const [ownReviews, setOwnReviews] = useState([]);
 
  useEffect(() =>{
  const userEmail = sessionStorage.getItem("username");
@@ -2181,12 +2186,6 @@ export default function DeanDashboard() {
 	hideAcr: true,
  });
 
- const [submitting, setSubmitting] = useState(false);
- const [accuracyConfirmed, setAccuracyConfirmed] = useState(false);
- const [attachmentsConfirmed, setAttachmentsConfirmed] = useState(false);
- const [ownDeclaration, setOwnDeclaration] = useState(null);
- const [ownReviews, setOwnReviews] = useState([]);
-
  const validateSelfAppraisalRows = () =>{
  const sections = [
  { label: "A(i). Lectures", rows: lectures, fields: ["sem", "code", "planned", "conducted", "score"] },
@@ -2254,8 +2253,7 @@ export default function DeanDashboard() {
  ];
  if (section === "partA") partASections.push({ label: "A(iii). Innovative Teaching Methods", rows: visibleInnovRows, fields: ["method", "details", "score"], docKey: (_row, index) =>index === 0 ? "innov" : `innov-${index}`, rowMax: SCORE_LIMITS.innovativeRow, maxScore: 10 });
  const errors = validateCompleteRows(section === "partA" ? partASections : partBSections, docs);
- if (section === "partA") {
- } else {
+ if (section !== "partA") {
  [...projects2, ...externalProjects].forEach((row, index) =>{
  if (row.date && !isValidDDMMYYYY(row.date)) errors.push(`B4 project row ${index + 1}: date must be DD/MM/YYYY.`);
  });
