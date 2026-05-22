@@ -397,6 +397,16 @@ const workflowRejectionFor = (role) => {
   };
 };
 
+const rejectionRoleHintsFor = (role) => ({
+  reviewer_role: role,
+  reviewerRole: role,
+  current_reviewer: role,
+  current_reviewer_role: role,
+  currentReviewerRole: role,
+  authority_role: role,
+  role,
+});
+
 export const submitWorkflowReview = async ({
   subjectEmail,
   academicYear,
@@ -437,10 +447,11 @@ export const submitWorkflowReview = async ({
   const forwarding = rejected ? workflowRejectionFor(role) : workflowForwardingFor(role, subjectProfile || {});
 
   if (rejected) {
+    const roleHints = rejectionRoleHintsFor(role);
     try {
-      return await api.put(endpointUrl, { ...basePayload, ...forwarding }) || {};
+      return await api.put(endpointUrl, { ...basePayload, ...roleHints, ...forwarding }) || {};
     } catch {
-      return await api.put(endpointUrl, { ...basePayload, decision: "rejected" }) || {};
+      return await api.put(endpointUrl, { ...basePayload, ...roleHints, decision: "rejected" }) || {};
     }
   }
 
