@@ -15,6 +15,7 @@ import {
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
+import RejectionNotice from "../components/RejectionNotice";
 
 // --- Helpers ------------------------------------------------------------------
 const n = (v) => parseFloat(v) || 0;
@@ -2102,6 +2103,12 @@ export default function HODDashboard() {
               declaration={workflowDeclaration}
               reviews={workflowReviews}
               profile={profileFromsessionStorage()}
+            />
+            <RejectionNotice
+              declaration={workflowDeclaration}
+              reviews={workflowReviews}
+              status={workflowDeclaration?.status}
+              alertOnceKey={`${sessionStorage.getItem("username") || ""}:${info.ay || ""}:${workflowDeclaration?.status || ""}`}
             />
             {appraisalLocked && (
               <div style={{ background: workflowRejected ? "#fef2f2" : "#ecfdf5", border: `1px solid ${workflowRejected ? "#fecaca" : "#bbf7d0"}`, color: workflowRejected ? "#991b1b" : "#166534", borderRadius: 9, padding: "10px 14px", fontSize: 12, fontWeight: 700 }}>

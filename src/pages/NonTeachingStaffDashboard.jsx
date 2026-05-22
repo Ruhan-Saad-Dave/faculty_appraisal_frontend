@@ -31,6 +31,7 @@ import {
 import { clampScore, scoreRemaining } from "../utils/appraisalFormUtils";
 import { profileFromsessionStorage } from "../utils/hierarchy";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
+import RejectionNotice from "../components/RejectionNotice";
 import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
 
 const ACCENT = "#1d4ed8";
@@ -553,6 +554,12 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
               </button>
             ))}
           </div>
+
+          <RejectionNotice
+            form={form}
+            status={form.status}
+            alertOnceKey={`${form.info?.email || profileFromsessionStorage().email}:${form.info?.ay || APP_INFO.DEFAULT_AY}:${form.status || ""}`}
+          />
 
           {tab === "info" && (
             <SectionCard title="General Information" accent={accent}>

@@ -6,10 +6,11 @@ import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeF
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, selfEffectivePartAMax, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
-import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor } from "../utils/hierarchy";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
+import RejectionNotice from "../components/RejectionNotice";
 
 // - Helpers -
 const n = (v) =>parseFloat(v) || 0;
@@ -1051,7 +1052,8 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(faculty);
- const reviewLocked = finalisedByVc || readOnly || faculty.status === "Reviewed" || /(?:HOD|Center Head)\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.hodTotal) >0 || String(faculty.hodRemarks || "").trim() !== "";
+ const pendingThisReviewer = isPendingReviewStatusFor([faculty.status, faculty.workflowStatus, faculty.workflow_status], reviewerRole);
+ const reviewLocked = finalisedByVc || readOnly || (!pendingThisReviewer && (faculty.status === "Reviewed" || /(?:HOD|Center Head)\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.hodTotal) >0 || String(faculty.hodRemarks || "").trim() !== ""));
  const canReject = canReviewerRejectProfile(reviewerRole, faculty);
 
  // Compute HOD total from hodData
@@ -1578,11 +1580,13 @@ export default function HODDashboard({
  const g = gradeFunc();
  const isHodPending = (item) =>{
  const s = item.status || "";
+ if (isPendingReviewStatusFor([s, item.workflowStatus, item.workflow_status], reviewerRole)) return true;
  return s === "pending_hod" || s === "Pending Review" ||
  (n(item.hodTotal)<= 0 && !String(item.hodRemarks || "").trim() && s !== "Reviewed" && s !== "pending_director" && s !== "hod_reviewed" && !/(?:HOD|Center Head)\s*(Reviewed|Rejected)/i.test(s) && s !== "completed");
  };
  const isHodReviewed = (item) =>{
  const s = item.status || "";
+ if (isPendingReviewStatusFor([s, item.workflowStatus, item.workflow_status], reviewerRole)) return false;
  return n(item.hodTotal) >0 || String(item.hodRemarks || "").trim() !== "" || s === "Reviewed" || s === "pending_director" || s === "hod_reviewed" || /(?:HOD|Center Head)\s*Reviewed/i.test(s);
  };
 
@@ -2229,6 +2233,13 @@ ${String(summaryOtherInfo ?? "").trim() ? `
 </div>
 <AppraisalHeaderImage height={64} />
 </div>
+
+<RejectionNotice
+ declaration={ownDeclaration}
+ reviews={ownReviews}
+ status={ownDeclaration?.status}
+ alertOnceKey={`${sessionStorage.getItem("username") || ""}:${info.ay || ""}:${ownDeclaration?.status || ""}`}
+/>
 
 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 <div style={{ flex: 1 }}>

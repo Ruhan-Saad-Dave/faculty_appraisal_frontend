@@ -39,9 +39,10 @@ import {
  toggleInnovativeMethod,
  validateCompleteRows,
 } from "../utils/appraisalFormUtils";
-import { canReviewerRejectProfile, getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
+import { canReviewerRejectProfile, getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor } from "../utils/hierarchy";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
+import RejectionNotice from "../components/RejectionNotice";
 
 const ACCENT = "#b45309";
 const ACCENT2 = "#0f766e";
@@ -59,6 +60,7 @@ const pct = (value, max) =>Math.min(100, Math.round((n(value) / max) * 100)) || 
 const titleCase = (value) =>String(value || "").charAt(0).toUpperCase() + String(value || "").slice(1);
 const isReviewerReviewComplete = (item = {}, reviewerRole = "") =>{
  const status = String(item?.status || item?.workflowStatus || item?.workflow_status || "");
+ if (isPendingReviewStatusFor([item?.status, item?.workflowStatus, item?.workflow_status], reviewerRole)) return false;
  const reviewerLabel = roleLabel(reviewerRole);
  return (
  n(item?.[`${reviewerRole}Total`]) >0 ||
@@ -1682,6 +1684,13 @@ export default function MediaCommDashboard({ fixedRole }) {
  {activeTab === "my" && canSelfSubmit && (
 <div style={{ display: "grid", gap: 16 }}>
 <WorkflowTracker declaration={declaration} reviews={reviews} profile={{ ...profile, appraisal_role: role }} />
+<RejectionNotice
+ declaration={declaration}
+ reviews={reviews}
+ form={form}
+ status={declaration?.status || form.status}
+ alertOnceKey={`${userEmail}:${academicYear}:${declaration?.status || form.status || ""}`}
+/>
  {(selfSectionView === "partA" || selfSectionView === "partB") && (
 <>
 <MediaForm
@@ -1778,7 +1787,8 @@ export default function MediaCommDashboard({ fixedRole }) {
  const facultyTotals = calculateMediaTotals(mergedItem, "score");
  const reviewerTotals = calculateMediaTotals(mergedItem, role);
  const hasReviewerScores = reviewerTotals.partA >0 || reviewerTotals.partB >0 || reviewerTotals.total >0;
- const reviewComplete = isReviewerReviewComplete(item, role) || hasReviewerScores;
+ const pendingForRole = isPendingReviewStatusFor([item.status, item.workflowStatus, item.workflow_status], role);
+ const reviewComplete = !pendingForRole && (isReviewerReviewComplete(item, role) || hasReviewerScores);
  const maxScores = {
  partA: n(item.effectivePartAMax) || facultyTotals.maxScores.partA,
  partB: n(item.effectivePartBMax) || facultyTotals.maxScores.partB,

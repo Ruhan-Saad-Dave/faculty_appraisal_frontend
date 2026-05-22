@@ -126,6 +126,23 @@ export const roleLabel = (role) => ({
 export const pendingStatusFor = (role) => `Pending ${roleLabel(role)} Review`;
 export const reviewedStatusFor = (role) => `${roleLabel(role)} Reviewed`;
 export const rejectedStatusFor = (role) => `${roleLabel(role)} Rejected`;
+export const isPendingReviewStatusFor = (status, role) => {
+  const reviewerRole = normalizeRoleForWorkflow(role);
+  const reviewerLabel = normalizeText(roleLabel(reviewerRole));
+  const reviewerKey = normalizeText(reviewerRole);
+
+  if (!reviewerRole) return false;
+  const values = (Array.isArray(status) ? status : [status]).map(normalizeText).filter(Boolean);
+  const pendingValues = [
+    normalizeText(pendingStatusFor(reviewerRole)),
+    `pending ${reviewerLabel}`,
+    `pending ${reviewerKey}`,
+    reviewerRole === "reporting_officer" ? "pending ro" : "",
+    reviewerRole === "vc" ? "pending vice chancellor" : "",
+    "pending review",
+  ].filter(Boolean);
+  return values.some((value) => pendingValues.includes(value));
+};
 export const isRejectedStatus = (status) => normalizeText(status).includes("rejected");
 export const isAppraisalFinalisedByVc = (item = {}) => {
   const statuses = [

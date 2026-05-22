@@ -7,11 +7,12 @@ import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, selfEffectivePartAMax, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { DEAN_TRACKS, getSchoolKey, getSchoolsByDeanTrack } from "../constants/universityHierarchy";
-import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
+import RejectionNotice from "../components/RejectionNotice";
 
 const ENGINEERING_SCHOOLS = getSchoolsByDeanTrack(DEAN_TRACKS.ENGINEERING);
 const ENGINEERING_SCHOOL_VALUES = ENGINEERING_SCHOOLS.flatMap((school) =>[
@@ -1652,7 +1653,8 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(approval);
- const reviewLocked = finalisedByVc || readOnly || approval?.status === "Reviewed" || /Dean\s*(Reviewed|Approved|Rejected)/i.test(approval?.status || "");
+ const pendingThisReviewer = isPendingReviewStatusFor([approval?.status, approval?.workflowStatus, approval?.workflow_status], "dean");
+ const reviewLocked = finalisedByVc || readOnly || (!pendingThisReviewer && (approval?.status === "Reviewed" || /Dean\s*(Reviewed|Approved|Rejected)/i.test(approval?.status || "")));
  const canReject = canReviewerRejectProfile("dean", approval);
  const sectionScores = deanScorePayload(approval, deanData);
  const deanScores = deanScoreTotals(sectionScores);
@@ -2106,11 +2108,13 @@ export default function DeanDashboard() {
  const g = gradeFunc();
  const isDeanPending = (item) =>{
  const s = item.status || "";
+ if (isPendingReviewStatusFor([s, item.workflowStatus, item.workflow_status], "dean")) return true;
  return s === "pending_dean" ||
  (n(item.deanTotal)<= 0 && !String(item.deanRemarks || "").trim() && s !== "Reviewed" && s !== "pending_vc" && s !== "completed" && !/Dean\s*(Reviewed|Rejected)/i.test(s));
  };
  const isDeanReviewed = (item) =>{
  const s = item.status || "";
+ if (isPendingReviewStatusFor([s, item.workflowStatus, item.workflow_status], "dean")) return false;
  return n(item.deanTotal) >0 || String(item.deanRemarks || "").trim() !== "" || s === "Reviewed" || s === "pending_vc" || s === "completed" || /Dean\s*Reviewed/i.test(s);
  };
 
@@ -2520,6 +2524,13 @@ export default function DeanDashboard() {
 </div>
 <AppraisalHeaderImage height={64} />
 </div>
+
+<RejectionNotice
+ declaration={ownDeclaration}
+ reviews={ownReviews}
+ status={ownDeclaration?.status}
+ alertOnceKey={`${sessionStorage.getItem("username") || ""}:${info.ay || ""}:${ownDeclaration?.status || ""}`}
+/>
 
  {appraisalLocked && (
 <div style={{ padding: "12px 16px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, color: "#312e81", fontSize: 12, fontWeight: 700 }}>

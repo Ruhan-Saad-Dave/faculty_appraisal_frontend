@@ -7,7 +7,7 @@ import { ACR_DETAIL_POINTS, MAX_SCORES, APP_INFO, createAcrRows } from "../const
 
 import { DEAN_TRACKS, UNIVERSITY_SCHOOLS, normalizeHierarchyText } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
-import { canReviewerRejectProfile, getSchoolKey, profileFromsessionStorage, rejectedStatusFor, visiblePreviousReviewRoles, isAppraisalFinalisedByVc } from "../utils/hierarchy";
+import { canReviewerRejectProfile, getSchoolKey, profileFromsessionStorage, rejectedStatusFor, visiblePreviousReviewRoles, isAppraisalFinalisedByVc, isPendingReviewStatusFor } from "../utils/hierarchy";
 import { buildReviewRemarks, openFullFormReport } from "../utils/fullFormReport";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
@@ -20,7 +20,7 @@ import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 // --- Helpers ------------------------------------------------------------------
 const n = (v) =>parseFloat(v) || 0;
 const pct = (v, m) =>Math.min(100, Math.round((v / m) * 100)) || 0;
-const isVcReviewed = (person = {}) =>person.status === "Reviewed" || person.status === "VC Reviewed" || person.status === "Rejected" || person.status === "VC Rejected" || n(person.vcTotal) >0;
+const isVcReviewed = (person = {}) =>!isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || person.status === "Rejected" || person.status === "VC Rejected" || n(person.vcTotal) >0);
 const grade = (score, max) =>{
  const p = (score / max) * 100;
  if (p >= 85) return { label: "Outstanding", color: "#059669", bg: "#d1fae5" };
@@ -799,7 +799,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const selfTotal = Math.min(vcSelfTotalForPerson(person), selfPartA + selfPartB, selfMaxScores.grand);
  const facultyTotals = { partA: selfPartA, partB: selfPartB, total: selfTotal, maxScores: selfMaxScores };
  const reviewerSummaryTotals = { partA, partB, total, maxScores: reviewerMaxScores };
- const vcReviewCompleted = person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0;
+ const vcReviewCompleted = !isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0);
  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
  const personInfo = mergeFacultyInfo(person.info, person);
 

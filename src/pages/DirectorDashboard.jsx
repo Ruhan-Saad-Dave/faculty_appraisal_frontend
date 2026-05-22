@@ -7,7 +7,7 @@ import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeF
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, scoreRemaining, selfEffectivePartAMax, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
-import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, getSchoolKey, isAppraisalFinalisedByVc, isRejectedStatus } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, getSchoolKey, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
@@ -15,6 +15,7 @@ import { DesignArtsAuthorityReviewPanel } from "./DesignArtsDashboard";
 import { MediaCommAuthorityReviewPanel } from "./MediaCommDashboard";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
+import RejectionNotice from "../components/RejectionNotice";
 
 // - Helpers -
 const n = (v) =>parseFloat(v) || 0;
@@ -1071,7 +1072,8 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(faculty);
- const reviewLocked = finalisedByVc || readOnly || faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.directorTotal) >0 || String(faculty.directorRemarks || "").trim() !== "";
+ const pendingThisReviewer = isPendingReviewStatusFor([faculty.status, faculty.workflowStatus, faculty.workflow_status], "director");
+ const reviewLocked = finalisedByVc || readOnly || (!pendingThisReviewer && (faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.directorTotal) >0 || String(faculty.directorRemarks || "").trim() !== ""));
  const canReject = canReviewerRejectProfile("director", faculty);
 
  // Compute HOD total from hodData
@@ -1643,11 +1645,13 @@ export default function DirectorDashboard() {
  const g = gradeFunc();
  const isDirectorPending = (item) =>{
  const s = item.status || "";
+ if (isPendingReviewStatusFor([s, item.workflowStatus, item.workflow_status], "director")) return true;
  return s === "pending_director" || s === "Pending Review" || s === "pending_hod" ||
  (n(item.directorTotal)<= 0 && !String(item.directorRemarks || "").trim() && s !== "Reviewed" && s !== "pending_dean" && s !== "director_reviewed" && !/Director\s*(Reviewed|Rejected)/i.test(s) && s !== "completed");
  };
  const isDirectorReviewed = (item) =>{
  const s = item.status || "";
+ if (isPendingReviewStatusFor([s, item.workflowStatus, item.workflow_status], "director")) return false;
  return n(item.directorTotal) >0 || String(item.directorRemarks || "").trim() !== "" || s === "Reviewed" || s === "pending_dean" || s === "director_reviewed" || /Director\s*Reviewed/i.test(s);
  };
 
@@ -2008,6 +2012,13 @@ export default function DirectorDashboard() {
 </div>
 <AppraisalHeaderImage height={64} />
 </div>
+
+<RejectionNotice
+ declaration={ownDeclaration}
+ reviews={ownReviews}
+ status={ownDeclaration?.status}
+ alertOnceKey={`${sessionStorage.getItem("username") || ""}:${info.ay || ""}:${ownDeclaration?.status || ""}`}
+/>
 
 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 <div style={{ flex: 1 }}>
