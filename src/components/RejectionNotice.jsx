@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isRejectedStatus, roleLabel } from "../utils/hierarchy";
+import { hasActiveRejection, isRejectedStatus, roleLabel } from "../utils/hierarchy";
 
 const clean = (value) => String(value ?? "").trim();
 
@@ -69,10 +69,11 @@ const buildRejectionNotice = ({ declaration, reviews = [], form = {}, item = {},
     item?.declaration?.status,
   ];
   const rejectedStatus = statusCandidates.find((candidate) => isRejectedStatus(candidate));
+  const activeRejection = hasActiveRejection(declaration, reviews);
   const rejectedReview = [...(reviews || [])].reverse().find((review) => isRejectedStatus(reviewStatus(review)));
   const role = normalizedRole(reviewRole(rejectedReview) || roleFromStatus(rejectedStatus));
 
-  if (!rejectedStatus && !rejectedReview) return null;
+  if (!rejectedStatus && !activeRejection) return null;
 
   const matchingReview = role
     ? [...(reviews || [])].reverse().find((review) => reviewRole(review) === role && reviewRemarks(review))

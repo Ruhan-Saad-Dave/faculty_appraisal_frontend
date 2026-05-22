@@ -7,6 +7,7 @@ import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, cour
 import {
   getReviewChain,
   isRejectedStatus,
+  hasActiveRejection,
   pendingStatusFor,
   profileFromsessionStorage,
   roleLabel,
@@ -124,7 +125,7 @@ function WorkflowStatusTracker({ declaration, reviews, profile }) {
   const chain = getReviewChain(profile);
   const status = declaration?.status || "";
   const reviewByRole = new Map((reviews || []).map((review) => [review.reviewer_role, review]));
-  const rejected = isRejectedStatus(status) || (reviews || []).some((review) => isRejectedStatus(review.status));
+  const rejected = hasActiveRejection(declaration, reviews);
   const nextRole = rejected
     ? null
     : chain.find((role) => !reviewByRole.has(role));
@@ -1414,8 +1415,9 @@ export default function HODDashboard() {
         });
         const declaration = data?.declaration || null;
         setWorkflowDeclaration(declaration);
-        setWorkflowReviews(data?.reviews || []);
-        setAppraisalLocked(Boolean(declaration) && !isRejectedStatus(declaration?.status));
+        const loadedReviews = data?.reviews || [];
+        setWorkflowReviews(loadedReviews);
+        setAppraisalLocked(Boolean(declaration) && !hasActiveRejection(declaration, loadedReviews));
 
         await Promise.all([
           loadSavedAppraisal({
@@ -2010,8 +2012,7 @@ export default function HODDashboard() {
     { id: "myAppraisal", icon: "", label: "My Appraisal", sub: "View your self-appraisal form" },
     { id: "guidelines", icon: "", label: "Guidelines", sub: "Faculty appraisal guidelines AY 2025-26" },
   ];
-  const workflowRejected = isRejectedStatus(workflowDeclaration?.status) ||
-    workflowReviews.some((review) => isRejectedStatus(review.status));
+  const workflowRejected = hasActiveRejection(workflowDeclaration, workflowReviews);
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "inherit", background: "#f8fafc", color: "#1e293b" }}>

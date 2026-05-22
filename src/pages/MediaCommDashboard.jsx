@@ -39,7 +39,7 @@ import {
  toggleInnovativeMethod,
  validateCompleteRows,
 } from "../utils/appraisalFormUtils";
-import { canReviewerRejectProfile, getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor } from "../utils/hierarchy";
+import { canReviewerRejectProfile, getReviewChain, pendingStatusFor, profileFromsessionStorage, reviewedStatusFor, roleLabel, visiblePreviousReviewRoles, workflowValidationError, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor, hasActiveRejection } from "../utils/hierarchy";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
 import RejectionNotice from "../components/RejectionNotice";
@@ -1326,7 +1326,8 @@ export default function MediaCommDashboard({ fixedRole }) {
  const [reviews, setReviews] = useState([]);
  const userEmail = sessionStorage.getItem("username") || "";
  const academicYear = form.info?.ay || "2025-2026";
- const locked = Boolean(declaration) && !isRejectedStatus(declaration?.status);
+ const workflowRejected = hasActiveRejection(declaration, reviews);
+ const locked = Boolean(declaration) && !workflowRejected;
  const totals = calculateMediaTotals(form, "score");
  const canSelfSubmit = role !== "vc";
 
@@ -1353,8 +1354,9 @@ export default function MediaCommDashboard({ fixedRole }) {
  return null;
  });
  const declarationRow = data?.declaration || null;
+ const loadedReviews = data?.reviews || [];
  setDeclaration(declarationRow);
- setReviews(data?.reviews || []);
+ setReviews(loadedReviews);
  await Promise.all([
  loadSavedAppraisal({ facultyEmail: userEmail, academicYear, setters }),
  loadAppraisalDocuments({ facultyEmail: userEmail, academicYear, setDocs }),

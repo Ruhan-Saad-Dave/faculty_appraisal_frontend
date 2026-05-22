@@ -144,6 +144,8 @@ const NON_TEACHING_STATUS_ALIASES = {
 };
 export const normalizeNonTeachingStatus = (status) =>
   NON_TEACHING_STATUS_ALIASES[normalizeStatusText(status)] || clean(status);
+export const isNonTeachingRejectedStatus = (status) =>
+  normalizeStatusText(status).includes("rejected");
 const isTruthyFlag = (value) => {
   if (value === true || value === 1) return true;
   const normalized = clean(value).toLowerCase();

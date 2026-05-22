@@ -6,7 +6,7 @@ import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeF
 import { api } from "../services/api";
 import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, selfEffectivePartAMax, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
-import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor } from "../utils/hierarchy";
+import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor, hasActiveRejection } from "../utils/hierarchy";
 import { standardSubmittedScoreSummary } from "../utils/reviewSummaryTotals";
 import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
 import SummaryOtherInfoField, { summaryOtherInfoValueFrom } from "../components/SummaryOtherInfoField";
@@ -1468,8 +1468,9 @@ export default function HODDashboard({
  try {
  const statusData = await api.get("/appraisal/status", { params: { academic_year: info.ay } }).catch(() =>null);
  const declarationRow = statusData?.declaration || null;
+ const loadedReviews = statusData?.reviews || [];
  setOwnDeclaration(declarationRow);
- setOwnReviews(statusData?.reviews || []);
+ setOwnReviews(loadedReviews);
 
  await Promise.all([
  loadSavedAppraisal({
@@ -1515,7 +1516,7 @@ export default function HODDashboard({
  setDocs,
  }),
  ]);
- setAppraisalLocked(Boolean(declarationRow) && !isRejectedStatus(declarationRow?.status));
+ setAppraisalLocked(Boolean(declarationRow) && !hasActiveRejection(declarationRow, loadedReviews));
  } catch (err) {
  console.error("Could not load saved HOD appraisal:", err);
  }

@@ -15,6 +15,7 @@ import {
   calculateNonTeachingTotals,
   emptyNonTeachingForm,
   fetchNonTeachingQueueForRole,
+  isNonTeachingRejectedStatus,
   loadNonTeachingAppraisal,
   loadNonTeachingWorkflow,
   nonTeachingRoleLabel,
@@ -375,7 +376,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [workflow, setWorkflow] = useState(null);
   const accent = roleAccent(normalizedRole);
-  const locked = form.status !== NON_TEACHING_STATUS.DRAFT;
+  const locked = form.status !== NON_TEACHING_STATUS.DRAFT && !isNonTeachingRejectedStatus(form.status);
   const sidebarWorkflowText = (workflow?.approvalSteps || workflow?.steps || [])
     .filter((stage) => !stage.isInitial)
     .map((stage) => stage.designation)

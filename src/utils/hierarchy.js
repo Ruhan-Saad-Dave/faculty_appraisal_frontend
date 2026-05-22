@@ -144,6 +144,28 @@ export const isPendingReviewStatusFor = (status, role) => {
   return values.some((value) => pendingValues.includes(value));
 };
 export const isRejectedStatus = (status) => normalizeText(status).includes("rejected");
+const timestampMs = (value) => {
+  const time = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(time) ? time : null;
+};
+const reviewTimestampMs = (review = {}) =>
+  timestampMs(review.reviewed_at || review.reviewedAt || review.updated_at || review.updatedAt || review.created_at || review.createdAt);
+const declarationTimestampMs = (declaration = {}) =>
+  timestampMs(declaration.submitted_at || declaration.submittedAt || declaration.updated_at || declaration.updatedAt || declaration.created_at || declaration.createdAt);
+export const hasRejectedReview = (reviews = [], { since } = {}) => {
+  const sinceMs = timestampMs(since);
+  return (reviews || []).some((review) => [
+    review?.status,
+    review?.review_status,
+    review?.reviewStatus,
+    review?.workflow_status,
+    review?.workflowStatus,
+    review?.decision,
+  ].some(isRejectedStatus) && (!sinceMs || !reviewTimestampMs(review) || reviewTimestampMs(review) >= sinceMs));
+};
+export const hasActiveRejection = (declaration, reviews = []) =>
+  isRejectedStatus(declaration?.status || declaration?.workflow_status || declaration?.workflowStatus) ||
+  hasRejectedReview(reviews, { since: declarationTimestampMs(declaration) });
 export const isAppraisalFinalisedByVc = (item = {}) => {
   const statuses = [
     item?.declaration?.status,
