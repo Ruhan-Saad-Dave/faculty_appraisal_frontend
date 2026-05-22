@@ -5,6 +5,7 @@ import { APP_INFO } from "../constants/formConfig";
 import { normalizeNonTeachingRole } from "../constants/nonTeachingHierarchy";
 import { api } from "../services/api";
 import { getMe } from "../services/authService";
+import { loadReviewerDraft, saveReviewerDraft } from "../services/reviewWorkflow";
 import { isAllowedAttachmentFile, isFilled } from "../utils/appraisalFormUtils";
 import {
   NON_TEACHING_MAX,
@@ -792,6 +793,8 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const [remarks, setRemarks] = useState(role === "vc" ? item.form?.vcRemarks : role === "registrar" ? item.form?.registrarRemarks : item.form?.roRemarks);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftStatus, setDraftStatus] = useState("");
   const [workflow, setWorkflow] = useState(item.workflow || null);
   const finalisedByVc = role === "vc" && (
     normalizeNonTeachingStatus(item.status) === NON_TEACHING_STATUS.VC_APPROVED ||
@@ -802,6 +805,8 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
     ? !editingFinalised
     : readOnly;
   const accent = roleAccent(role);
+  const subjectEmail = item.email || item.staff_email || form.info?.email;
+  const academicYear = item.academicYear || item.academic_year || form.info?.ay || APP_INFO.DEFAULT_AY;
   useEffect(() => {
     let active = true;
     loadNonTeachingWorkflow({
@@ -823,6 +828,57 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const totals = calculateNonTeachingTotals(form, role === "vc" ? "vc" : role);
   const authorityScoreLabel = role === "vc" ? "Vice Chancellor Score" : `${reviewerDesignation} Score`;
   const remarksLabel = role === "vc" ? "Vice Chancellor Remarks and Grade" : `${reviewerDesignation} Remarks`;
+  useEffect(() => {
+    let active = true;
+    if (locked || !subjectEmail) return undefined;
+    loadReviewerDraft({ subjectEmail, academicYear, reviewerRole: role })
+      .then((draft) => {
+        if (!active || !draft?.payload) return;
+        const draftForm = draft.payload.form || draft.payload.section_scores;
+        if (draftForm) setForm(primeFormForReviewer(draftForm, role));
+        setRemarks(draft.payload.remarks ?? "");
+        setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error("Could not load non-teaching reviewer draft:", err);
+        setDraftStatus(err?.message || "Could not load draft.");
+      });
+    return () => { active = false; };
+  }, [academicYear, locked, role, subjectEmail]);
+
+  const buildDraftForm = () => ({
+    ...form,
+    roRemarks: role === "reporting_officer" ? remarks : form.roRemarks,
+    registrarRemarks: role === "registrar" ? remarks : form.registrarRemarks,
+    vcRemarks: role === "vc" ? remarks : form.vcRemarks,
+  });
+
+  const handleSaveDraft = async () => {
+    try {
+      setSavingDraft(true);
+      const draftForm = buildDraftForm();
+      await saveReviewerDraft({
+        subjectEmail,
+        academicYear,
+        reviewerRole: role,
+        payload: {
+          part_a_score: totals.partA,
+          part_b_score: totals.partB,
+          total_score: totals.total,
+          remarks,
+          section_scores: draftForm,
+          form: draftForm,
+        },
+      });
+      setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
+    } catch (err) {
+      console.error("Could not save non-teaching reviewer draft:", err);
+      alert(err?.message || "Unable to save draft.");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!confirmed) {
@@ -923,6 +979,14 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
         {tab === "partA" && <AuthorityPartA form={form} setForm={setForm} reviewerRole={role} readOnly={locked} visibleRoles={visibleRoles} />}
         {tab === "partB" && <AuthorityPartB form={form} setForm={setForm} reviewerRole={role} readOnly={locked} visibleRoles={visibleRoles} />}
       </fieldset>
+      {(tab === "partA" || tab === "partB") && !locked && (
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
+          <span style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{draftStatus}</span>
+          <button type="button" onClick={handleSaveDraft} disabled={savingDraft} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontFamily: "inherit" }}>
+            {savingDraft ? "Saving..." : "Save Draft"}
+          </button>
+        </div>
+      )}
 
       {tab === "remarks" && (
         <SectionCard title={locked ? "Submitted Review" : `${reviewerDesignation} Remarks & Submission`} accent={accent}>
@@ -967,16 +1031,24 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
             </label>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+            <span style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{draftStatus}</span>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
             <button type="button" onClick={onBack} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}>{locked ? "Close" : "Cancel"}</button>
             {role !== "registrar" && (
               <button type="button" onClick={handleReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#e2e8f0", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}>Generate Report</button>
             )}
             {!locked && (
+              <>
+              <button type="button" onClick={handleSaveDraft} disabled={savingDraft} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontFamily: "inherit" }}>
+                {savingDraft ? "Saving..." : "Save Draft"}
+              </button>
               <button type="button" onClick={handleSubmit} disabled={!confirmed || !remarks.trim() || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: (confirmed && remarks.trim()) ? accent : "#94a3b8", color: "#fff", cursor: confirmed && remarks.trim() && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "inherit" }}>
                 {submitting ? "Submitting..." : "Submit"}
               </button>
+              </>
             )}
+            </div>
           </div>
         </SectionCard>
       )}

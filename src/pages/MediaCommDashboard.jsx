@@ -5,7 +5,7 @@ import { FORM_SCHOOL_CODES, FORM_TYPES } from "../constants/formRouting";
 import { getSchoolKey } from "../constants/universityHierarchy";
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { fetchReviewQueueForRole, loadReviewerDraft, saveReviewerDraft, submitWorkflowReview } from "../services/reviewWorkflow";
 import { buildReviewRemarks, generateMediaCommReport } from "../utils/fullFormReport";
 import {
  INNOVATIVE_METHODS,
@@ -1095,6 +1095,8 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  const [reviewData, setReviewData] = useState({});
  const [remarks, setRemarks] = useState(person?.[`${reviewerRole}Remarks`] || "");
  const [confirmed, setConfirmed] = useState(false);
+ const [draftStatus, setDraftStatus] = useState("");
+ const [savingDraft, setSavingDraft] = useState(false);
  const form = mergeForm(emptyMediaForm(), person || {});
  const [docs, setDocs] = useState(form.docs || {});
  const subjectProfile = { school: person?.school, department: person?.department, appraisal_role: person?.appraisalRole };
@@ -1104,6 +1106,8 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  const finalisedVcReadOnly = reviewerRole === "vc" && finalisedByVc && !editingFinalised;
  const panelReadOnly = reviewerRole === "vc" ? finalisedVcReadOnly : (readOnly || finalisedByVc);
  const canReject = canReviewerRejectProfile(reviewerRole, person);
+ const subjectEmail = person?.email || person?.faculty_email || person?.facultyEmail;
+ const academicYear = person?.academicYear || person?.academic_year || person?.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
 
  const reviewerForm = useMemo(() =>{
  const merged = { ...form };
@@ -1132,6 +1136,45 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  partB: String(person?.[`${reviewerRole}PartB`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}PartB`]) : totals.partB,
  total: String(person?.[`${reviewerRole}Total`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}Total`]) : totals.total,
  } : totals;
+ useEffect(() =>{
+ let active = true;
+ if (panelReadOnly || !subjectEmail) return undefined;
+ loadReviewerDraft({ subjectEmail, academicYear, reviewerRole })
+ .then((draft) =>{
+ if (!active || !draft?.payload) return;
+ setReviewData(draft.payload.section_scores || {});
+ setRemarks(draft.payload.remarks ?? "");
+ setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
+ })
+ .catch((err) =>{
+ if (!active) return;
+ console.error("Could not load reviewer draft:", err);
+ setDraftStatus(err?.message || "Could not load draft.");
+ });
+ return () =>{ active = false; };
+ }, [academicYear, panelReadOnly, reviewerRole, subjectEmail]);
+
+ const handleSaveDraft = async () =>{
+ try {
+ setSavingDraft(true);
+ await saveReviewerDraft({
+ subjectEmail,
+ academicYear,
+ reviewerRole,
+ partAScore: totals.partA,
+ partBScore: totals.partB,
+ totalScore: totals.total,
+ remarks,
+ sectionScores: buildMediaSectionScores(form, reviewData, reviewerRole),
+ });
+ setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
+ } catch (err) {
+ console.error("Could not save reviewer draft:", err);
+ alert(err?.message || "Unable to save draft.");
+ } finally {
+ setSavingDraft(false);
+ }
+ };
 
  const generateReviewReport = async () =>{
  if (!reviewCompleted) return;
@@ -1256,6 +1299,18 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  sectionView={sectionView}
  />
  )}
+ {(sectionView === "partA" || sectionView === "partB") && !panelReadOnly && (
+<div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={smallButton(savingDraft ? "#94a3b8" : "#2563eb")}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
+</div>
+ )}
  {sectionView === "summary" && (
 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
 <SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel="Faculty submitted score for the SoMCS media appraisal form." />
@@ -1266,7 +1321,9 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
 <textarea value={remarks} readOnly={panelReadOnly} onChange={(event) =>setRemarks(event.target.value)} rows={5} style={{ border: "1px solid #99f6e4", borderRadius: 7, padding: 10, fontFamily: "inherit", resize: "vertical" }} />
 </label>
  {!panelReadOnly &&<AccuracyCheckbox checked={confirmed} onChange={setConfirmed} />}
-<div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
 <button onClick={onBack} style={smallButton("#64748b")}>Close</button>
  {showReport && (
 <button onClick={generateReviewReport} disabled={!reviewCompleted} style={smallButton(reviewCompleted ? "#4c1d95" : "#94a3b8")}>
@@ -1275,6 +1332,13 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
  )}
  {!panelReadOnly && (
 <>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={smallButton(savingDraft ? "#94a3b8" : "#2563eb")}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
  {canReject && (
 <button
  onClick={() =>{
@@ -1297,6 +1361,7 @@ export function MediaCommAuthorityReviewPanel({ person, reviewerRole, onBack, on
 </button>
 </>
  )}
+</div>
 </div>
 </div>
  )}

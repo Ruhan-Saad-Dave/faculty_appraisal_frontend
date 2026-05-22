@@ -4,7 +4,7 @@ import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows 
 import { HodInput } from "../components/Inputs";
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { fetchReviewQueueForRole, loadReviewerDraft, saveReviewerDraft, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, rowHasReviewableData, scoreRemaining, selfEffectivePartAMax, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { DEAN_TRACKS, getSchoolKey, getSchoolsByDeanTrack } from "../constants/universityHierarchy";
 import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor, hasActiveRejection, reviewListFrom } from "../utils/hierarchy";
@@ -1652,10 +1652,14 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  const [deanData, setDeanData] = useState({});
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+ const [draftStatus, setDraftStatus] = useState("");
+ const [savingDraft, setSavingDraft] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(approval);
  const pendingThisReviewer = isPendingReviewStatusFor([approval?.status, approval?.workflowStatus, approval?.workflow_status], "dean");
  const reviewLocked = finalisedByVc || readOnly || (!pendingThisReviewer && (approval?.status === "Reviewed" || /Dean\s*(Reviewed|Approved|Rejected)/i.test(approval?.status || "")));
  const canReject = canReviewerRejectProfile("dean", approval);
+ const subjectEmail = approval?.email || approval?.faculty_email || approval?.facultyEmail;
+ const academicYear = approval?.academicYear || approval?.academic_year || approval?.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
  const sectionScores = deanScorePayload(approval, deanData);
  const deanScores = deanScoreTotals(sectionScores);
  const hasSavedDeanScores = ["deanPartA", "deanPartB", "deanTotal"].some((key) =>String(approval?.[key] ?? "").trim() !== "");
@@ -1669,6 +1673,45 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  hodApprovals: "HOD's Appraisal Review",
  directorApprovals: "Director's Appraisal Review",
  facultyApprovals: "Faculty's Appraisal Review",
+ };
+ useEffect(() =>{
+ let active = true;
+ if (reviewLocked || !subjectEmail) return undefined;
+ loadReviewerDraft({ subjectEmail, academicYear, reviewerRole: "dean" })
+ .then((draft) =>{
+ if (!active || !draft?.payload) return;
+ setDeanData(draft.payload.section_scores || {});
+ setRemarks(draft.payload.remarks ?? "");
+ setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
+ })
+ .catch((err) =>{
+ if (!active) return;
+ console.error("Could not load reviewer draft:", err);
+ setDraftStatus(err?.message || "Could not load draft.");
+ });
+ return () =>{ active = false; };
+ }, [academicYear, reviewLocked, subjectEmail]);
+
+ const handleSaveDraft = async () =>{
+ try {
+ setSavingDraft(true);
+ await saveReviewerDraft({
+ subjectEmail,
+ academicYear,
+ reviewerRole: "dean",
+ partAScore: displayedDeanScores.partA,
+ partBScore: displayedDeanScores.partB,
+ totalScore: displayedDeanScores.total,
+ remarks,
+ sectionScores,
+ });
+ setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
+ } catch (err) {
+ console.error("Could not save reviewer draft:", err);
+ alert(err?.message || "Unable to save draft.");
+ } finally {
+ setSavingDraft(false);
+ }
  };
 
  return (
@@ -1721,6 +1764,18 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
 <DeanReviewScoreForm approval={approval} deanData={deanData} setDeanData={setDeanData} sectionView={sectionView} />
 </fieldset>
  )}
+ {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && (
+<div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={{ padding: "10px 22px", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
+</div>
+ )}
 
  {sectionView === "summary" && (
 <>
@@ -1770,10 +1825,19 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
 </label>
  )}
 
-<div style={{ display: "flex", gap: 12 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<div style={{ display: "flex", gap: 12, flex: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
 <button onClick={onBack} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#f8fafc", color: "#475569", fontWeight: 700, cursor: "pointer" }}>{reviewLocked ? "Close" : "Cancel"}</button>
  {!reviewLocked && (
 <>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#f8fafc", fontWeight: 700, cursor: savingDraft ? "not-allowed" : "pointer" }}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
  {canReject && (
 <button
  onClick={() =>{
@@ -1790,6 +1854,7 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
 <button onClick={() =>onSubmit(approval.id, deanScores, remarks, sectionScores, reviewConfirmed)} disabled={!reviewConfirmed || !remarks.trim()} style={{ flex: 1, padding: "12px 16px", borderRadius: 10, border: "none", background: (reviewConfirmed && remarks.trim()) ? "#0f172a" : "#64748b", color: "#f8fafc", fontWeight: 700, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed" }}>Approve & Forward</button>
 </>
  )}
+</div>
 </div>
 </>
  )}

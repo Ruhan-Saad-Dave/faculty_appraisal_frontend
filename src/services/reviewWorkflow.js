@@ -407,6 +407,59 @@ const rejectionRoleHintsFor = (role) => ({
   role,
 });
 
+const draftRoleFor = (reviewerRole) => {
+  const rawRole = lower(reviewerRole).replace(/[\s-]+/g, "_");
+  if (rawRole === "section_head") return "section_head";
+  return normalizeRoleForWorkflow(rawRole);
+};
+
+export const loadReviewerDraft = async ({
+  subjectEmail,
+  academicYear,
+  reviewerRole,
+} = {}) => {
+  const role = draftRoleFor(reviewerRole);
+  if (!subjectEmail || !academicYear || !role || role === "faculty") {
+    return { payload: null, updated_at: null };
+  }
+
+  return await api.get(`/appraisal-remarks/draft/${encodeURIComponent(subjectEmail)}`, {
+    params: {
+      academic_year: academicYear,
+      reviewer_role: role,
+    },
+  }) || { payload: null, updated_at: null };
+};
+
+export const saveReviewerDraft = async ({
+  subjectEmail,
+  academicYear,
+  reviewerRole,
+  partAScore = 0,
+  partBScore = 0,
+  totalScore = 0,
+  remarks = "",
+  sectionScores,
+  payload,
+} = {}) => {
+  const role = draftRoleFor(reviewerRole);
+  if (!subjectEmail || !academicYear || !role || role === "faculty") {
+    throw new Error("Missing reviewer draft details.");
+  }
+
+  return await api.put(`/appraisal-remarks/draft/${encodeURIComponent(subjectEmail)}`, {
+    academic_year: academicYear,
+    reviewer_role: role,
+    payload: payload || {
+      part_a_score: n(partAScore),
+      part_b_score: n(partBScore),
+      total_score: n(totalScore),
+      remarks,
+      section_scores: sectionScores || {},
+    },
+  }) || {};
+};
+
 export const submitWorkflowReview = async ({
   subjectEmail,
   academicYear,

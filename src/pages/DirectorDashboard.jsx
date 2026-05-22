@@ -5,7 +5,7 @@ import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows 
 
 import { fetchSavedAppraisal, loadAppraisalDocuments, loadSavedAppraisal, mergeFacultyInfo, saveAppraisalDraftSection, submitAppraisal } from "../services/appraisalPersistence";
 import { api } from "../services/api";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { fetchReviewQueueForRole, loadReviewerDraft, saveReviewerDraft, submitWorkflowReview } from "../services/reviewWorkflow";
 import { INNOVATIVE_METHODS, SCORE_LIMITS, averageSectionScore, clampScore, clampReviewScore, courseFileAverageScore, courseFileRowScore, effectiveMaxScore, feedbackAverage, feedbackRowScore, feedbackSectionScore, innovativeSelectionsFromDetails, innovativeTeachingScore, isAllowedAttachmentFile, isValidDDMMYYYY, maskDateDDMMYYYY, normalizeAutoScores, projectGuidanceRowMax, researchGuidanceRowMax, researchGuidanceScore, reviewSectionScore, scoreRemaining, selfEffectivePartAMax, societyRowLocked, societyRowScore, sumSectionScore, toggleInnovativeMethod, validateCompleteRows } from "../utils/appraisalFormUtils";
 import { canReviewerRejectProfile, rejectedStatusFor, reviewedStatusFor, profileFromsessionStorage, workflowValidationError, roleLabel, getSchoolKey, isAppraisalFinalisedByVc, isRejectedStatus, isPendingReviewStatusFor, hasActiveRejection, reviewListFrom } from "../utils/hierarchy";
 import { generateStandardReport } from "../utils/fullFormReport";
@@ -1071,10 +1071,14 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const [dirRemarks, setDirRemarks] = useState(faculty.directorRemarks || "");
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+ const [draftStatus, setDraftStatus] = useState("");
+ const [savingDraft, setSavingDraft] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(faculty);
  const pendingThisReviewer = isPendingReviewStatusFor([faculty.status, faculty.workflowStatus, faculty.workflow_status], "director");
  const reviewLocked = finalisedByVc || readOnly || (!pendingThisReviewer && (faculty.status === "Reviewed" || /Director\s*(Reviewed|Rejected)/i.test(faculty.status || "") || n(faculty.directorTotal) >0 || String(faculty.directorRemarks || "").trim() !== ""));
  const canReject = canReviewerRejectProfile("director", faculty);
+ const subjectEmail = faculty.email || faculty.faculty_email || faculty.facultyEmail;
+ const academicYear = faculty.academicYear || faculty.academic_year || faculty.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
 
  // Compute HOD total from hodData
  const calcHodScore = () =>{
@@ -1202,6 +1206,45 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  } : calculatedDirScores;
  const { partA: dirPartA, partB: dirPartB, total: dirTotal } = displayedDirScores;
  const g = grade(dirTotal, 575);
+ useEffect(() =>{
+ let active = true;
+ if (reviewLocked || !subjectEmail) return undefined;
+ loadReviewerDraft({ subjectEmail, academicYear, reviewerRole: "director" })
+ .then((draft) =>{
+ if (!active || !draft?.payload) return;
+ setDirData(draft.payload.section_scores || {});
+ setDirRemarks(draft.payload.remarks ?? "");
+ setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
+ })
+ .catch((err) =>{
+ if (!active) return;
+ console.error("Could not load reviewer draft:", err);
+ setDraftStatus(err?.message || "Could not load draft.");
+ });
+ return () =>{ active = false; };
+ }, [academicYear, reviewLocked, subjectEmail]);
+
+ const handleSaveDraft = async () =>{
+ try {
+ setSavingDraft(true);
+ await saveReviewerDraft({
+ subjectEmail,
+ academicYear,
+ reviewerRole: "director",
+ partAScore: dirPartA,
+ partBScore: dirPartB,
+ totalScore: dirTotal,
+ remarks: dirRemarks,
+ sectionScores: buildDirectorSectionScores(faculty, dirData),
+ });
+ setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
+ } catch (err) {
+ console.error("Could not save reviewer draft:", err);
+ alert(err?.message || "Unable to save draft.");
+ } finally {
+ setSavingDraft(false);
+ }
+ };
  const facultySummary = standardSubmittedScoreSummary(faculty, {
  partA: faculty.lectures?.reduce((a, r) =>a + n(r.score), 0) || 0,
  partB: faculty.journals?.reduce((a, r) =>a + n(r.score), 0) || 0,
@@ -1258,6 +1301,18 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
 <FacultyReviewForm faculty={faculty} hodData={hodData} setHodData={setHodData} dirData={dirData} setDirData={setDirData} sectionView={sectionView} />
 </fieldset>
  )}
+ {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && (
+<div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={{ padding: "10px 22px", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
+</div>
+ )}
 
  {sectionView === "summary" && (
 <div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
@@ -1310,10 +1365,19 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
 </label>
  )}
 
-<div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
 <button onClick={onBack} style={{ padding: "9px 22px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>{reviewLocked ? "Close" : "Cancel"}</button>
  {!reviewLocked && (
 <>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={{ padding: "10px 22px", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
 {canReject && (
 <button
  onClick={() =>{
@@ -1334,6 +1398,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
 </button>
 </>
  )}
+</div>
 </div>
 </div>
  )}

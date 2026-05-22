@@ -1,6 +1,6 @@
  import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchReviewQueueForRole, submitWorkflowReview } from "../services/reviewWorkflow";
+import { fetchReviewQueueForRole, loadReviewerDraft, saveReviewerDraft, submitWorkflowReview } from "../services/reviewWorkflow";
 import { fetchSavedAppraisal, mergeFacultyInfo } from "../services/appraisalPersistence";
 import { fetchNonTeachingQueueForRole, isNonTeachingReviewComplete } from "../services/nonTeachingWorkflow";
 import { ACR_DETAIL_POINTS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
@@ -770,11 +770,15 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const [remarks, setRemarks] = useState(person.vcRemarks || "");
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+ const [draftStatus, setDraftStatus] = useState("");
+ const [savingDraft, setSavingDraft] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(person);
  const [editingFinalised, setEditingFinalised] = useState(false);
  const finalisedReadOnly = finalisedByVc && !editingFinalised;
  const reviewLocked = (readOnly && !finalisedByVc) || finalisedReadOnly;
  const canReject = canReviewerRejectProfile("vc", person);
+ const subjectEmail = person.email || person.faculty_email || person.facultyEmail;
+ const academicYear = person.academicYear || person.academic_year || person.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
 
  const calculatedScores = calcVCScore(person, vcData);
  const partA = reviewLocked && n(person.vcPartA) >0 ? n(person.vcPartA) : calculatedScores.partA;
@@ -802,6 +806,45 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const vcReviewCompleted = !isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0);
  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
  const personInfo = mergeFacultyInfo(person.info, person);
+ useEffect(() =>{
+ let active = true;
+ if (reviewLocked || !subjectEmail) return undefined;
+ loadReviewerDraft({ subjectEmail, academicYear, reviewerRole: "vc" })
+ .then((draft) =>{
+ if (!active || !draft?.payload) return;
+ setVcData(draft.payload.section_scores || {});
+ setRemarks(draft.payload.remarks ?? "");
+ setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
+ })
+ .catch((err) =>{
+ if (!active) return;
+ console.error("Could not load reviewer draft:", err);
+ setDraftStatus(err?.message || "Could not load draft.");
+ });
+ return () =>{ active = false; };
+ }, [academicYear, reviewLocked, subjectEmail]);
+
+ const handleSaveDraft = async () =>{
+ try {
+ setSavingDraft(true);
+ await saveReviewerDraft({
+ subjectEmail,
+ academicYear,
+ reviewerRole: "vc",
+ partAScore: partA,
+ partBScore: partB,
+ totalScore: total,
+ remarks,
+ sectionScores: buildVcSectionScores(person, vcData),
+ });
+ setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
+ } catch (err) {
+ console.error("Could not save reviewer draft:", err);
+ alert(err?.message || "Unable to save draft.");
+ } finally {
+ setSavingDraft(false);
+ }
+ };
 
  const generateVcReport = () =>{
  if (!vcReviewCompleted) return;
@@ -922,6 +965,18 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 <VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} sectionView={sectionView} />
 </fieldset>
  )}
+ {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && (
+<div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={{ padding: "8px 14px", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
+</div>
+ )}
 
  {sectionView === "summary" && (
 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
@@ -946,7 +1001,9 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </label>
  )}
 
-<div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
 <button onClick={onBack} style={{ padding: "8px 14px", background: "#64748b", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}>Close</button>
 <button onClick={generateVcReport} disabled={!vcReviewCompleted}
  style={{ padding: "8px 14px", background: vcReviewCompleted ? "#4c1d95" : "#94a3b8", color: "#fff", border: "none", borderRadius: 7, cursor: vcReviewCompleted ? "pointer" : "not-allowed", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}>
@@ -954,6 +1011,13 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </button>
  {!reviewLocked && (
 <>
+<button
+ onClick={handleSaveDraft}
+ disabled={savingDraft}
+ style={{ padding: "8px 14px", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}
+>
+ {savingDraft ? "Saving..." : "Save Draft"}
+</button>
  {canReject && (
 <button
  onClick={() =>{
@@ -974,6 +1038,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </button>
 </>
  )}
+</div>
 </div>
 </div>
  )}
