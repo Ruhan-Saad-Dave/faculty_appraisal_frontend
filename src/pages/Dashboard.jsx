@@ -402,7 +402,8 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
 }
 
 function ViewDocsCell({ docKey, docs }) {
-  const files = Array.isArray(docs?.[docKey]) ? docs[docKey] : docs?.[docKey] ? [docs[docKey]] : [];
+  const docKeys = Array.isArray(docKey) ? docKey : [docKey];
+  const files = docKeys.flatMap((key) => Array.isArray(docs?.[key]) ? docs[key] : docs?.[key] ? [docs[key]] : []);
   if (!files.length) return <span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -550,11 +551,12 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
         <SC title="A3. Innovative Teaching-Learning (Max 10)" accent="#8b5cf6">
           <table style={T}>
             <thead><tr>
-              <th style={TH}>Method</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
+              <th style={TH}>Method</th><th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>HOD Score</th>
             </tr></thead>
             <tbody>
               <tr>
                 <td style={TD}>Innovative / participatory teaching methods used</td>
+                <td style={TDV}><ViewDocsCell docKey={["innov", "innov-0"]} docs={docs} /></td>
                 <td style={TDS}><RO val={faculty.innovScore} center /></td>
                 <td style={TDS_HOD}><HodInput val={getS("innovHod")} onChange={v => setScalar("innovHod", v)} /></td>
               </tr>

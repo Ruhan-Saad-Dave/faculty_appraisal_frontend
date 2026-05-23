@@ -255,7 +255,8 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
 }
 
 function ViewDocsCell({ docKey, docs }) {
- const files = Array.isArray(docs?.[docKey]) ? docs[docKey] : docs?.[docKey] ? [docs[docKey]] : [];
+ const docKeys = Array.isArray(docKey) ? docKey : [docKey];
+ const files = docKeys.flatMap((key) =>Array.isArray(docs?.[key]) ? docs[key] : docs?.[key] ? [docs[key]] : []);
  if (!files.length) return<span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
  return (
 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -1377,7 +1378,7 @@ function DeanReviewScoreForm({ approval, deanData, setDeanData, sectionView = "p
 <td style={TDC}>{index + 1}</td>
 <td style={TD}><RO val={row.method || approval.innovDetails} /></td>
 <td style={TD}><RO val={row.details} /></td>
-<td style={TDV}><ViewDocsCell docKey={`innov-${index}`} docs={docs} /></td>
+<td style={TDV}><ViewDocsCell docKey={index === 0 ? ["innov", "innov-0"] : `innov-${index}`} docs={docs} /></td>
 <td style={TDS}><RO val={String(row.score ?? "").trim() ? clampScore(row.score, SCORE_LIMITS.innovativeRow) : ""} center /></td>
 <td style={TDS_DEAN}><DeanInnovativeScoreCell row={row} index={index} rows={innovativeRows} deanData={deanData} setDeanData={setDeanData} /></td>
 </tr>

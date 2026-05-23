@@ -211,9 +211,64 @@ const hasReviewScore = (item = {}, role) => {
   return false;
 };
 
+const rejectedRoleFromStatus = (status, chain = []) => {
+  const normalizedStatus = normalizeStatusText(status);
+  if (!isRejectedStatus(normalizedStatus)) return "";
+
+  return chain.find((role) => {
+    const label = normalizeStatusText(roleLabel(role));
+    const key = normalizeStatusText(role);
+    return normalizedStatus === normalizeStatusText(rejectedStatusFor(role)) ||
+      normalizedStatus.includes(`${label} rejected`) ||
+      normalizedStatus.includes(`${key} rejected`);
+  }) || "";
+};
+
+const activeRejectedRoleFor = (item = {}, chain = []) => {
+  const hintedRole = normalizeRoleForWorkflow(firstValue(
+    item.reviewer_role,
+    item.reviewerRole,
+    item.current_reviewer,
+    item.current_reviewer_role,
+    item.currentReviewerRole,
+    item.authority_role,
+  ));
+  const rejectedDecision = [
+    item.decision,
+    item.review_decision,
+    item.reviewDecision,
+    item.review_status,
+    item.reviewStatus,
+  ].some(isRejectedStatus) || item.rejected === true || item.is_rejected === true;
+
+  if (rejectedDecision && chain.includes(hintedRole)) return hintedRole;
+
+  const statusCandidates = [
+    getWorkflowStatus(item),
+    item.declarationStatus,
+    item.declaration_status,
+    item.declaration?.status,
+    item.review_status,
+    item.reviewStatus,
+    item.workflowStatus,
+    item.workflow_status,
+  ];
+  const rejectedRole = statusCandidates
+    .map((status) => rejectedRoleFromStatus(status, chain))
+    .find(Boolean);
+
+  if (rejectedRole) return rejectedRole;
+  return statusCandidates.some(isRejectedStatus) || rejectedDecision ? "unknown" : "";
+};
+
 const statusStageIndex = (item = {}, chain = []) => {
   const status = normalizeStatusText(getWorkflowStatus(item));
   if (!status) return null;
+  const rejectedRole = activeRejectedRoleFor(item, chain);
+  if (rejectedRole) {
+    const rejectedIndex = chain.indexOf(rejectedRole);
+    return rejectedIndex >= 0 ? rejectedIndex : -1;
+  }
   if (status === "submitted" || status === "pending review") return 0;
   if (status === "reviewed" || status === "completed") {
     const scoreStages = chain
@@ -231,8 +286,7 @@ const statusStageIndex = (item = {}, chain = []) => {
     if (
       status === normalizeStatusText(reviewedStatusFor(role)) ||
       status.includes(`${label} reviewed`) ||
-      status.includes(`${label} approved`) ||
-      (isRejectedStatus(status) && status.includes(label))
+      status.includes(`${label} approved`)
     ) {
       return index + 1;
     }
@@ -260,6 +314,10 @@ const isReviewableForRole = (item = {}, reviewerRole, reviewerProfile = {}) => {
   const role = normalizeRoleForWorkflow(reviewerRole);
   const reviewer = { ...reviewerProfile, appraisal_role: role };
   const subjectProfile = subjectProfileFromItem(item);
+  const rejectionRole = activeRejectedRoleFor(item, getReviewChain(subjectProfile));
+
+  if (rejectionRole && rejectionRole !== role) return false;
+  if (rejectionRole === "unknown") return false;
 
   return hasSubmittedAppraisal(item) &&
     canAuthorityReviewProfile(reviewer, subjectProfile) &&
@@ -389,11 +447,27 @@ const workflowRejectionFor = (role) => {
   const status = rejectedStatusFor(role);
   return {
     status,
+    declaration_status: status,
     workflow_status: status,
     review_status: status,
-    next_reviewer: "",
-    next_reviewer_role: "",
+    next_reviewer: null,
+    next_reviewer_role: null,
+    nextReviewer: null,
+    nextReviewerRole: null,
+    next_reviewer_email: null,
+    nextReviewerEmail: null,
     decision: "rejected",
+    action: "reject",
+    review_decision: "rejected",
+    is_rejected: true,
+    rejected: true,
+    should_forward: false,
+    forward: false,
+    forwarded: false,
+    advance_workflow: false,
+    advanceWorkflow: false,
+    stop_workflow: true,
+    stopWorkflow: true,
   };
 };
 
@@ -501,11 +575,15 @@ export const submitWorkflowReview = async ({
 
   if (rejected) {
     const roleHints = rejectionRoleHintsFor(role);
-    try {
-      return await api.put(endpointUrl, { ...basePayload, ...roleHints, ...forwarding }) || {};
-    } catch {
-      return await api.put(endpointUrl, { ...basePayload, ...roleHints, decision: "rejected" }) || {};
-    }
+    return await api.put(endpointUrl, {
+      ...basePayload,
+      ...roleHints,
+      ...forwarding,
+      rejected_by: role,
+      rejectedBy: role,
+      rejection_reason: remarks,
+      rejectionReason: remarks,
+    }) || {};
   }
 
   if (role === "vc") {

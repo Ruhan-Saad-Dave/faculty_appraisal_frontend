@@ -269,7 +269,8 @@ function SectionSaveFooter({ label, saved, saving, locked, onSave }) {
 }
 
 function ViewDocsCell({ docKey, docs }) {
- const files = Array.isArray(docs?.[docKey]) ? docs[docKey] : docs?.[docKey] ? [docs[docKey]] : [];
+ const docKeys = Array.isArray(docKey) ? docKey : [docKey];
+ const files = docKeys.flatMap((key) =>Array.isArray(docs?.[key]) ? docs[key] : docs?.[key] ? [docs[key]] : []);
  if (!files.length) return<span style={{ color: "#cbd5e1", fontSize: 10 }}>No docs</span>;
  return (
 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -508,7 +509,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
 <SC title="A3. Innovative Teaching-Learning (Max 10)" accent="#8b5cf6">
 <table style={T}>
 <thead><tr>
-<th style={TH}>SN</th><th style={TH}>Method</th><th style={TH}>Details</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>{reviewerScoreLabel}</th>
+<th style={TH}>SN</th><th style={TH}>Method</th><th style={TH}>Details</th><th style={TH}>View Docs</th><th style={TH}>Faculty Score</th><th style={TH_HOD}>{reviewerScoreLabel}</th>
 </tr></thead>
 <tbody>
  {innovativeRows.map((row, index) =>{
@@ -518,6 +519,7 @@ function FacultyReviewForm({ faculty, hodData, setHodData, reviewerLabel = "HOD"
 <td style={TDC}>{index + 1}</td>
 <td style={TD}><RO val={row.method || faculty.innovDetails} /></td>
 <td style={TD}><RO val={row.details} /></td>
+<td style={TDV}><ViewDocsCell docKey={index === 0 ? ["innov", "innov-0"] : `innov-${index}`} docs={docs} /></td>
 <td style={TDS}><RO val={String(row.score ?? "").trim() ? clampScore(row.score, SCORE_LIMITS.innovativeRow) : ""} center /></td>
 <td style={TDS_HOD}><HodInput val={String(getInnovHod(index) ?? "").trim() ? clampScore(getInnovHod(index), SCORE_LIMITS.innovativeRow) : ""} max={SCORE_LIMITS.innovativeRow} disabled={!rowReviewable} onChange={v =>setInnovHod(index, v)} /></td>
 </tr>
