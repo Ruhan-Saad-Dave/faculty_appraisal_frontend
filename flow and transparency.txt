@@ -66,6 +66,8 @@ When the Dean fills the form and submits it, the form gets forwarded to the VC, 
 
 ### Transparency in Flow:
 
+In the VC dashboard, teaching appraisal cards and the opened VC review form show an "Average Score" before the VC score. This value is calculated from the available scores submitted before the VC stage: the self/faculty score and the applicable prior reviewer scores in that chain, such as HOD or Center Head, Director, and Dean. The score summary in the opened VC review header is displayed to one decimal place. In the VC review form's Personal Information section, the rows ExpDyp, ExpPrev, and ExpTotal are hidden for display clarity.
+
 #### For Faculty:
 
 When the faculty fills the form and submits it, the form should go to the HOD. If the faculty belongs to the Mechanical department, then the form should go only to the HOD of the Mechanical department. Then the HOD inserts a score into the faculty form and submits it. After that, the form gets forwarded to the Director, and the Director should not be able to see the score given by the HOD. The Director should only be able to see the self-score given by the faculty. Then the Director inserts a score into the faculty form and submits it. After that, the form gets forwarded to the Dean, and the Dean should not be able to see the scores given by the HOD and Director. The Dean should only be able to see the self-score given by the faculty. Then the Dean inserts a score into the faculty form and submits it. Finally, the form goes to the VC, and the VC will be able to see the scores given by the Faculty, HOD, Director, and Dean. Then the VC inserts a score into the faculty form and submits it.

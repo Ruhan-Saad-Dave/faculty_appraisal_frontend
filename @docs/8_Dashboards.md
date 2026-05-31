@@ -32,6 +32,10 @@ Reviewer-focused dashboards. Their main logic includes:
 ### `VCDashboard.jsx`
 The final level of review. It provides a university-wide view and the ability to finalize any appraisal.
 
+VC teaching-appraisal cards show the submitted self score, prior reviewer totals, an `Average Score`, and the editable/final `VC Score`. The average is computed on the frontend from the available pre-VC totals only: self/faculty score plus the applicable prior reviewers in that appraisal chain, such as HOD or Center Head, Director, and Dean. Missing prior scores are ignored, while explicit zero scores are treated as valid submitted values.
+
+When the VC opens a teaching appraisal form, the top review header repeats the same pre-VC score summary and formats those values to one decimal place for readability. The VC review form's `Personal Information` table hides `ExpDyp`, `ExpPrev`, and `ExpTotal`; the underlying profile/form data is not changed.
+
 ### `NonTeachingStaffDashboard.jsx`
 A specialized dashboard for non-teaching staff, using a simplified workflow and a different form structure (Managed via `nonTeachingWorkflow.js`).
 

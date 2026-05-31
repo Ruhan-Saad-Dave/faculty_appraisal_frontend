@@ -377,6 +377,8 @@ Used by reviewer dashboards to open and read a faculty's submitted form.
 **REQUIRED BACKEND CHANGE — per-row reviewer scores (currently missing):**  
 The VC review panel shows HOD / Director / Dean score columns for every row in every form section (lectures, courseFile, quals, feedback, journals, etc.). These scores are stored in the DB tables (`teaching_process.hod_score`, `teaching_process.director_score`, etc.) but are **not currently returned** in this response. The frontend pipeline is fully implemented to display them — it just needs the data.
 
+The VC dashboard also displays a frontend-only `Average Score` between the Dean and VC score summaries. This is not a backend field. It is calculated from the available pre-VC total scores for the subject: self/faculty total plus the applicable prior reviewer totals in the review chain. For example, a SoEMR faculty item averages Faculty, HOD, Director, and Dean totals; a CISR faculty item averages Faculty and Center Head totals. The VC review header displays these score summaries to one decimal place. The VC review form's `Personal Information` table intentionally hides `ExpDyp`, `ExpPrev`, and `ExpTotal` rows for display clarity only.
+
 The backend must include per-row reviewer scores in one of two ways:
 
 **Option A — embed in form rows (preferred):** Add `hod_score`, `director_score`, `dean_score`, `vc_score` columns directly into each form row object by JOINing from the corresponding table:

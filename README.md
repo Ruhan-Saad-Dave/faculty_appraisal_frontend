@@ -62,7 +62,7 @@ The portal supports appraisal review and forwarding across role-specific dashboa
 - HOD / Center Head review
 - Director review
 - Dean review
-- Vice Chancellor review and finalization
+- Vice Chancellor review and finalization, including a pre-VC average score summary
 - Registrar / Reporting Officer flows for non-teaching staff
 
 ### School and Form Routing
