@@ -46,22 +46,53 @@ function ScoreBar({ score, max, color = "#0ea5e9" }) {
 </div>
  );
 }
-function SummaryBox({ totals, roleScoreLabel = "Score", maxScores = { partA: MAX_SCORES.PART_A, partB: MAX_SCORES.PART_B, grand: MAX_SCORES.GRAND_TOTAL } }) {
- return (
-<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: 16, display: "grid", gap: 12 }}>
- {[
+function SummaryBox({
+ totals,
+ title = "Score",
+ roleScoreLabel = "Score",
+ maxScores = { partA: MAX_SCORES.PART_A, partB: MAX_SCORES.PART_B, grand: MAX_SCORES.GRAND_TOTAL },
+ accent = "#4c1d95",
+ remarks,
+ remarksTitle,
+}) {
+ const scoreRows = [
  ["Part A", totals.partA, maxScores.partA, "#6366f1"],
  ["Part B", totals.partB, maxScores.partB, "#0ea5e9"],
- ["Grand Total", totals.total, maxScores.grand, "#059669"],
- ].map(([label, value, max, color]) =>(
-<div key={label}>
-<div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-<strong>{label}</strong><span style={{ color, fontWeight: 900 }}>{n(value).toFixed(1)} / {max}</span>
+ ["Total", totals.total, maxScores.grand, "#059669"],
+ ];
+ const hasRemarks = remarks !== undefined;
+ return (
+<div style={{ background: "#fff", border: "1px solid #dbe3ef", borderRadius: 8, padding: 12, display: "grid", gridTemplateColumns: hasRemarks ? "minmax(300px, 0.95fr) minmax(280px, 1.05fr)" : "1fr", gap: 12, alignItems: "stretch", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+<div style={{ display: "grid", gap: 9, minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+<div>
+<div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{title}</div>
+<div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{roleScoreLabel}</div>
+</div>
+<div style={{ background: `${accent}14`, color: accent, border: `1px solid ${accent}33`, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 900, whiteSpace: "nowrap" }}>
+ {oneDecimal(totals.total)} / {maxScores.grand}
+</div>
+</div>
+<div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+ {scoreRows.map(([label, value, max, color]) =>(
+<div key={label} style={{ background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 7, padding: "8px 9px", minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "baseline", marginBottom: 5 }}>
+<span style={{ fontSize: 10, color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
+<span style={{ fontSize: 11, color, fontWeight: 900, whiteSpace: "nowrap" }}>{oneDecimal(value)} / {max}</span>
 </div>
 <ScoreBar score={value} max={max} color={color} />
 </div>
  ))}
-<div style={{ fontSize: 11, color: "#64748b" }}>{roleScoreLabel}</div>
+</div>
+</div>
+ {hasRemarks && (
+<div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "9px 10px", minWidth: 0 }}>
+<div style={{ fontWeight: 900, color: accent, fontSize: 12, marginBottom: 5 }}>{remarksTitle || `${title} Remarks`}</div>
+<div style={{ color: "#334155", fontSize: 12, lineHeight: 1.45, whiteSpace: "pre-wrap", maxHeight: 74, overflow: "auto" }}>
+ {String(remarks || "").trim() || "-"}
+</div>
+</div>
+ )}
 </div>
  );
 }
@@ -828,6 +859,38 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const selfTotal = Math.min(vcSelfTotalForPerson(person), selfPartA + selfPartB, selfMaxScores.grand);
  const facultyTotals = { partA: selfPartA, partB: selfPartB, total: selfTotal, maxScores: selfMaxScores };
  const reviewerSummaryTotals = { partA, partB, total, maxScores: reviewerMaxScores };
+ const roleSummaryTotalsFor = (role) =>{
+ const prefix = role === "hod" || role === "center_head" ? "hod" : role;
+ const rawTotal = rawVcTotalForRole(person, role);
+ return {
+ partA: n(person[`${prefix}PartA`]),
+ partB: n(person[`${prefix}PartB`]),
+ total: n(rawTotal),
+ maxScores: reviewerMaxScores,
+ hasTotal: hasScoreValue(rawTotal),
+ };
+ };
+ const previousSummaryCards = previousRoles.map((role) =>{
+ const meta = vcRoleMeta(role);
+ return {
+ role,
+ meta,
+ totals: roleSummaryTotalsFor(role),
+ remarks: person[meta.remarksKey],
+ };
+ });
+ const averageSourceTotals = [
+ facultyTotals,
+ ...previousSummaryCards.filter((item) =>item.totals.hasTotal).map((item) =>item.totals),
+ ];
+ const averageSummaryTotals = averageSourceTotals.length
+ ? {
+ partA: averageSourceTotals.reduce((sum, item) =>sum + n(item.partA), 0) / averageSourceTotals.length,
+ partB: averageSourceTotals.reduce((sum, item) =>sum + n(item.partB), 0) / averageSourceTotals.length,
+ total: averageSourceTotals.reduce((sum, item) =>sum + n(item.total), 0) / averageSourceTotals.length,
+ maxScores: reviewerMaxScores,
+ }
+ : { partA: 0, partB: 0, total: 0, maxScores: reviewerMaxScores };
  const vcReviewCompleted = !isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0);
  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
  const personInfo = mergeFacultyInfo(person.info, person);
@@ -1005,14 +1068,18 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  )}
 
  {sectionView === "summary" && (
-<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
-<SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel={`${personMode === "faculty" ? "Faculty submitted" : "Self"} score for the engineering appraisal form.`} />
-<SummaryOtherInfoField value={summaryOtherInfoValueFrom(person)} readOnly rows={4} />
-<SummaryBox totals={reviewerSummaryTotals} maxScores={reviewerSummaryTotals.maxScores} roleScoreLabel="VC score for the engineering appraisal form." />
+<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, display: "grid", gap: 10 }}>
+<SummaryBox title={personMode === "faculty" ? "Faculty Score" : "Self Score"} totals={facultyTotals} maxScores={facultyTotals.maxScores} accent="#0ea5e9" roleScoreLabel={`${personMode === "faculty" ? "Faculty submitted" : "Self"} score for the engineering appraisal form.`} />
+<SummaryOtherInfoField value={summaryOtherInfoValueFrom(person)} readOnly rows={5} />
+ {previousSummaryCards.map(({ role, meta, totals, remarks: roleRemarks }) =>(
+<SummaryBox key={role} title={`${meta.shortLabel} Score`} totals={totals} maxScores={totals.maxScores} accent={meta.remarksColor || meta.color} roleScoreLabel={`${meta.shortLabel} score for the engineering appraisal form.`} remarks={roleRemarks} remarksTitle={`${meta.shortLabel} Remarks`} />
+ ))}
+<SummaryBox title="Average Score" totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} accent="#f59e0b" roleScoreLabel="Average score before VC review." />
+<SummaryBox title="VC Score" totals={reviewerSummaryTotals} maxScores={reviewerSummaryTotals.maxScores} accent="#7c3aed" roleScoreLabel="VC score for the engineering appraisal form." />
 
 <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
  Vice Chancellor Remarks and Grade
-<textarea value={remarks} readOnly={reviewLocked} onChange={e =>setRemarks(e.target.value)} rows={5} style={{ border: "1px solid #99f6e4", borderRadius: 7, padding: 10, fontFamily: "inherit", resize: "vertical", background: reviewLocked ? "#f8fafc" : "#fff" }} />
+<textarea value={remarks} readOnly={reviewLocked} onChange={e =>setRemarks(e.target.value)} rows={3} style={{ border: "1px solid #99f6e4", borderRadius: 7, padding: 10, fontFamily: "inherit", resize: "vertical", background: reviewLocked ? "#f8fafc" : "#fff" }} />
 </label>
 
  {!reviewLocked && (

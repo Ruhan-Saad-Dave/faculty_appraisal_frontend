@@ -905,6 +905,16 @@ function SummaryBox({ totals, roleScoreLabel = "Score", maxScores = { partA: PAR
 </div>
  );
 }
+function RemarksBox({ title, remarks, color = "#334155" }) {
+ return (
+<div style={{ display: "grid", gap: 6 }}>
+<div style={{ fontWeight: 800, color, fontSize: 13 }}>{title}</div>
+<div style={{ border: "1px solid #cbd5e1", borderRadius: 7, padding: 10, minHeight: 52, color: "#334155", background: "#f8fafc", fontSize: 12, whiteSpace: "pre-wrap" }}>
+ {String(remarks || "").trim() || "-"}
+</div>
+</div>
+ );
+}
 
 function SectionSelector({ value, onChange, label = "Appraisal Section", isOptionDisabled = () =>false }) {
  return (
@@ -1053,6 +1063,34 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
  partB: String(person?.[`${reviewerRole}PartB`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}PartB`]) : totals.partB,
  total: String(person?.[`${reviewerRole}Total`] ?? "").trim() !== "" ? n(person?.[`${reviewerRole}Total`]) : totals.total,
  } : totals;
+ const roleSummaryTotalsFor = (role) =>{
+ const prefix = role === "center_head" ? "hod" : role;
+ const rawTotal = person?.[`${prefix}Total`];
+ return {
+ partA: n(person?.[`${prefix}PartA`]),
+ partB: n(person?.[`${prefix}PartB`]),
+ total: n(rawTotal),
+ maxScores: totals.maxScores,
+ hasTotal: rawTotal !== undefined && rawTotal !== null && String(rawTotal).trim() !== "",
+ };
+ };
+ const previousSummaryCards = reviewerRole === "vc" ? visiblePreviousRoles.map((role) =>{
+ const prefix = role === "center_head" ? "hod" : role;
+ const label = role === "center_head" ? "Center Head" : roleLabel(role);
+ return {
+ role,
+ label,
+ totals: roleSummaryTotalsFor(role),
+ remarks: person?.[`${prefix}Remarks`],
+ };
+ }) : [];
+ const averageSourceTotals = [facultyTotals, ...previousSummaryCards.filter((item) =>item.totals.hasTotal).map((item) =>item.totals)];
+ const averageSummaryTotals = averageSourceTotals.length ? {
+ partA: averageSourceTotals.reduce((sum, item) =>sum + n(item.partA), 0) / averageSourceTotals.length,
+ partB: averageSourceTotals.reduce((sum, item) =>sum + n(item.partB), 0) / averageSourceTotals.length,
+ total: averageSourceTotals.reduce((sum, item) =>sum + n(item.total), 0) / averageSourceTotals.length,
+ maxScores: totals.maxScores,
+ } : { partA: 0, partB: 0, total: 0, maxScores: totals.maxScores };
  useEffect(() =>{
  let active = true;
  if (panelReadOnly || !subjectEmail) return undefined;
@@ -1209,6 +1247,13 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
 <SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel={`Faculty submitted score for the ${schoolDisplayName} appraisal form.`} />
 <SummaryOtherInfoField value={summaryOtherInfoValueFrom(person)} readOnly rows={4} />
+ {previousSummaryCards.map(({ role, label, totals: roleTotals, remarks: roleRemarks }) =>(
+<div key={role} style={{ display: "grid", gap: 10 }}>
+<SummaryBox totals={roleTotals} maxScores={roleTotals.maxScores} roleScoreLabel={`${label} score for the ${schoolDisplayName} appraisal form.`} />
+<RemarksBox title={`${label} Remarks`} remarks={roleRemarks} color="#334155" />
+</div>
+ ))}
+ {reviewerRole === "vc" &&<SummaryBox totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} roleScoreLabel="Average score before VC review." />}
 <SummaryBox totals={reviewerSummaryTotals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the ${schoolDisplayName} appraisal form.`} />
 <label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
  {reviewerRole === "vc" ? "Vice Chancellor Remarks and Grade" : `${roleLabel(reviewerRole)} Remarks`}
