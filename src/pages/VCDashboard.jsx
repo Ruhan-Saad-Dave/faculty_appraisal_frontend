@@ -307,7 +307,9 @@ const hasScoreValue = (value) =>
 const vcAverageBeforeVc = (person = {}, personMode = "faculty", previousRoles = vcPreviousRolesFor(person, personMode)) =>{
  const scores = [
  rawVcSelfTotalForPerson(person),
- ...previousRoles.map((role) =>rawVcTotalForRole(person, role)),
+ ...previousRoles
+ .filter((role) =>role !== personMode)
+ .map((role) =>rawVcTotalForRole(person, role)),
  ]
  .filter(hasScoreValue)
  .map(Number);
@@ -883,7 +885,9 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  });
  const averageSourceTotals = [
  facultyTotals,
- ...previousSummaryCards.filter((item) =>item.totals.hasTotal).map((item) =>item.totals),
+ ...previousSummaryCards
+ .filter((item) =>item.role !== personMode && item.totals.hasTotal)
+ .map((item) =>item.totals),
  ];
  const averageSummaryTotals = averageSourceTotals.length
  ? {

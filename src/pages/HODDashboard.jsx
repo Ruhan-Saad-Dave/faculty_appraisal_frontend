@@ -66,6 +66,47 @@ function ScoreBar({ score, max, color = "#6366f1" }) {
  );
 }
 
+function CompactSummaryCard({ title, subtitle, totals, maxScores, accent = "#312e81", remarksTitle, remarksContent }) {
+ const rows = [
+ ["Part A", totals.partA, maxScores.partA, "#6366f1"],
+ ["Part B", totals.partB, maxScores.partB, "#0ea5e9"],
+ ["Total", totals.total, maxScores.grand, "#059669"],
+ ];
+ const hasRemarks = Boolean(remarksContent);
+ return (
+<div style={{ background: "#fff", border: "1px solid #dbe3ef", borderRadius: 8, padding: 12, display: "grid", gridTemplateColumns: hasRemarks ? "minmax(300px, 0.95fr) minmax(280px, 1.05fr)" : "1fr", gap: 12, alignItems: "stretch", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+<div style={{ display: "grid", gap: 9, minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+<div>
+<div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{title}</div>
+<div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{subtitle}</div>
+</div>
+<div style={{ background: `${accent}14`, color: accent, border: `1px solid ${accent}33`, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 900, whiteSpace: "nowrap" }}>
+ {totals.total.toFixed(1)} / {maxScores.grand}
+</div>
+</div>
+<div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+ {rows.map(([label, value, max, color]) =>(
+<div key={label} style={{ background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 7, padding: "8px 9px", minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "baseline", marginBottom: 5 }}>
+<span style={{ fontSize: 10, color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
+<span style={{ fontSize: 11, color, fontWeight: 900, whiteSpace: "nowrap" }}>{value.toFixed(1)} / {max}</span>
+</div>
+<ScoreBar score={value} max={max} color={color} />
+</div>
+ ))}
+</div>
+</div>
+ {hasRemarks && (
+<div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "9px 10px", minWidth: 0 }}>
+<div style={{ fontWeight: 900, color: accent, fontSize: 12, marginBottom: 5 }}>{remarksTitle}</div>
+ {remarksContent}
+</div>
+ )}
+</div>
+ );
+}
+
 function StatusBadge({ status }) {
  const map = {
  "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
@@ -1249,42 +1290,28 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  )}
 
  {sectionView === "summary" && (
-<div style={{ background: "#fff", borderRadius: 10, padding: "22px 24px", boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
-<h3 style={{ margin: "0 0 16px", color: "#0f172a", fontSize: 15 }}>{reviewLocked ? `${reviewerLabel} Submitted Review` : `${reviewerLabel} Remarks & Final Submission`}</h3>
-
- {/* Score Summary */}
-<table style={{ ...T, marginBottom: 18 }}>
-<thead><tr>
-<th style={TH}>Section</th><th style={TH}>Max</th>
-<th style={TH}>Faculty Score</th><th style={TH_HOD}>{reviewerLabel} Score</th>
-</tr></thead>
-<tbody>
- {[
- ["Part A - Teaching & Activities", facultySummary.partAMax, facultySummary.partA, partA],
- ["Part B - Research & Contributions", facultySummary.partBMax, facultySummary.partB, partB],
- ].map(([label, max, fac, hod]) =>(
-<tr key={label}>
-<td style={TD}>{label}</td>
-<td style={TDC}>{max}</td>
-<td style={TDS}>{fac.toFixed(1)}</td>
-<td style={{ ...TDS_HOD, fontWeight: 700, color: "#312e81" }}>{hod.toFixed(1)}</td>
-</tr>
- ))}
-<tr style={{ background: "#d1fae5", fontWeight: 700 }}>
-<td style={TD}>Grand Total</td>
-<td style={TDC}>{facultySummary.grandMax}</td>
-<td style={TDS}>{facultySummary.total.toFixed(1)}</td>
-<td style={{ ...TDS_HOD, color: "#065f46", fontSize: 14 }}>{total.toFixed(1)}</td>
-</tr>
-</tbody>
-</table>
-
+<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, display: "grid", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,.06)" }}>
+<CompactSummaryCard
+ title="Faculty Score"
+ subtitle="Faculty submitted score for the engineering appraisal form."
+ totals={{ partA: facultySummary.partA, partB: facultySummary.partB, total: facultySummary.total }}
+ maxScores={{ partA: facultySummary.partAMax, partB: facultySummary.partBMax, grand: facultySummary.grandMax }}
+ accent="#0ea5e9"
+/>
 <SummaryOtherInfoField value={summaryOtherInfoValueFrom(faculty)} readOnly rows={4} />
-
-<label style={{ fontWeight: 700, fontSize: 13, color: "#334155", display: "block", marginBottom: 6 }}>{reviewerLabel} Remarks</label>
+<CompactSummaryCard
+ title={`${reviewerLabel} Score`}
+ subtitle={`${reviewerLabel} score for the engineering appraisal form.`}
+ totals={{ partA, partB, total }}
+ maxScores={{ partA: facultySummary.partAMax, partB: facultySummary.partBMax, grand: facultySummary.grandMax }}
+ accent="#312e81"
+ remarksTitle={`${reviewerLabel} Remarks`}
+ remarksContent={(
 <textarea value={remarks} onChange={e =>setRemarks(e.target.value)} rows={4} readOnly={reviewLocked}
  placeholder="Enter your remarks, observations, and recommendations for this faculty member..."
- style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 7, padding: "10px 12px", fontSize: 12, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginBottom: 16, background: reviewLocked ? "#f8fafc" : "#fff" }} />
+ style={{ width: "100%", border: "none", padding: 0, fontSize: 12, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", background: "transparent", color: "#334155", outline: "none" }} />
+ )}
+/>
 
  {!reviewLocked && (
 <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 8, marginBottom: 14, color: "#334155", fontSize: 12, lineHeight: 1.5, cursor: "pointer" }}>

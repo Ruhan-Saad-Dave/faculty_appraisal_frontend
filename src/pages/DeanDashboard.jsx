@@ -61,6 +61,46 @@ function ScoreBar({ score, max, color = "#0ea5e9" }) {
 </div>
  );
 }
+function CompactSummaryCard({ title, subtitle, totals, maxScores, accent = "#4c1d95", remarksTitle, remarksContent }) {
+ const rows = [
+ ["Part A", totals.partA, maxScores.partA, "#6366f1"],
+ ["Part B", totals.partB, maxScores.partB, "#0ea5e9"],
+ ["Total", totals.total, maxScores.grand, "#059669"],
+ ];
+ const hasRemarks = Boolean(remarksContent);
+ return (
+<div style={{ background: "#fff", border: "1px solid #dbe3ef", borderRadius: 8, padding: 12, display: "grid", gridTemplateColumns: hasRemarks ? "minmax(300px, 0.95fr) minmax(280px, 1.05fr)" : "1fr", gap: 12, alignItems: "stretch", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+<div style={{ display: "grid", gap: 9, minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+<div>
+<div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{title}</div>
+<div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{subtitle}</div>
+</div>
+<div style={{ background: `${accent}14`, color: accent, border: `1px solid ${accent}33`, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 900, whiteSpace: "nowrap" }}>
+ {totals.total.toFixed(1)} / {maxScores.grand}
+</div>
+</div>
+<div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+ {rows.map(([label, value, max, color]) =>(
+<div key={label} style={{ background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 7, padding: "8px 9px", minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "baseline", marginBottom: 5 }}>
+<span style={{ fontSize: 10, color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
+<span style={{ fontSize: 11, color, fontWeight: 900, whiteSpace: "nowrap" }}>{value.toFixed(1)} / {max}</span>
+</div>
+<ScoreBar score={value} max={max} color={color} />
+</div>
+ ))}
+</div>
+</div>
+ {hasRemarks && (
+<div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "9px 10px", minWidth: 0 }}>
+<div style={{ fontWeight: 900, color: accent, fontSize: 12, marginBottom: 5 }}>{remarksTitle}</div>
+ {remarksContent}
+</div>
+ )}
+</div>
+ );
+}
 function StatusBadge({ status }) {
  const map = {
  "Pending Review": { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
@@ -1782,34 +1822,28 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
 
  {sectionView === "summary" && (
 <>
-<div style={{ background: "#faf5ff", border: "1px solid #ddd6fe", borderRadius: 12, padding: "14px 16px", marginBottom: 18 }}>
-<div style={{ fontSize: 11, color: "#6d28d9", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 10 }}>Dean Score Summary</div>
-<table style={{ ...T, fontSize: 12 }}>
-<thead><tr><th style={TH}>Section</th><th style={TH}>Max</th><th style={TH}>Faculty Score</th><th style={TH}>Dean Score</th></tr></thead>
-<tbody>
- {[
- ["Part A - Teaching & Activities", selfSummary.partAMax, selfSummary.partA, displayedDeanScores.partA],
- ["Part B - Research & Contributions", selfSummary.partBMax, selfSummary.partB, displayedDeanScores.partB],
- ["Grand Total", selfSummary.grandMax, selfSummary.total, displayedDeanScores.total],
- ].map(([label, max, selfScore, deanScore]) =>(
-<tr key={label}>
-<td style={TD}>{label}</td>
-<td style={TDC}>{max}</td>
-<td style={TDS}>{selfScore.toFixed(1)}</td>
-<td style={{ ...TDS, color: "#4c1d95", fontWeight: 800 }}>{deanScore.toFixed(1)}</td>
-</tr>
- ))}
-</tbody>
-</table>
-</div>
-
+<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, display: "grid", gap: 10, boxShadow: "0 1px 6px rgba(0,0,0,.06)", marginBottom: 14 }}>
+<CompactSummaryCard
+ title="Faculty Score"
+ subtitle="Faculty submitted score for the engineering appraisal form."
+ totals={{ partA: selfSummary.partA, partB: selfSummary.partB, total: selfSummary.total }}
+ maxScores={{ partA: selfSummary.partAMax, partB: selfSummary.partBMax, grand: selfSummary.grandMax }}
+ accent="#0ea5e9"
+/>
 <SummaryOtherInfoField value={summaryOtherInfoValueFrom(approval)} readOnly rows={4} />
-
-<div style={{ marginBottom: 18 }}>
-<div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Dean Remarks</div>
-<textarea value={remarks} onChange={(e) =>setRemarks(e.target.value)} rows={7} readOnly={reviewLocked}
- style={{ width: "100%", borderRadius: 12, border: "1px solid #cbd5e1", padding: "14px", fontFamily: "inherit", fontSize: 13, color: "#1f2937", resize: "vertical", background: reviewLocked ? "#f8fafc" : "#fff" }}
+<CompactSummaryCard
+ title="Dean Score"
+ subtitle="Dean score for the engineering appraisal form."
+ totals={displayedDeanScores}
+ maxScores={{ partA: selfSummary.partAMax, partB: selfSummary.partBMax, grand: selfSummary.grandMax }}
+ accent="#4c1d95"
+ remarksTitle="Dean Remarks"
+ remarksContent={(
+<textarea value={remarks} onChange={(e) =>setRemarks(e.target.value)} rows={4} readOnly={reviewLocked}
+ style={{ width: "100%", border: "none", padding: 0, fontFamily: "inherit", fontSize: 12, color: "#334155", resize: "vertical", background: "transparent", outline: "none" }}
  />
+ )}
+/>
 </div>
 </>
  )}

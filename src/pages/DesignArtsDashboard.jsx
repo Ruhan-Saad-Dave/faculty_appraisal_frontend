@@ -905,13 +905,43 @@ function SummaryBox({ totals, roleScoreLabel = "Score", maxScores = { partA: PAR
 </div>
  );
 }
-function RemarksBox({ title, remarks, color = "#334155" }) {
+function CompactAuthoritySummaryCard({ title, subtitle, totals, maxScores, accent = ACCENT, remarksTitle, remarksContent }) {
+ const rows = [
+ ["Part A", totals.partA, maxScores.partA, ACCENT],
+ ["Part B", totals.partB, maxScores.partB, ACCENT2],
+ ["Total", totals.total, maxScores.grand, "#059669"],
+ ];
+ const hasRemarks = Boolean(remarksContent);
  return (
-<div style={{ display: "grid", gap: 6 }}>
-<div style={{ fontWeight: 800, color, fontSize: 13 }}>{title}</div>
-<div style={{ border: "1px solid #cbd5e1", borderRadius: 7, padding: 10, minHeight: 52, color: "#334155", background: "#f8fafc", fontSize: 12, whiteSpace: "pre-wrap" }}>
- {String(remarks || "").trim() || "-"}
+<div style={{ background: "#fff", border: "1px solid #dbe3ef", borderRadius: 8, padding: 12, display: "grid", gridTemplateColumns: hasRemarks ? "minmax(300px, 0.95fr) minmax(280px, 1.05fr)" : "1fr", gap: 12, alignItems: "stretch", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+<div style={{ display: "grid", gap: 9, minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+<div>
+<div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>{title}</div>
+<div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{subtitle}</div>
 </div>
+<div style={{ background: `${accent}14`, color: accent, border: `1px solid ${accent}33`, borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 900, whiteSpace: "nowrap" }}>
+ {n(totals.total).toFixed(1)} / {maxScores.grand}
+</div>
+</div>
+<div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+ {rows.map(([label, value, max, color]) =>(
+<div key={label} style={{ background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 7, padding: "8px 9px", minWidth: 0 }}>
+<div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "baseline", marginBottom: 5 }}>
+<span style={{ fontSize: 10, color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
+<span style={{ fontSize: 11, color, fontWeight: 900, whiteSpace: "nowrap" }}>{n(value).toFixed(1)} / {max}</span>
+</div>
+<ScoreBar score={value} max={max} color={color} />
+</div>
+ ))}
+</div>
+</div>
+ {hasRemarks && (
+<div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "9px 10px", minWidth: 0 }}>
+<div style={{ fontWeight: 900, color: accent, fontSize: 12, marginBottom: 5 }}>{remarksTitle}</div>
+ {remarksContent}
+</div>
+ )}
 </div>
  );
 }
@@ -1084,7 +1114,13 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
  remarks: person?.[`${prefix}Remarks`],
  };
  }) : [];
- const averageSourceTotals = [facultyTotals, ...previousSummaryCards.filter((item) =>item.totals.hasTotal).map((item) =>item.totals)];
+ const subjectRole = person?.appraisalRole || person?.appraisal_role || person?.role || "";
+ const averageSourceTotals = [
+ facultyTotals,
+ ...previousSummaryCards
+ .filter((item) =>item.role !== subjectRole && item.totals.hasTotal)
+ .map((item) =>item.totals),
+ ];
  const averageSummaryTotals = averageSourceTotals.length ? {
  partA: averageSourceTotals.reduce((sum, item) =>sum + n(item.partA), 0) / averageSourceTotals.length,
  partB: averageSourceTotals.reduce((sum, item) =>sum + n(item.partB), 0) / averageSourceTotals.length,
@@ -1244,21 +1280,22 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
 </div>
  )}
  {sectionView === "summary" && (
-<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 18, display: "grid", gap: 14 }}>
-<SummaryBox totals={facultyTotals} maxScores={facultyTotals.maxScores} roleScoreLabel={`Faculty submitted score for the ${schoolDisplayName} appraisal form.`} />
+<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 14, display: "grid", gap: 10 }}>
+<CompactAuthoritySummaryCard title="Faculty Score" totals={facultyTotals} maxScores={facultyTotals.maxScores} accent="#0ea5e9" subtitle={`Faculty submitted score for the ${schoolDisplayName} appraisal form.`} />
 <SummaryOtherInfoField value={summaryOtherInfoValueFrom(person)} readOnly rows={4} />
  {previousSummaryCards.map(({ role, label, totals: roleTotals, remarks: roleRemarks }) =>(
-<div key={role} style={{ display: "grid", gap: 10 }}>
-<SummaryBox totals={roleTotals} maxScores={roleTotals.maxScores} roleScoreLabel={`${label} score for the ${schoolDisplayName} appraisal form.`} />
-<RemarksBox title={`${label} Remarks`} remarks={roleRemarks} color="#334155" />
-</div>
+<CompactAuthoritySummaryCard key={role} title={`${label} Score`} totals={roleTotals} maxScores={roleTotals.maxScores} accent="#334155" subtitle={`${label} score for the ${schoolDisplayName} appraisal form.`} remarksTitle={`${label} Remarks`} remarksContent={<div style={{ color: "#334155", fontSize: 12, lineHeight: 1.45, whiteSpace: "pre-wrap", maxHeight: 74, overflow: "auto" }}>{String(roleRemarks || "").trim() || "-"}</div>} />
  ))}
- {reviewerRole === "vc" &&<SummaryBox totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} roleScoreLabel="Average score before VC review." />}
-<SummaryBox totals={reviewerSummaryTotals} maxScores={totals.maxScores} roleScoreLabel={`${roleLabel(reviewerRole)} score for the ${schoolDisplayName} appraisal form.`} />
-<label style={{ display: "grid", gap: 6, fontWeight: 800, color: "#134e4a", fontSize: 13 }}>
- {reviewerRole === "vc" ? "Vice Chancellor Remarks and Grade" : `${roleLabel(reviewerRole)} Remarks`}
-<textarea value={remarks} readOnly={panelReadOnly} onChange={(event) =>setRemarks(event.target.value)} rows={5} style={{ border: "1px solid #99f6e4", borderRadius: 7, padding: 10, fontFamily: "inherit", resize: "vertical" }} />
-</label>
+ {reviewerRole === "vc" &&<CompactAuthoritySummaryCard title="Average Score" totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} accent="#f59e0b" subtitle="Average score before VC review." />}
+<CompactAuthoritySummaryCard
+ title={`${roleLabel(reviewerRole)} Score`}
+ totals={reviewerSummaryTotals}
+ maxScores={totals.maxScores}
+ accent="#134e4a"
+ subtitle={`${roleLabel(reviewerRole)} score for the ${schoolDisplayName} appraisal form.`}
+ remarksTitle={reviewerRole === "vc" ? "Vice Chancellor Remarks and Grade" : `${roleLabel(reviewerRole)} Remarks`}
+ remarksContent={<textarea value={remarks} readOnly={panelReadOnly} onChange={(event) =>setRemarks(event.target.value)} rows={4} style={{ width: "100%", border: "none", padding: 0, fontFamily: "inherit", fontSize: 12, color: "#334155", resize: "vertical", background: "transparent", outline: "none" }} />}
+/>
  {!panelReadOnly &&<AccuracyCheckbox checked={confirmed} onChange={setConfirmed} />}
 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
 <span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
