@@ -1229,15 +1229,21 @@ const sumDeanRows = (payload, keys) =>
  }, 0), DEAN_SECTION_MAX[key] || 0);
  }, 0);
 
-const deanScoreTotals = (payload) =>{
+const deanScoreTotals = (payload, sectionApplicability = {}) =>{
+ const reviewerMaxScores = {
+ partA: effectiveMaxScore(200, sectionApplicability, [{ key: "projects", max: 10 }, { key: "society", max: 10 }]),
+ partB: effectiveMaxScore(375, sectionApplicability, [{ key: "research", max: 30 }]),
+ grand: 0,
+ };
+ reviewerMaxScores.grand = reviewerMaxScores.partA + reviewerMaxScores.partB;
  const innovativeScore = Array.isArray(payload.innovRows) && payload.innovRows.length
  ? reviewSectionScore("innovRows", payload.innovRows, 10, "dean")
  : clampScore(payload.innovativeTeaching?.dean, 10);
- const partA = clampScore(sumDeanRows(payload, DEAN_REVIEW_PART_A_KEYS) + innovativeScore, 200);
+ const partA = clampScore(sumDeanRows(payload, DEAN_REVIEW_PART_A_KEYS) + innovativeScore, reviewerMaxScores.partA);
  const b8 = clampScore(sumDeanRows(payload, ["fdps"]) + sumDeanRows(payload, ["training"]), 10);
  const partBWithoutB8 = sumDeanRows(payload, DEAN_REVIEW_PART_B_KEYS.filter(k =>k !== "fdps" && k !== "training"));
- const cappedPartB = clampScore(partBWithoutB8 + b8, 375);
- return { partA, partB: cappedPartB, total: clampScore(partA + cappedPartB, 575) };
+ const cappedPartB = clampScore(partBWithoutB8 + b8, reviewerMaxScores.partB);
+ return { partA, partB: cappedPartB, total: clampScore(partA + cappedPartB, reviewerMaxScores.grand) };
 };
 
 function DeanScoreCell({ sectionKey, index, row, deanData, setDeanData }) {
@@ -1704,13 +1710,24 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  const subjectEmail = approval?.email || approval?.faculty_email || approval?.facultyEmail;
  const academicYear = approval?.academicYear || approval?.academic_year || approval?.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
  const sectionScores = deanScorePayload(approval, deanData);
- const deanScores = deanScoreTotals(sectionScores);
+ const reviewerMaxScores = {
+ partA: effectiveMaxScore(200, approval.sectionApplicability || {}, [{ key: "projects", max: 10 }, { key: "society", max: 10 }]),
+ partB: effectiveMaxScore(375, approval.sectionApplicability || {}, [{ key: "research", max: 30 }]),
+ grand: 0,
+ };
+ reviewerMaxScores.grand = reviewerMaxScores.partA + reviewerMaxScores.partB;
+ const deanScores = deanScoreTotals(sectionScores, approval.sectionApplicability || {});
  const hasSavedDeanScores = ["deanPartA", "deanPartB", "deanTotal"].some((key) =>String(approval?.[key] ?? "").trim() !== "");
- const displayedDeanScores = reviewLocked && hasSavedDeanScores ? {
+ const rawDisplayedDeanScores = reviewLocked && hasSavedDeanScores ? {
  partA: String(approval?.deanPartA ?? "").trim() !== "" ? n(approval?.deanPartA) : deanScores.partA,
  partB: String(approval?.deanPartB ?? "").trim() !== "" ? n(approval?.deanPartB) : deanScores.partB,
  total: String(approval?.deanTotal ?? "").trim() !== "" ? n(approval?.deanTotal) : deanScores.total,
  } : deanScores;
+ const displayedDeanScores = {
+ partA: clampScore(rawDisplayedDeanScores.partA, reviewerMaxScores.partA),
+ partB: clampScore(rawDisplayedDeanScores.partB, reviewerMaxScores.partB),
+ total: clampScore(rawDisplayedDeanScores.total || rawDisplayedDeanScores.partA + rawDisplayedDeanScores.partB, reviewerMaxScores.grand),
+ };
  const selfSummary = standardSubmittedScoreSummary(approval);
  const titleMap = {
  hodApprovals: "HOD's Appraisal Review",
@@ -1835,7 +1852,7 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  title="Dean Score"
  subtitle="Dean score for the engineering appraisal form."
  totals={displayedDeanScores}
- maxScores={{ partA: selfSummary.partAMax, partB: selfSummary.partBMax, grand: selfSummary.grandMax }}
+ maxScores={reviewerMaxScores}
  accent="#4c1d95"
  remarksTitle="Dean Remarks"
  remarksContent={(

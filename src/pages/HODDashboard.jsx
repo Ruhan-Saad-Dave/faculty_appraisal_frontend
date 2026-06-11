@@ -1102,6 +1102,12 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  const canReject = canReviewerRejectProfile(reviewerRole, faculty);
  const subjectEmail = faculty.email || faculty.faculty_email || faculty.facultyEmail;
  const academicYear = faculty.academicYear || faculty.academic_year || faculty.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
+ const reviewerMaxScores = {
+ partA: effectiveMaxScore(200, faculty.sectionApplicability || {}, [{ key: "projects", max: 10 }, { key: "society", max: 10 }]),
+ partB: effectiveMaxScore(375, faculty.sectionApplicability || {}, [{ key: "research", max: 30 }]),
+ grand: 0,
+ };
+ reviewerMaxScores.grand = reviewerMaxScores.partA + reviewerMaxScores.partB;
 
  // Compute HOD total from hodData
  const calcHodScore = () =>{
@@ -1151,7 +1157,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  const soc = faculty.sectionApplicability?.society === "notApplicable" ? 0 : sumReviewRows("society", "hod", 10, SCORE_LIMITS.societyRow);
  const ind = sumReviewRows("industry", "hod", 5);
  const acrT = sumReviewRows("acr", "hod", 25, SCORE_LIMITS.acrRow);
- const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, 200);
+ const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, reviewerMaxScores.partA);
 
  const jour = sumReviewRows("journals", "hod", 120);
  const bk = sumReviewRows("books", "hod", 50);
@@ -1167,20 +1173,25 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  const fdp = sumReviewRows("fdps", "hod", 10, SCORE_LIMITS.fdpRow);
  const train = sumReviewRows("training", "hod", 10, SCORE_LIMITS.fdpRow);
  const b8 = clampScore(fdp + train, 10);
- const partB = clampScore(jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8, 375);
+ const partB = clampScore(jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8, reviewerMaxScores.partB);
 
- return { partA, partB, total: clampScore(partA + partB, 575) };
+ return { partA, partB, total: clampScore(partA + partB, reviewerMaxScores.grand) };
  };
 
  const calculatedScores = calcHodScore();
  const hasSavedReviewerScores = ["hodPartA", "hodPartB", "hodTotal"].some((key) =>String(faculty?.[key] ?? "").trim() !== "");
- const displayedScores = reviewLocked && hasSavedReviewerScores ? {
+ const rawDisplayedScores = reviewLocked && hasSavedReviewerScores ? {
  partA: String(faculty?.hodPartA ?? "").trim() !== "" ? n(faculty.hodPartA) : calculatedScores.partA,
  partB: String(faculty?.hodPartB ?? "").trim() !== "" ? n(faculty.hodPartB) : calculatedScores.partB,
  total: String(faculty?.hodTotal ?? "").trim() !== "" ? n(faculty.hodTotal) : calculatedScores.total,
  } : calculatedScores;
+ const displayedScores = {
+ partA: clampScore(rawDisplayedScores.partA, reviewerMaxScores.partA),
+ partB: clampScore(rawDisplayedScores.partB, reviewerMaxScores.partB),
+ total: clampScore(rawDisplayedScores.total || rawDisplayedScores.partA + rawDisplayedScores.partB, reviewerMaxScores.grand),
+ };
  const { partA, partB, total } = displayedScores;
- const g = grade(total, 575);
+ const g = grade(total, reviewerMaxScores.grand);
  useEffect(() =>{
  let active = true;
  if (reviewLocked || !subjectEmail) return undefined;
@@ -1303,7 +1314,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false, reviewerLabe
  title={`${reviewerLabel} Score`}
  subtitle={`${reviewerLabel} score for the engineering appraisal form.`}
  totals={{ partA, partB, total }}
- maxScores={{ partA: facultySummary.partAMax, partB: facultySummary.partBMax, grand: facultySummary.grandMax }}
+ maxScores={reviewerMaxScores}
  accent="#312e81"
  remarksTitle={`${reviewerLabel} Remarks`}
  remarksContent={(

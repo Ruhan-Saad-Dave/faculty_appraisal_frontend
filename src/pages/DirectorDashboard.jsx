@@ -20,6 +20,9 @@ import RejectionNotice from "../components/RejectionNotice";
 // - Helpers -
 const n = (v) =>parseFloat(v) || 0;
 const pct = (v, m) =>Math.min(100, Math.round((v / m) * 100)) || 0;
+const NON_ENGINEERING_REVIEW_SCHOOLS = new Set(["SoCM", "SoMCS", "SoD", "SoAA"]);
+const isNonEngineeringReviewSubject = (item = {}) =>
+ NON_ENGINEERING_REVIEW_SCHOOLS.has(getSchoolKey(item.school || item.schoolName || item.info?.school || ""));
 const REVIEW_META_KEYS = new Set(["score", "hod", "director", "dean", "vc", "_id", "id"]);
 const rowHasReviewableData = (row = {}) =>
  Object.entries(row || {}).some(([key, value]) =>
@@ -1142,6 +1145,12 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const canReject = canReviewerRejectProfile("director", faculty);
  const subjectEmail = faculty.email || faculty.faculty_email || faculty.facultyEmail;
  const academicYear = faculty.academicYear || faculty.academic_year || faculty.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
+ const reviewerMaxScores = {
+ partA: effectiveMaxScore(200, faculty.sectionApplicability || {}, [{ key: "projects", max: 10 }, { key: "society", max: 10 }]),
+ partB: effectiveMaxScore(375, faculty.sectionApplicability || {}, [{ key: "research", max: 30 }]),
+ grand: 0,
+ };
+ reviewerMaxScores.grand = reviewerMaxScores.partA + reviewerMaxScores.partB;
 
  // Compute HOD total from hodData
  const calcHodScore = () =>{
@@ -1174,7 +1183,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const soc = sumReviewRows("society", "hod", 10, SCORE_LIMITS.societyRow);
  const ind = sumReviewRows("industry", "hod", 5);
  const acrT = sumReviewRows("acr", "hod", 25, SCORE_LIMITS.acrRow);
- const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, 200);
+ const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, reviewerMaxScores.partA);
 
  const jour = sumReviewRows("journals", "hod", 120);
  const bk = sumReviewRows("books", "hod", 50);
@@ -1188,9 +1197,9 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const prop = sumReviewRows("proposals", "hod", 10);
  const prod = sumReviewRows("products", "hod", 10);
  const b8 = clampScore(sumReviewRows("fdps", "hod", 10, SCORE_LIMITS.fdpRow) + sumReviewRows("training", "hod", 10, SCORE_LIMITS.fdpRow), 10);
- const partB = clampScore(jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8, 375);
+ const partB = clampScore(jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8, reviewerMaxScores.partB);
 
- return { partA, partB, total: clampScore(partA + partB, 575) };
+ return { partA, partB, total: clampScore(partA + partB, reviewerMaxScores.grand) };
  };
 
  // Compute Director total from dirData
@@ -1240,7 +1249,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const soc = sumReviewRows("society", "dir", 10, SCORE_LIMITS.societyRow);
  const ind = sumReviewRows("industry", "dir", 5);
  const acrT = sumReviewRows("acr", "dir", 25, SCORE_LIMITS.acrRow);
- const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, 200);
+ const partA = clampScore(lec + cf + innov + proj + qual + fb + dept + uni + soc + ind + acrT, reviewerMaxScores.partA);
 
  const jour = sumReviewRows("journals", "dir", 120);
  const bk = sumReviewRows("books", "dir", 50);
@@ -1254,21 +1263,26 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  const prop = sumReviewRows("proposals", "dir", 10);
  const prod = sumReviewRows("products", "dir", 10);
  const b8 = clampScore(sumReviewRows("fdps", "dir", 10, SCORE_LIMITS.fdpRow) + sumReviewRows("training", "dir", 10, SCORE_LIMITS.fdpRow), 10);
- const partB = clampScore(jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8, 375);
+ const partB = clampScore(jour + bk + ictT + res + resProjects + externalResProjects + pat + awd + conf + prop + prod + b8, reviewerMaxScores.partB);
 
- return { partA, partB, total: clampScore(partA + partB, 575) };
+ return { partA, partB, total: clampScore(partA + partB, reviewerMaxScores.grand) };
  };
 
  const { partA, partB, total } = calcHodScore();
  const calculatedDirScores = calcDirScore();
  const hasSavedDirectorScores = ["directorPartA", "directorPartB", "directorTotal"].some((key) =>String(faculty?.[key] ?? "").trim() !== "");
- const displayedDirScores = reviewLocked && hasSavedDirectorScores ? {
+ const rawDisplayedDirScores = reviewLocked && hasSavedDirectorScores ? {
  partA: String(faculty?.directorPartA ?? "").trim() !== "" ? n(faculty.directorPartA) : calculatedDirScores.partA,
  partB: String(faculty?.directorPartB ?? "").trim() !== "" ? n(faculty.directorPartB) : calculatedDirScores.partB,
  total: String(faculty?.directorTotal ?? "").trim() !== "" ? n(faculty.directorTotal) : calculatedDirScores.total,
  } : calculatedDirScores;
+ const displayedDirScores = {
+ partA: clampScore(rawDisplayedDirScores.partA, reviewerMaxScores.partA),
+ partB: clampScore(rawDisplayedDirScores.partB, reviewerMaxScores.partB),
+ total: clampScore(rawDisplayedDirScores.total || rawDisplayedDirScores.partA + rawDisplayedDirScores.partB, reviewerMaxScores.grand),
+ };
  const { partA: dirPartA, partB: dirPartB, total: dirTotal } = displayedDirScores;
- const g = grade(dirTotal, 575);
+ const g = grade(dirTotal, reviewerMaxScores.grand);
  useEffect(() =>{
  let active = true;
  if (reviewLocked || !subjectEmail) return undefined;
@@ -1391,7 +1405,7 @@ function ReviewPanel({ faculty, onBack, onSubmit, readOnly = false }) {
  title="Director Score"
  subtitle="Director score for the engineering appraisal form."
  totals={{ partA: dirPartA, partB: dirPartB, total: dirTotal }}
- maxScores={{ partA: facultySummary.partAMax, partB: facultySummary.partBMax, grand: facultySummary.grandMax }}
+ maxScores={reviewerMaxScores}
  accent="#0ea5e9"
  remarksTitle="Director Remarks"
  remarksContent={(
@@ -3234,6 +3248,7 @@ export default function DirectorDashboard() {
  const selfA = itemSummary.partA;
  const selfB = itemSummary.partB;
  const showDirScores = reviewed && (dirA >0 || dirB >0);
+ const reviewPartAMax = isNonEngineeringReviewSubject(item) ? itemSummary.partAMax + 25 : itemSummary.partAMax;
  const noScoresAvailable = reviewed && dirA === 0 && dirB === 0 && selfA === 0 && selfB === 0;
  if (noScoresAvailable) {
  return (
@@ -3246,8 +3261,8 @@ export default function DirectorDashboard() {
  }
  return (
 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, background: "#f8fafc", borderRadius: 8, padding: "12px 14px" }}>
- {[
- { label: showDirScores ? "Dir Part A" : "Part A", val: showDirScores ? dirA : selfA, max: itemSummary.partAMax, color: "#6366f1" },
+ {[ 
+ { label: showDirScores ? "Dir Part A" : "Part A", val: showDirScores ? dirA : selfA, max: showDirScores ? reviewPartAMax : itemSummary.partAMax, color: "#6366f1" },
  { label: showDirScores ? "Dir Part B" : "Part B", val: showDirScores ? dirB : selfB, max: itemSummary.partBMax, color: "#0ea5e9" },
  { label: "Docs", val: docCount, max: null, color: "#10b981" },
  ].map(({ label, val, max, color }) =>(
