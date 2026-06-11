@@ -35,6 +35,11 @@ const SCHOOL_VISUALS = {
 // --- Helpers ------------------------------------------------------------------
 const n = (v) =>parseFloat(v) || 0;
 const pct = (v, m) =>Math.min(100, Math.round((v / m) * 100)) || 0;
+const reviewerMaxScoresFromSubmitted = (summary) =>({
+ partA: n(summary.partAMax) + 25,
+ partB: n(summary.partBMax),
+ grand: n(summary.grandMax) + 25,
+});
 const preserveScrollAfterStateUpdate = (update) =>{
  const x = window.scrollX || 0;
  const y = window.scrollY || 0;
@@ -1704,13 +1709,19 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  const academicYear = approval?.academicYear || approval?.academic_year || approval?.info?.ay || APP_INFO.DEFAULT_AY || "2025-2026";
  const sectionScores = deanScorePayload(approval, deanData);
  const deanScores = deanScoreTotals(sectionScores);
+ const selfSummary = standardSubmittedScoreSummary(approval);
+ const reviewerMaxScores = reviewerMaxScoresFromSubmitted(selfSummary);
  const hasSavedDeanScores = ["deanPartA", "deanPartB", "deanTotal"].some((key) =>String(approval?.[key] ?? "").trim() !== "");
- const displayedDeanScores = reviewLocked && hasSavedDeanScores ? {
+ const rawDisplayedDeanScores = reviewLocked && hasSavedDeanScores ? {
  partA: String(approval?.deanPartA ?? "").trim() !== "" ? n(approval?.deanPartA) : deanScores.partA,
  partB: String(approval?.deanPartB ?? "").trim() !== "" ? n(approval?.deanPartB) : deanScores.partB,
  total: String(approval?.deanTotal ?? "").trim() !== "" ? n(approval?.deanTotal) : deanScores.total,
  } : deanScores;
- const selfSummary = standardSubmittedScoreSummary(approval);
+ const displayedDeanScores = {
+ partA: clampScore(rawDisplayedDeanScores.partA, reviewerMaxScores.partA),
+ partB: clampScore(rawDisplayedDeanScores.partB, reviewerMaxScores.partB),
+ total: clampScore(rawDisplayedDeanScores.total || rawDisplayedDeanScores.partA + rawDisplayedDeanScores.partB, reviewerMaxScores.grand),
+ };
  const titleMap = {
  directorApprovals: "Director's Appraisal Review",
  facultyApprovals: "Faculty's Appraisal Review",
@@ -1833,7 +1844,7 @@ function ApprovalReviewPanel({ approval, approvalType, onBack, onSubmit, readOnl
  title="Dean Score"
  subtitle="Dean score for the non-engineering appraisal form."
  totals={displayedDeanScores}
- maxScores={{ partA: selfSummary.partAMax, partB: selfSummary.partBMax, grand: selfSummary.grandMax }}
+ maxScores={reviewerMaxScores}
  accent="#4c1d95"
  remarksTitle="Dean Remarks"
  remarksContent={(
