@@ -166,6 +166,260 @@ input[type="number"] {
   }
 }
 
+/* ====================================================
+   VC DASHBOARD — Full UI Redesign
+   Pure visual overhaul. No logic, no data, no functionality touched.
+   ==================================================== */
+
+/* App shell */
+.vc-app-shell {
+  background: #f0f4ff !important;
+}
+
+/* Sidebar */
+.vc-sidebar {
+  width: 272px !important;
+  background: linear-gradient(175deg, #08091a 0%, #0e1134 50%, #0a0d20 100%) !important;
+  border-right: 1px solid rgba(99,102,241,0.12) !important;
+  box-shadow: 4px 0 40px rgba(8,9,26,0.40) !important;
+}
+
+/* Brand logo mark */
+.vc-brand-mark {
+  background: linear-gradient(135deg,#7c3aed,#4f46e5) !important;
+  box-shadow: 0 8px 24px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  border-radius: 14px !important;
+}
+
+/* VC role card */
+.vc-sidebar-role-card {
+  background: linear-gradient(135deg,#3b0070 0%,#4c1d95 60%,#5b21b6 100%) !important;
+  border: 1px solid rgba(167,139,250,0.22) !important;
+  box-shadow: 0 8px 24px rgba(76,29,149,0.28), inset 0 1px 0 rgba(255,255,255,0.10) !important;
+  border-radius: 14px !important;
+}
+
+/* Sidebar nav / cards */
+.vc-sidebar-nav {
+  background: rgba(99,102,241,0.14) !important;
+  border: 1px solid rgba(99,102,241,0.20) !important;
+  border-radius: 12px !important;
+  transition: background 0.18s ease, border-color 0.18s ease !important;
+}
+.vc-sidebar-nav:hover {
+  background: rgba(99,102,241,0.22) !important;
+  border-color: rgba(99,102,241,0.35) !important;
+}
+
+.vc-sidebar-card {
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 12px !important;
+}
+
+.vc-sidebar-help {
+  background: rgba(37,99,235,0.12) !important;
+  border: 1px solid rgba(59,130,246,0.25) !important;
+  border-radius: 12px !important;
+}
+
+/* Main content area */
+.vc-dashboard-main {
+  background: transparent !important;
+}
+
+.vc-dashboard-hero {
+  gap: 18px;
+  margin-bottom: 8px;
+}
+
+/* Count pills */
+.vc-total-pill {
+  border: 1px solid rgba(15,23,42,0.08) !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+}
+.vc-total-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15,23,42,0.12) !important;
+}
+
+.vc-count-pill {
+  border-radius: 20px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  transition: transform 0.15s ease !important;
+}
+.vc-count-pill--pending {
+  background: linear-gradient(135deg,#fef3c7,#fde68a) !important;
+  border: 1px solid #fcd34d !important;
+  color: #78350f !important;
+}
+
+/* Segmented tabs container */
+.vc-segmented-tabs {
+  min-width: 720px;
+  border: 1px solid rgba(15,23,42,0.07) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08) !important;
+  background: #fff !important;
+  padding: 5px !important;
+}
+
+/* Individual tab buttons */
+.vc-segmented-tab {
+  position: relative;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+}
+.vc-segmented-tab:hover:not(.is-active) {
+  background: #f8fafc !important;
+  color: #374151 !important;
+}
+.vc-segmented-tab:focus-visible {
+  outline: 3px solid rgba(99,102,241,0.22);
+  outline-offset: 2px;
+}
+
+/* School tabs container */
+.vc-school-tabs {
+  border-radius: 14px !important;
+  border: 1px solid rgba(15,23,42,0.07) !important;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.07) !important;
+  overflow: hidden;
+}
+
+.vc-school-tab {
+  position: relative;
+  transition: all 0.2s ease !important;
+}
+.vc-school-tab:hover:not(.is-active) {
+  background: #f8fafc !important;
+}
+.vc-school-tab:focus-visible {
+  outline: 3px solid rgba(99,102,241,0.22);
+  outline-offset: 2px;
+}
+
+/* School summary banner */
+.vc-school-summary {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px !important;
+  border: 1px solid rgba(15,23,42,0.07) !important;
+  box-shadow: 0 4px 16px rgba(15,23,42,0.07) !important;
+  transition: box-shadow 0.2s ease !important;
+}
+.vc-school-summary:hover {
+  box-shadow: 0 8px 28px rgba(15,23,42,0.12) !important;
+}
+
+.vc-school-icon {
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  border-radius: 14px !important;
+}
+.vc-school-summary:hover .vc-school-icon {
+  transform: scale(1.06) rotate(-2deg);
+}
+
+/* Person / review cards */
+.vc-review-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px !important;
+  border: 1px solid rgba(15,23,42,0.07) !important;
+  transition: transform 0.2s ease, box-shadow 0.25s ease !important;
+  background: #fff !important;
+}
+.vc-review-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(15,23,42,0.13) !important;
+  border-color: rgba(99,102,241,0.18) !important;
+}
+
+.vc-score-strip {
+  transition: background 0.18s ease;
+  border-radius: 10px !important;
+}
+.vc-review-card:hover .vc-score-strip {
+  background: #eef2ff !important;
+}
+
+/* Review action button */
+.vc-action-button {
+  border-radius: 8px !important;
+  letter-spacing: 0.2px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease !important;
+}
+.vc-action-button:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(76,29,149,0.30) !important;
+  opacity: 0.92;
+}
+
+/* Empty state */
+.vc-empty-state {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px !important;
+  border: 1.5px dashed #e2e8f0 !important;
+  background: #fafbff !important;
+  box-shadow: none !important;
+}
+.vc-empty-orb {
+  transition: transform 0.22s ease;
+}
+.vc-empty-state:hover .vc-empty-orb {
+  transform: translateY(-3px) scale(1.05);
+}
+
+/* Card grid */
+.vc-card-grid {
+  animation: fa-fade-up 0.22s ease both;
+}
+
+@media (max-width: 1100px) {
+  .vc-dashboard-hero {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .vc-hero-right,
+  .vc-segmented-tabs,
+  .vc-school-tabs {
+    width: 100% !important;
+    overflow-x: auto !important;
+  }
+
+  .vc-segmented-tab,
+  .vc-school-tab {
+    min-width: max-content;
+  }
+
+  .vc-card-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .vc-dashboard-main {
+    padding: 18px !important;
+  }
+
+  .vc-school-summary {
+    align-items: flex-start !important;
+    flex-direction: column;
+  }
+
+  .vc-school-summary > div:last-child {
+    flex-wrap: wrap;
+  }
+}
+
 
 /* =
    PBAS Animation & Transition System
