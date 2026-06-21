@@ -2,7 +2,7 @@ import axios from "axios";
 // https://faculty-appraisal-java-backend-376777978967.asia-south1.run.app
 // https://faculty-appraisal-git-376777978967.asia-south1.run.app
 const DEFAULT_API_BASE_URL =
-  "https://faculty-appraisal-git-376777978967.asia-south1.run.app/api/v1";
+  "https://faculty-appraisal-python-919405994318.asia-south1.run.app/api/v1";
 
 const rawBaseUrl = (
   import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
