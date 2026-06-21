@@ -1113,26 +1113,22 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </div>
 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
 <SummaryBox title="Average Score" totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} accent="#f59e0b" roleScoreLabel="Average across all reviewers." />
-<SummaryBox title="VC Score" totals={reviewerSummaryTotals} maxScores={reviewerSummaryTotals.maxScores} accent="#7c3aed" roleScoreLabel="Vice Chancellor final score." />
+<SummaryBox title="Vice Chancellor Score" totals={reviewerSummaryTotals} maxScores={reviewerSummaryTotals.maxScores} accent="#7c3aed" roleScoreLabel="Vice Chancellor final score." />
 </div>
 
  {/* ⑥ VC Remarks & Actions */}
-<div style={{ background: "linear-gradient(145deg,#2d1060,#4c1d95,#5b21b6)", borderRadius: 16, overflow: "hidden", boxShadow: "0 8px 32px rgba(76,29,149,0.30)" }}>
+<div style={{ background: "#fff", border: "1px solid #a5b4fc", borderRadius: 16, overflow: "hidden", boxShadow: "0 8px 24px rgba(79,70,229,0.10)" }}>
 
  {/* Header strip */}
-<div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.1)", background: "rgba(0,0,0,0.12)" }}>
+<div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #c7d2fe", background: "#f5f7ff" }}>
 <div>
-<div style={{ fontSize: 15, fontWeight: 900, color: "#fff", letterSpacing: -0.3 }}>Vice Chancellor Remarks</div>
-<div style={{ fontSize: 10, color: "#c4b5fd", marginTop: 3 }}>Enter your assessment remarks and confirm before submitting</div>
+<div style={{ fontSize: 15, fontWeight: 900, color: "#1e293b", letterSpacing: -0.3 }}>Vice Chancellor Final Remarks</div>
+<div style={{ fontSize: 10, color: "#64748b", marginTop: 3 }}>Enter your assessment remarks and confirm before submitting</div>
 </div>
 <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
-<div style={{ background: g.bg, border: `1px solid ${g.color}44`, borderRadius: 10, padding: "7px 14px", textAlign: "center" }}>
-<div style={{ fontSize: 8, fontWeight: 800, color: g.color, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 }}>Grade</div>
-<div style={{ fontSize: 14, fontWeight: 900, color: g.color }}>{g.label}</div>
-</div>
-<div style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "7px 16px", textAlign: "center" }}>
-<div style={{ fontSize: 8, fontWeight: 800, color: "#c4b5fd", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 }}>VC Total</div>
-<div style={{ fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{oneDecimal(reviewerSummaryTotals.total)}<span style={{ fontSize: 10, color: "#a78bfa", fontWeight: 500 }}>/{reviewerSummaryTotals.maxScores.grand}</span></div>
+<div style={{ background: "#fff", border: "1px solid #c7d2fe", borderRadius: 10, padding: "7px 16px", textAlign: "center" }}>
+<div style={{ fontSize: 8, fontWeight: 800, color: "#6366f1", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 }}>VC Total</div>
+<div style={{ fontSize: 18, fontWeight: 900, color: "#4338ca", lineHeight: 1 }}>{oneDecimal(reviewerSummaryTotals.total)}<span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>/{reviewerSummaryTotals.maxScores.grand}</span></div>
 </div>
 </div>
 </div>
@@ -1142,25 +1138,25 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 
  {/* Textarea */}
 <div>
-<div style={{ fontSize: 10, fontWeight: 700, color: "#c4b5fd", marginBottom: 7, textTransform: "uppercase", letterSpacing: 0.6 }}>Your Remarks</div>
+<div style={{ fontSize: 10, fontWeight: 700, color: "#475569", marginBottom: 7, textTransform: "uppercase", letterSpacing: 0.6 }}>Your Remarks</div>
 <textarea value={remarks} readOnly={reviewLocked} onChange={e =>setRemarks(e.target.value)} rows={4}
  placeholder="Write your assessment remarks here…"
- style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 10, padding: "12px 14px", fontFamily: "inherit", fontSize: 12, resize: "vertical", background: reviewLocked ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.97)", color: reviewLocked ? "#c4b5fd" : "#1e1b4b", outline: "none", lineHeight: 1.6 }} />
+ style={{ width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 10, padding: "12px 14px", fontFamily: "inherit", fontSize: 12, resize: "vertical", background: reviewLocked ? "#f8fafc" : "#fff", color: "#1e293b", outline: "none", lineHeight: 1.6 }} />
 </div>
 
  {/* Confirmation checkbox */}
  {!reviewLocked && (
-<label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: "#e2e8f0", fontSize: 12, lineHeight: 1.65, cursor: "pointer" }}>
+<label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 10, color: "#334155", fontSize: 12, lineHeight: 1.65, cursor: "pointer" }}>
 <input type="checkbox" checked={reviewConfirmed} onChange={e =>setReviewConfirmed(e.target.checked)} style={{ marginTop: 3, accentColor: "#a78bfa", flexShrink: 0, width: 14, height: 14 }} />
 <span>I have verified all the details and confirm that the information provided is correct. I am responsible for the accuracy of this data.</span>
 </label>
  )}
 
  {/* Footer: status + buttons */}
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, paddingTop: 4, borderTop: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
-<span style={{ color: "#a78bfa", fontSize: 11, fontStyle: "italic" }}>{draftStatus}</span>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, paddingTop: 4, borderTop: "1px solid #c7d2fe", flexWrap: "wrap" }}>
+<span style={{ color: "#64748b", fontSize: 11, fontStyle: "italic" }}>{draftStatus}</span>
 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-<button onClick={onBack} style={{ padding: "9px 16px", background: "rgba(255,255,255,0.08)", color: "#cbd5e1", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>Close</button>
+<button onClick={onBack} style={{ padding: "9px 16px", background: "#fff", color: "#475569", border: "1px solid #cbd5e1", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>Close</button>
 <button onClick={generateVcReport} disabled={!vcReviewCompleted}
  style={{ padding: "9px 16px", background: vcReviewCompleted ? "rgba(255,255,255,0.93)" : "rgba(255,255,255,0.08)", color: vcReviewCompleted ? "#4c1d95" : "#6b7280", border: "none", borderRadius: 9, cursor: vcReviewCompleted ? "pointer" : "not-allowed", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}>
  📄 Generate Report
