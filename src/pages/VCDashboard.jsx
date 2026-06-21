@@ -259,8 +259,6 @@ const vcChainProfileFor = (person = {}, personMode = "faculty") =>({
 
 const vcPreviousRolesFor = (person = {}, personMode = "faculty") =>{
  const profile = vcChainProfileFor(person, personMode);
- if (getSchoolKey(profile.school) === "CISR") return ["center_head"];
- if (profile.appraisal_role !== "vc") return ["hod", "director", "dean"];
  return visiblePreviousReviewRoles("vc", profile);
 };
 
