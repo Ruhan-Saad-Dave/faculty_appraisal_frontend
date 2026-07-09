@@ -6,6 +6,7 @@ import {
   getReviewChain,
   isRejectedStatus,
   pendingStatusFor,
+  rejectedStatusFor,
   profileFromsessionStorage,
   reviewedStatusFor,
   roleLabel,
@@ -89,6 +90,43 @@ const subjectProfileFromItem = (item = {}) => {
       getNested(item, "department"),
     ),
     designation: firstValue(item.designation, getNested(item, "designation")),
+    qualification: firstValue(
+      item.qualification,
+      item.qual,
+      item.educational_qualifications,
+      item.educationalQualifications,
+      item.profile?.qualification,
+      item.facultyProfile?.qualification,
+      item.faculty_profile?.qualification,
+      item.submitterProfile?.qualification,
+      item.submitter_profile?.qualification,
+      item.payload?.submitterProfile?.qualification,
+      item.payload?.submitter_profile?.qualification,
+      getNested(item, "qualification"),
+      getNested(item, "qual"),
+    ),
+    teaching_experience: firstValue(
+      item.teaching_experience,
+      item.teachingExperience,
+      item.experience,
+      item.profile?.teaching_experience,
+      item.profile?.experience,
+      item.facultyProfile?.teaching_experience,
+      item.facultyProfile?.experience,
+      item.faculty_profile?.teaching_experience,
+      item.faculty_profile?.experience,
+      item.submitterProfile?.teaching_experience,
+      item.submitterProfile?.experience,
+      item.submitter_profile?.teaching_experience,
+      item.submitter_profile?.experience,
+      item.payload?.submitterProfile?.teaching_experience,
+      item.payload?.submitterProfile?.experience,
+      item.payload?.submitter_profile?.teaching_experience,
+      item.payload?.submitter_profile?.experience,
+      getNested(item, "teaching_experience"),
+      getNested(item, "teachingExperience"),
+      getNested(item, "experience"),
+    ),
   };
 };
 
@@ -173,9 +211,64 @@ const hasReviewScore = (item = {}, role) => {
   return false;
 };
 
+const rejectedRoleFromStatus = (status, chain = []) => {
+  const normalizedStatus = normalizeStatusText(status);
+  if (!isRejectedStatus(normalizedStatus)) return "";
+
+  return chain.find((role) => {
+    const label = normalizeStatusText(roleLabel(role));
+    const key = normalizeStatusText(role);
+    return normalizedStatus === normalizeStatusText(rejectedStatusFor(role)) ||
+      normalizedStatus.includes(`${label} rejected`) ||
+      normalizedStatus.includes(`${key} rejected`);
+  }) || "";
+};
+
+const activeRejectedRoleFor = (item = {}, chain = []) => {
+  const hintedRole = normalizeRoleForWorkflow(firstValue(
+    item.reviewer_role,
+    item.reviewerRole,
+    item.current_reviewer,
+    item.current_reviewer_role,
+    item.currentReviewerRole,
+    item.authority_role,
+  ));
+  const rejectedDecision = [
+    item.decision,
+    item.review_decision,
+    item.reviewDecision,
+    item.review_status,
+    item.reviewStatus,
+  ].some(isRejectedStatus) || item.rejected === true || item.is_rejected === true;
+
+  if (rejectedDecision && chain.includes(hintedRole)) return hintedRole;
+
+  const statusCandidates = [
+    getWorkflowStatus(item),
+    item.declarationStatus,
+    item.declaration_status,
+    item.declaration?.status,
+    item.review_status,
+    item.reviewStatus,
+    item.workflowStatus,
+    item.workflow_status,
+  ];
+  const rejectedRole = statusCandidates
+    .map((status) => rejectedRoleFromStatus(status, chain))
+    .find(Boolean);
+
+  if (rejectedRole) return rejectedRole;
+  return statusCandidates.some(isRejectedStatus) || rejectedDecision ? "unknown" : "";
+};
+
 const statusStageIndex = (item = {}, chain = []) => {
   const status = normalizeStatusText(getWorkflowStatus(item));
   if (!status) return null;
+  const rejectedRole = activeRejectedRoleFor(item, chain);
+  if (rejectedRole) {
+    const rejectedIndex = chain.indexOf(rejectedRole);
+    return rejectedIndex >= 0 ? rejectedIndex : -1;
+  }
   if (status === "submitted" || status === "pending review") return 0;
   if (status === "reviewed" || status === "completed") {
     const scoreStages = chain
@@ -193,8 +286,7 @@ const statusStageIndex = (item = {}, chain = []) => {
     if (
       status === normalizeStatusText(reviewedStatusFor(role)) ||
       status.includes(`${label} reviewed`) ||
-      status.includes(`${label} approved`) ||
-      (isRejectedStatus(status) && status.includes(label))
+      status.includes(`${label} approved`)
     ) {
       return index + 1;
     }
@@ -222,6 +314,10 @@ const isReviewableForRole = (item = {}, reviewerRole, reviewerProfile = {}) => {
   const role = normalizeRoleForWorkflow(reviewerRole);
   const reviewer = { ...reviewerProfile, appraisal_role: role };
   const subjectProfile = subjectProfileFromItem(item);
+  const rejectionRole = activeRejectedRoleFor(item, getReviewChain(subjectProfile));
+
+  if (rejectionRole && rejectionRole !== role) return false;
+  if (rejectionRole === "unknown") return false;
 
   return hasSubmittedAppraisal(item) &&
     canAuthorityReviewProfile(reviewer, subjectProfile) &&
@@ -252,6 +348,19 @@ const normalizeQueueItem = (item = {}) => {
     schoolCode: getSchoolKey(school),
     department: subjectProfile.department,
     designation: subjectProfile.designation,
+    qualification: subjectProfile.qualification,
+    qual: subjectProfile.qualification,
+    teaching_experience: subjectProfile.teaching_experience,
+    experience: subjectProfile.teaching_experience,
+    info: {
+      ...(item.info || {}),
+      name: firstValue(item.info?.name, item.name, item.full_name, item.fullName, subjectProfile.full_name, email),
+      qual: firstValue(item.info?.qual, item.info?.qualification, subjectProfile.qualification),
+      desig: firstValue(item.info?.desig, item.info?.designation, subjectProfile.designation),
+      school: firstValue(item.info?.school, school),
+      experience: firstValue(item.info?.experience, item.info?.teaching_experience, subjectProfile.teaching_experience),
+      ay: firstValue(item.info?.ay, academicYear),
+    },
     status,
     workflowStatus: status,
     hasSubmittedAppraisal: submitted,
@@ -334,6 +443,97 @@ const workflowForwardingFor = (role, subjectProfile = {}) => {
   };
 };
 
+const workflowRejectionFor = (role) => {
+  const status = rejectedStatusFor(role);
+  return {
+    status,
+    declaration_status: status,
+    workflow_status: status,
+    review_status: status,
+    next_reviewer: null,
+    next_reviewer_role: null,
+    nextReviewer: null,
+    nextReviewerRole: null,
+    next_reviewer_email: null,
+    nextReviewerEmail: null,
+    decision: "rejected",
+    action: "reject",
+    review_decision: "rejected",
+    is_rejected: true,
+    rejected: true,
+    should_forward: false,
+    forward: false,
+    forwarded: false,
+    advance_workflow: false,
+    advanceWorkflow: false,
+    stop_workflow: true,
+    stopWorkflow: true,
+  };
+};
+
+const rejectionRoleHintsFor = (role) => ({
+  reviewer_role: role,
+  reviewerRole: role,
+  current_reviewer: role,
+  current_reviewer_role: role,
+  currentReviewerRole: role,
+  authority_role: role,
+  role,
+});
+
+const draftRoleFor = (reviewerRole) => {
+  const rawRole = lower(reviewerRole).replace(/[\s-]+/g, "_");
+  if (rawRole === "section_head") return "section_head";
+  return normalizeRoleForWorkflow(rawRole);
+};
+
+export const loadReviewerDraft = async ({
+  subjectEmail,
+  academicYear,
+  reviewerRole,
+} = {}) => {
+  const role = draftRoleFor(reviewerRole);
+  if (!subjectEmail || !academicYear || !role || role === "faculty") {
+    return { payload: null, updated_at: null };
+  }
+
+  return await api.get(`/appraisal-remarks/draft/${encodeURIComponent(subjectEmail)}`, {
+    params: {
+      academic_year: academicYear,
+      reviewer_role: role,
+    },
+  }) || { payload: null, updated_at: null };
+};
+
+export const saveReviewerDraft = async ({
+  subjectEmail,
+  academicYear,
+  reviewerRole,
+  partAScore = 0,
+  partBScore = 0,
+  totalScore = 0,
+  remarks = "",
+  sectionScores,
+  payload,
+} = {}) => {
+  const role = draftRoleFor(reviewerRole);
+  if (!subjectEmail || !academicYear || !role || role === "faculty") {
+    throw new Error("Missing reviewer draft details.");
+  }
+
+  return await api.put(`/appraisal-remarks/draft/${encodeURIComponent(subjectEmail)}`, {
+    academic_year: academicYear,
+    reviewer_role: role,
+    payload: payload || {
+      part_a_score: n(partAScore),
+      part_b_score: n(partBScore),
+      total_score: n(totalScore),
+      remarks,
+      section_scores: sectionScores || {},
+    },
+  }) || {};
+};
+
 export const submitWorkflowReview = async ({
   subjectEmail,
   academicYear,
@@ -344,6 +544,7 @@ export const submitWorkflowReview = async ({
   remarks = "",
   sectionScores,
   subjectProfile,
+  decision = "approved",
 }) => {
   const role = normalizeRoleForWorkflow(reviewerRole);
 
@@ -369,12 +570,31 @@ export const submitWorkflowReview = async ({
     section_scores: sectionScores || {},
   };
   const endpointUrl = `/appraisal-remarks/${endpoint}/${encodeURIComponent(subjectEmail)}`;
-  const forwarding = workflowForwardingFor(role, subjectProfile || {});
+  const rejected = decision === "rejected";
+  const forwarding = rejected ? workflowRejectionFor(role) : workflowForwardingFor(role, subjectProfile || {});
+
+  if (rejected) {
+    const roleHints = rejectionRoleHintsFor(role);
+    return await api.put(endpointUrl, {
+      ...basePayload,
+      ...roleHints,
+      ...forwarding,
+      rejected_by: role,
+      rejectedBy: role,
+      rejection_reason: remarks,
+      rejectionReason: remarks,
+    }) || {};
+  }
+
+  if (role === "vc") {
+    return await api.put(endpointUrl, basePayload) || {};
+  }
 
   let result;
   try {
     result = await api.put(endpointUrl, { ...basePayload, ...forwarding });
   } catch (err) {
+    if (rejected) throw err;
     if (![400, 422].includes(err?.response?.status)) throw err;
     result = await api.put(endpointUrl, basePayload);
   }

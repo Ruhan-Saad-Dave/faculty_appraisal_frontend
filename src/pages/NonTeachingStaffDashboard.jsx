@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { storeUserSession } from "../auth/session";
 import { APP_INFO } from "../constants/formConfig";
 import { normalizeNonTeachingRole } from "../constants/nonTeachingHierarchy";
 import { api } from "../services/api";
+import { getMe } from "../services/authService";
+import { loadReviewerDraft, saveReviewerDraft } from "../services/reviewWorkflow";
 import { isAllowedAttachmentFile, isFilled } from "../utils/appraisalFormUtils";
 import {
   NON_TEACHING_MAX,
@@ -12,10 +15,12 @@ import {
   SELF_ITEMS,
   calculateNonTeachingTotals,
   emptyNonTeachingForm,
-  expectedPendingStatus,
   fetchNonTeachingQueueForRole,
+  isNonTeachingRejectedStatus,
   loadNonTeachingAppraisal,
+  loadNonTeachingWorkflow,
   nonTeachingRoleLabel,
+  normalizeNonTeachingStatus,
   openNonTeachingReport,
   primeFormForReviewer,
   saveNonTeachingDraft,
@@ -23,9 +28,13 @@ import {
   submitNonTeachingSelfAppraisal,
   validateNonTeachingForm,
   visibleNonTeachingReviewRoles,
+  workflowDesignationForNonTeachingRole,
 } from "../services/nonTeachingWorkflow";
 import { clampScore, scoreRemaining } from "../utils/appraisalFormUtils";
 import { profileFromsessionStorage } from "../utils/hierarchy";
+import AppraisalHeaderImage from "../components/AppraisalHeaderImage";
+import RejectionNotice from "../components/RejectionNotice";
+import SummaryOtherInfoField from "../components/SummaryOtherInfoField";
 
 const ACCENT = "#1d4ed8";
 const REG_ACCENT = "#155e75";
@@ -36,7 +45,7 @@ const pct = (value, max) => Math.min(100, Math.round((n(value) / max) * 100)) ||
 const clampOptionalScore = (value, max) => String(value ?? "").trim() === "" ? "" : clampScore(value, max);
 
 const T = { width: "100%", borderCollapse: "collapse", fontSize: 12 };
-const TH = { border: "1px solid #cbd5e1", padding: "7px 8px", background: "#0f172a", color: "#e2e8f0", fontWeight: 700, textAlign: "center", fontSize: 10 };
+const TH = { border: "1px solid #334155", padding: "7px 8px", background: "#1e293b", color: "#e2e8f0", fontWeight: 700, textAlign: "center", fontSize: 10, letterSpacing: "0.3px" };
 const TD = { border: "1px solid #e2e8f0", padding: "7px 8px", verticalAlign: "top" };
 const TDC = { ...TD, textAlign: "center", verticalAlign: "middle" };
 
@@ -56,28 +65,20 @@ const initials = (name = "User") =>
     .slice(0, 2)
     .toUpperCase();
 
+const emptyWorkflow = {
+  workflowId: null,
+  workflowName: "Approval Workflow",
+  currentStep: null,
+  status: "NOT_STARTED",
+  steps: [],
+  approvalSteps: [],
+};
+
 function Avatar({ name, color = ACCENT, size = 38 }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: `linear-gradient(135deg,${color},${color}99)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size * 0.34, flexShrink: 0 }}>
       {initials(name)}
     </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const map = {
-    [NON_TEACHING_STATUS.DRAFT]: { bg: "#f1f5f9", color: "#475569", dot: "#94a3b8" },
-    [NON_TEACHING_STATUS.SUBMITTED]: { bg: "#fef3c7", color: "#92400e", dot: "#f59e0b" },
-    [NON_TEACHING_STATUS.RO_REVIEWED]: { bg: "#dbeafe", color: "#1e40af", dot: "#3b82f6" },
-    [NON_TEACHING_STATUS.REGISTRAR_REVIEWED]: { bg: "#cffafe", color: "#155e75", dot: "#06b6d4" },
-    [NON_TEACHING_STATUS.VC_APPROVED]: { bg: "#d1fae5", color: "#065f46", dot: "#10b981" },
-  };
-  const current = map[status] || map[NON_TEACHING_STATUS.DRAFT];
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: current.bg, color: current.color, fontSize: 10, fontWeight: 800, padding: "4px 9px", borderRadius: 20 }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: current.dot }} />
-      {status || NON_TEACHING_STATUS.DRAFT}
-    </span>
   );
 }
 
@@ -91,7 +92,7 @@ function ScoreBar({ score, max, color = ACCENT }) {
 
 function SectionCard({ title, subtitle, accent = ACCENT, children }) {
   return (
-    <section style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`, borderRadius: 9, boxShadow: "0 1px 3px rgba(15,23,42,0.06)", marginBottom: 14, overflow: "hidden" }}>
+    <section className="fa-section-card" style={{ background: "#fff", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}`, borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflow: "hidden" }}>
       <div style={{ padding: "10px 15px", borderBottom: "1px solid #f1f5f9" }}>
         <div style={{ fontWeight: 800, fontSize: 13, color: accent }}>{title}</div>
         {subtitle && <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
@@ -109,7 +110,7 @@ function TextInput({ value, onChange, readOnly = false, placeholder = "", type =
       onChange={(event) => onChange(event.target.value)}
       readOnly={readOnly}
       placeholder={placeholder}
-      style={{ width: "100%", boxSizing: "border-box", height: 34, border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 9px", fontSize: 12, fontFamily: "Georgia, serif", outline: "none", background: readOnly ? "#f8fafc" : "#fff", color: "#0f172a" }}
+      style={{ width: "100%", boxSizing: "border-box", height: 34, border: "1px solid #cbd5e1", borderRadius: 6, padding: "6px 9px", fontSize: 12, fontFamily: "inherit", outline: "none", background: readOnly ? "#f8fafc" : "#fff", color: "#0f172a" }}
     />
   );
 }
@@ -122,7 +123,7 @@ function TextArea({ value, onChange, readOnly = false, placeholder = "", rows = 
       readOnly={readOnly}
       placeholder={placeholder}
       rows={rows}
-      style={{ width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 6, padding: "8px 10px", fontSize: 12, fontFamily: "Georgia, serif", resize: "vertical", outline: "none", background: readOnly ? "#f8fafc" : "#fff", color: "#0f172a" }}
+      style={{ width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 6, padding: "8px 10px", fontSize: 12, fontFamily: "inherit", resize: "vertical", outline: "none", background: readOnly ? "#f8fafc" : "#fff", color: "#0f172a" }}
     />
   );
 }
@@ -138,7 +139,7 @@ function MarksInput({ value, onChange, max, readOnly = false, accent = ACCENT })
         value={value ?? ""}
         onChange={(event) => onChange(clampOptionalScore(event.target.value, max))}
         readOnly={readOnly}
-        style={{ width: 62, textAlign: "center", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "5px 6px", fontSize: 12, fontFamily: "Georgia, serif", outline: "none", background: readOnly ? "#f8fafc" : "#eff6ff" }}
+        style={{ width: 62, textAlign: "center", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "5px 6px", fontSize: 12, fontFamily: "inherit", outline: "none", background: readOnly ? "#f8fafc" : "#eff6ff" }}
       />
       <span style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>/ {max}</span>
     </div>
@@ -157,7 +158,7 @@ function RatingPicker({ value, onChange, readOnly = false }) {
             title={`${rating.label} (${rating.value})`}
             disabled={readOnly}
             onClick={() => onChange(rating.value)}
-            style={{ width: 30, height: 30, border: active ? `1.5px solid ${rating.color}` : "1px solid #e2e8f0", borderRadius: 5, background: active ? rating.bg : "#fff", color: active ? rating.color : "#94a3b8", fontWeight: 800, cursor: readOnly ? "default" : "pointer", fontFamily: "Georgia, serif" }}
+            style={{ width: 30, height: 30, border: active ? `1.5px solid ${rating.color}` : "1px solid #e2e8f0", borderRadius: 5, background: active ? rating.bg : "#fff", color: active ? rating.color : "#94a3b8", fontWeight: 800, cursor: readOnly ? "default" : "pointer", fontFamily: "inherit" }}
           >
             {rating.value}
           </button>
@@ -170,10 +171,11 @@ function RatingPicker({ value, onChange, readOnly = false }) {
 function DocCell({ id, docs, setDocs, readOnly = false }) {
   const ref = useRef(null);
   const [uploading, setUploading] = useState(false);
-  const files = docs?.[id] || [];
+  const files = Array.isArray(docs?.[id]) ? docs[id] : docs?.[id] ? [docs[id]] : [];
 
   const handleFiles = async (selectedFiles) => {
-    const fileList = Array.from(selectedFiles || []).slice(0, 1);
+    if (readOnly) return;
+    const fileList = Array.from(selectedFiles || []);
     if (!fileList.length) return;
     const unsupported = fileList.find((file) => !isAllowedAttachmentFile(file));
     if (unsupported) {
@@ -184,11 +186,18 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append("file", fileList[0]);
-      fd.append("folder", `non-teaching-appraisal/${id}`);
-      const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setDocs((current) => ({ ...current, [id]: [uploaded] }));
+      const uploadedFiles = [];
+      for (const file of fileList) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("folder", `non-teaching-appraisal/${id}`);
+        const uploaded = await api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } });
+        uploadedFiles.push(uploaded);
+      }
+      setDocs((current) => ({
+        ...current,
+        [id]: [...(Array.isArray(current[id]) ? current[id] : current[id] ? [current[id]] : []), ...uploadedFiles],
+      }));
     } catch (err) {
       console.error("Upload error:", err);
       alert(`Unable to upload file.\n\n${err.message}`);
@@ -220,57 +229,12 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
         </div>
       ))}
       {!readOnly && (
-        <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", borderRadius: 5, padding: "5px 8px", color: "#64748b", cursor: uploading ? "wait" : "pointer", fontSize: 10, fontFamily: "Georgia, serif" }}>
-          {uploading ? "Uploading..." : "Attach supporting document"}
-          <input ref={ref} type="file" accept="image/*,.pdf,application/pdf" onChange={(event) => handleFiles(event.target.files)} style={{ display: "none" }} />
+        <button type="button" onClick={() => ref.current?.click()} disabled={uploading} style={{ border: "1px dashed #cbd5e1", background: "#f8fafc", borderRadius: 5, padding: "5px 8px", color: "#64748b", cursor: uploading ? "wait" : "pointer", fontSize: 10, fontFamily: "inherit" }}>
+          {uploading ? "Uploading..." : "Attach supporting documents"}
+          <input ref={ref} type="file" multiple accept="image/*,.pdf,application/pdf" onChange={(event) => handleFiles(event.target.files)} style={{ display: "none" }} />
         </button>
       )}
     </div>
-  );
-}
-
-function WorkflowTracker({ status, role }) {
-  const normalizedRole = normalizeNonTeachingRole(role, role);
-  const allStages = [
-    { id: "draft", label: "Draft", status: NON_TEACHING_STATUS.DRAFT },
-    { id: "submitted", label: "Submitted", status: NON_TEACHING_STATUS.SUBMITTED },
-    { id: "ro", label: "Reporting Officer", status: NON_TEACHING_STATUS.RO_REVIEWED },
-    { id: "registrar", label: "Registrar", status: NON_TEACHING_STATUS.REGISTRAR_REVIEWED },
-    { id: "vc", label: "VC", status: NON_TEACHING_STATUS.VC_APPROVED },
-  ];
-  const stageIds = normalizedRole === "registrar"
-    ? ["draft", "registrar", "vc"]
-    : normalizedRole === "reporting_officer"
-      ? ["draft", "ro", "registrar", "vc"]
-      : ["draft", "submitted", "ro", "registrar", "vc"];
-  const stages = allStages.filter((stage) => stageIds.includes(stage.id));
-  const order = [
-    NON_TEACHING_STATUS.DRAFT,
-    NON_TEACHING_STATUS.SUBMITTED,
-    NON_TEACHING_STATUS.RO_REVIEWED,
-    NON_TEACHING_STATUS.REGISTRAR_REVIEWED,
-    NON_TEACHING_STATUS.VC_APPROVED,
-  ];
-  const currentIndex = Math.max(0, order.indexOf(status));
-
-  return (
-    <SectionCard title="Approval Workflow" accent="#0f172a">
-      <div style={{ display: "flex", gap: 8 }}>
-        {stages.map((stage) => {
-          const stageIndex = order.indexOf(stage.status);
-          const done = stageIndex < currentIndex;
-          const active = stageIndex === currentIndex;
-          return (
-            <div key={stage.id} style={{ flex: 1, minHeight: 62, border: "1px solid #e2e8f0", borderRadius: 8, background: done ? "#f0fdf4" : active ? "#eff6ff" : "#f8fafc", padding: "10px 8px", textAlign: "center" }}>
-              <div style={{ margin: "0 auto 6px", width: 24, height: 24, borderRadius: "50%", background: done ? "#10b981" : active ? ACCENT : "#cbd5e1", color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 800 }}>
-                {done ? "✓" : stages.indexOf(stage) + 1}
-              </div>
-              <div style={{ color: done ? "#166534" : active ? ACCENT : "#64748b", fontSize: 10, fontWeight: 800 }}>{stage.label}</div>
-            </div>
-          );
-        })}
-      </div>
-    </SectionCard>
   );
 }
 
@@ -340,7 +304,7 @@ function SelfAppraisalTable({ form, setForm, readOnly, accent }) {
   );
 }
 
-function SummaryPanel({ form, role, onSubmit, onUpdateRemarks, onReport, submitting, locked, confirmed, setConfirmed, accent }) {
+function SummaryPanel({ form, onSubmit, onUpdateRemarks, onUpdateSummaryOtherInfo, onReport, submitting, locked, confirmed, setConfirmed, accent, showReport = true }) {
   const self = calculateNonTeachingTotals(form, "self");
   const selfMax = NON_TEACHING_MAX.partA;
   const scoreCards = [["Self Claimed", self.total, ACCENT]];
@@ -362,6 +326,12 @@ function SummaryPanel({ form, role, onSubmit, onUpdateRemarks, onReport, submitt
         Current visible score: <strong>{self.total.toFixed(1)} / {selfMax}</strong>
       </div>
 
+      <SummaryOtherInfoField
+        value={form.summaryOtherInfo}
+        onChange={onUpdateSummaryOtherInfo}
+        readOnly={locked}
+      />
+
       <label style={{ fontSize: 12, color: "#334155", fontWeight: 800, display: "block", marginBottom: 6 }}>Remarks</label>
       <TextArea
         value={form.remarks}
@@ -379,12 +349,14 @@ function SummaryPanel({ form, role, onSubmit, onUpdateRemarks, onReport, submitt
       )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
-        <button type="button" onClick={onReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>
-          Generate Report
-        </button>
+        {showReport && (
+          <button type="button" onClick={onReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}>
+            Generate Report
+          </button>
+        )}
         {!locked && (
-          <button type="button" onClick={onSubmit} disabled={!confirmed || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: confirmed ? accent : "#94a3b8", color: "#fff", cursor: confirmed && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "Georgia, serif" }}>
-            {submitting ? "Submitting..." : `Submit to ${role === "registrar" ? "VC" : role === "reporting_officer" ? "Registrar" : "Reporting Officer"}`}
+          <button type="button" onClick={onSubmit} disabled={!confirmed || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: confirmed ? accent : "#94a3b8", color: "#fff", cursor: confirmed && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "inherit" }}>
+            {submitting ? "Submitting..." : "Submit"}
           </button>
         )}
       </div>
@@ -403,22 +375,39 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
   const [draftSaved, setDraftSaved] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [workflow, setWorkflow] = useState(null);
   const accent = roleAccent(normalizedRole);
-  const locked = form.status !== NON_TEACHING_STATUS.DRAFT;
+  const locked = form.status !== NON_TEACHING_STATUS.DRAFT && !isNonTeachingRejectedStatus(form.status);
+  const sidebarWorkflowText = (workflow?.approvalSteps || workflow?.steps || [])
+    .filter((stage) => !stage.isInitial)
+    .map((stage) => stage.designation)
+    .join(" to ") || "Submit your appraisal to begin the review process.";
 
   useEffect(() => {
     let active = true;
     const loadForm = async () => {
       try {
-        const profile = profileFromsessionStorage();
+        let profile = profileFromsessionStorage();
+        try {
+          const latestProfile = await getMe();
+          storeUserSession({ profile: latestProfile });
+          profile = profileFromsessionStorage();
+        } catch (profileErr) {
+          console.warn("Could not refresh non-teaching profile:", profileErr?.message || profileErr);
+        }
         const saved = await loadNonTeachingAppraisal({
           email: profile.email,
           academicYear: APP_INFO.DEFAULT_AY,
           profile,
           role: normalizedRole,
         });
+        const liveWorkflow = await loadNonTeachingWorkflow({
+          email: profile.email,
+          academicYear: APP_INFO.DEFAULT_AY,
+        }).catch(() => null);
         if (!active) return;
         setForm(saved?.form || emptyNonTeachingForm(profile, normalizedRole));
+        setWorkflow(liveWorkflow);
       } catch (err) {
         console.error("Could not load non-teaching appraisal:", err);
       } finally {
@@ -437,6 +426,10 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
     setForm((current) => ({ ...current, remarks: value }));
   };
 
+  const updateSummaryOtherInfo = (value) => {
+    setForm((current) => ({ ...current, summaryOtherInfo: value }));
+  };
+
   const handleSaveDraft = async () => {
     if (locked) return;
     setSavingDraft(true);
@@ -447,6 +440,11 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         profile: profileFromsessionStorage(),
       });
       setForm(saved.form);
+      const liveWorkflow = await loadNonTeachingWorkflow({
+        email: saved.form?.info?.email || profileFromsessionStorage().email,
+        academicYear: saved.form?.info?.ay || APP_INFO.DEFAULT_AY,
+      }).catch(() => null);
+      setWorkflow(liveWorkflow);
       setDraftSaved(true);
     } catch (err) {
       if (err?.statusCode === 403 || err?.response?.status === 403) {
@@ -467,7 +465,8 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
     const attachmentErrors = SELF_ITEMS.flatMap((item) => {
       const row = form[item.key] || {};
       const rowHasData = isFilled(row.text) || isFilled(row.marks);
-      const files = form.docs?.[item.key] || [];
+      const docValue = form.docs?.[item.key];
+      const files = Array.isArray(docValue) ? docValue : docValue ? [docValue] : [];
       if (!rowHasData) return [];
       if (!files.length) return [`${item.label}: attach an image or PDF.`];
       if (files.some((file) => !isAllowedAttachmentFile(file))) return [`${item.label}: attachment must be an image or PDF up to 10 MB.`];
@@ -493,6 +492,11 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         profile: profileFromsessionStorage(),
       });
       setForm(saved.form);
+      const liveWorkflow = await loadNonTeachingWorkflow({
+        email: saved.form?.info?.email || profileFromsessionStorage().email,
+        academicYear: saved.form?.info?.ay || APP_INFO.DEFAULT_AY,
+      }).catch(() => null);
+      setWorkflow(liveWorkflow);
       setConfirmed(false);
       alert("Non-teaching appraisal submitted successfully.");
     } catch (err) {
@@ -525,18 +529,16 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         <div style={{ color: "#64748b", padding: 30 }}>Loading appraisal...</div>
       ) : (
         <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 22, color: "#0f172a" }}>Non-Teaching Staff Appraisal</h1>
               <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12 }}>{nonTeachingRoleLabel(normalizedRole)} | AY {form.info?.ay || APP_INFO.DEFAULT_AY}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button type="button" onClick={() => navigate("/edit-profile")} style={S.headerButton}>Edit Profile</button>
-              <StatusBadge status={form.status} />
+              <AppraisalHeaderImage />
             </div>
           </div>
-
-          <WorkflowTracker status={form.status} role={normalizedRole} />
 
           <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
             {[
@@ -549,11 +551,17 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
                 requestAnimationFrame(() => {
                   window.scrollTo({ top: 0, left: 0, behavior: "auto" });
                 });
-              }} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", fontFamily: "Georgia, serif", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
+              }} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", fontFamily: "inherit", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
                 {label}
               </button>
             ))}
           </div>
+
+          <RejectionNotice
+            form={form}
+            status={form.status}
+            alertOnceKey={`${form.info?.email || profileFromsessionStorage().email}:${form.info?.ay || APP_INFO.DEFAULT_AY}:${form.status || ""}`}
+          />
 
           {tab === "info" && (
             <SectionCard title="General Information" accent={accent}>
@@ -592,12 +600,14 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
               role={normalizedRole}
               onSubmit={handleSubmit}
               onUpdateRemarks={updateRemarks}
+              onUpdateSummaryOtherInfo={updateSummaryOtherInfo}
               onReport={handleReport}
               submitting={submitting}
               locked={locked}
               confirmed={confirmed}
               setConfirmed={setConfirmed}
               accent={accent}
+              showReport={normalizedRole !== "registrar"}
             />
           )}
         </>
@@ -608,8 +618,8 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
   if (embedded) return content;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", fontFamily: "Georgia, serif", color: "#0f172a" }}>
-      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", fontFamily: "inherit", color: "#0f172a" }}>
+      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={sessionStorage.getItem("name") || "Staff"} color={accent} />
           <div>
@@ -618,7 +628,11 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
           </div>
         </div>
         <div style={{ background: "#1e293b", borderRadius: 8, padding: "10px 12px", fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>
-          {"Non-Teaching Staff -> Reporting Officer -> Registrar -> VC"}
+          {sidebarWorkflowText}
+        </div>
+        <div style={{ margin: "8px 0", padding: "10px 12px", background: "rgba(37,99,235,0.15)", border: "1px solid #2563eb", borderRadius: 8 }}>
+          <div style={{ color: "#94a3b8", fontWeight: 700, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>For any queries</div>
+          <a href="mailto:appraisal@dypiu.ac.in" style={{ color: "#60a5fa", fontWeight: 600, fontSize: 11, wordBreak: "break-all", textDecoration: "none" }}>appraisal@dypiu.ac.in</a>
         </div>
         <div style={S.sideActions}>
           <button type="button" onClick={() => setShowLogoutModal(true)} style={{ ...S.sideButton, color: "#f87171" }}>Logout</button>
@@ -630,13 +644,16 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
   );
 }
 
-function AuthorityPartA({ form, setForm, reviewerRole, readOnly }) {
+function AuthorityPartA({ form, setForm, reviewerRole, readOnly, visibleRoles = [] }) {
   const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
   const editableKey = role === "vc" ? "vcMarks" : role === "registrar" ? "regMarks" : "roMarks";
   const accent = roleAccent(role);
-  const showReportingOfficer = role === "reporting_officer" || role === "vc";
-  const showRegistrar = role === "registrar" || role === "vc";
-  const showVc = role === "vc";
+  const showReportingOfficer = visibleRoles.includes("ro");
+  const showRegistrar = visibleRoles.includes("registrar");
+  const showVc = visibleRoles.includes("vc");
+  const reportingOfficerLabel = workflowDesignationForNonTeachingRole(form, "reporting_officer");
+  const registrarLabel = workflowDesignationForNonTeachingRole(form, "registrar");
+  const vcLabel = workflowDesignationForNonTeachingRole(form, "vc");
   const setMark = (key, value) => {
     setForm((current) => ({
       ...current,
@@ -654,9 +671,9 @@ function AuthorityPartA({ form, setForm, reviewerRole, readOnly }) {
               <th style={{ ...TH, textAlign: "left" }}>Staff Description</th>
               <th style={TH}>Docs</th>
               <th style={TH}>Self</th>
-              {showReportingOfficer && <th style={TH}>RO</th>}
-              {showRegistrar && <th style={TH}>Registrar</th>}
-              {showVc && <th style={TH}>VC</th>}
+              {showReportingOfficer && <th style={TH}>{reportingOfficerLabel}</th>}
+              {showRegistrar && <th style={TH}>{registrarLabel}</th>}
+              {showVc && <th style={TH}>{vcLabel}</th>}
             </tr>
           </thead>
           <tbody>
@@ -694,12 +711,15 @@ function AuthorityPartA({ form, setForm, reviewerRole, readOnly }) {
   );
 }
 
-function AuthorityPartB({ form, setForm, reviewerRole, readOnly }) {
+function AuthorityPartB({ form, setForm, reviewerRole, readOnly, visibleRoles = [] }) {
   const role = normalizeNonTeachingRole(reviewerRole, reviewerRole);
   const suffix = role === "vc" ? "vc" : role === "registrar" ? "reg" : "ro";
-  const showReportingOfficer = role === "reporting_officer" || role === "vc";
-  const showRegistrar = role === "registrar" || role === "vc";
-  const showVc = role === "vc";
+  const showReportingOfficer = visibleRoles.includes("ro");
+  const showRegistrar = visibleRoles.includes("registrar");
+  const showVc = visibleRoles.includes("vc");
+  const reportingOfficerLabel = workflowDesignationForNonTeachingRole(form, "reporting_officer");
+  const registrarLabel = workflowDesignationForNonTeachingRole(form, "registrar");
+  const vcLabel = workflowDesignationForNonTeachingRole(form, "vc");
   const setRating = (sectionKey, index, value) => {
     setForm((current) => ({
       ...current,
@@ -723,9 +743,9 @@ function AuthorityPartB({ form, setForm, reviewerRole, readOnly }) {
                 <tr>
                   <th style={TH}>SN</th>
                   <th style={{ ...TH, textAlign: "left" }}>Parameter</th>
-                  {showReportingOfficer && <th style={TH}>Reporting Officer</th>}
-                  {showRegistrar && <th style={TH}>Registrar</th>}
-                  {showVc && <th style={TH}>VC</th>}
+                  {showReportingOfficer && <th style={TH}>{reportingOfficerLabel}</th>}
+                  {showRegistrar && <th style={TH}>{registrarLabel}</th>}
+                  {showVc && <th style={TH}>{vcLabel}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -773,15 +793,100 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
   const [remarks, setRemarks] = useState(role === "vc" ? item.form?.vcRemarks : role === "registrar" ? item.form?.registrarRemarks : item.form?.roRemarks);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const pendingStatus = expectedPendingStatus(role);
-  const locked = readOnly || item.status !== pendingStatus;
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftStatus, setDraftStatus] = useState("");
+  const [workflow, setWorkflow] = useState(item.workflow || null);
+  const finalisedByVc = role === "vc" && (
+    normalizeNonTeachingStatus(item.status) === NON_TEACHING_STATUS.VC_APPROVED ||
+    n(item.vcTotal) > 0
+  );
+  const [editingFinalised, setEditingFinalised] = useState(false);
+  const locked = finalisedByVc
+    ? !editingFinalised
+    : readOnly;
   const accent = roleAccent(role);
+  const subjectEmail = item.email || item.staff_email || form.info?.email;
+  const academicYear = item.academicYear || item.academic_year || form.info?.ay || APP_INFO.DEFAULT_AY;
+  useEffect(() => {
+    let active = true;
+    loadNonTeachingWorkflow({
+      email: item.email || item.staff_email,
+      academicYear: item.academicYear || item.academic_year || form.info?.ay || APP_INFO.DEFAULT_AY,
+    })
+      .then((liveWorkflow) => {
+        if (active) setWorkflow(liveWorkflow);
+      })
+      .catch(() => {
+        if (active) setWorkflow(item.workflow || emptyWorkflow);
+      });
+    return () => { active = false; };
+  }, [item, form.info?.ay]);
+  const displayWorkflow = workflow || emptyWorkflow;
+  const visibleRoles = visibleNonTeachingReviewRoles(role, { ...item, workflow: displayWorkflow });
+  const reviewerDesignation = workflowDesignationForNonTeachingRole({ ...item, form, workflow: displayWorkflow }, role);
   const selfTotals = calculateNonTeachingTotals(form, "self");
   const totals = calculateNonTeachingTotals(form, role === "vc" ? "vc" : role);
+  const authorityScoreLabel = role === "vc" ? "Vice Chancellor Score" : `${reviewerDesignation} Score`;
+  const remarksLabel = role === "vc" ? "Vice Chancellor Remarks and Grade" : `${reviewerDesignation} Remarks`;
+  useEffect(() => {
+    let active = true;
+    if (locked || !subjectEmail) return undefined;
+    loadReviewerDraft({ subjectEmail, academicYear, reviewerRole: role })
+      .then((draft) => {
+        if (!active || !draft?.payload) return;
+        const draftForm = draft.payload.form || draft.payload.section_scores;
+        if (draftForm) setForm(primeFormForReviewer(draftForm, role));
+        setRemarks(draft.payload.remarks ?? "");
+        setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
+      })
+      .catch((err) => {
+        if (!active) return;
+        console.error("Could not load non-teaching reviewer draft:", err);
+        setDraftStatus(err?.message || "Could not load draft.");
+      });
+    return () => { active = false; };
+  }, [academicYear, locked, role, subjectEmail]);
+
+  const buildDraftForm = () => ({
+    ...form,
+    roRemarks: role === "reporting_officer" ? remarks : form.roRemarks,
+    registrarRemarks: role === "registrar" ? remarks : form.registrarRemarks,
+    vcRemarks: role === "vc" ? remarks : form.vcRemarks,
+  });
+
+  const handleSaveDraft = async () => {
+    try {
+      setSavingDraft(true);
+      const draftForm = buildDraftForm();
+      await saveReviewerDraft({
+        subjectEmail,
+        academicYear,
+        reviewerRole: role,
+        payload: {
+          part_a_score: totals.partA,
+          part_b_score: totals.partB,
+          total_score: totals.total,
+          remarks,
+          section_scores: draftForm,
+          form: draftForm,
+        },
+      });
+      setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
+    } catch (err) {
+      console.error("Could not save non-teaching reviewer draft:", err);
+      alert(err?.message || "Unable to save draft.");
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!confirmed) {
       alert("Please verify and confirm the accuracy declaration before submitting the review.");
+      return;
+    }
+    if (!remarks?.trim()) {
+      alert("Remarks are mandatory. Please enter your remarks before submitting the review.");
       return;
     }
     try {
@@ -790,7 +895,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
       alert(err.message);
       return;
     }
-    if (!window.confirm(`Submit ${nonTeachingRoleLabel(role)} review?`)) return;
+    if (!window.confirm(finalisedByVc ? `Edit and resubmit ${reviewerDesignation} review?` : `Submit ${reviewerDesignation} review?`)) return;
 
     setSubmitting(true);
     try {
@@ -800,7 +905,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
         reviewerRole: role,
         remarks,
       });
-      alert(`${nonTeachingRoleLabel(role)} review submitted.`);
+      alert(finalisedByVc ? `${reviewerDesignation} review resubmitted.` : `${reviewerDesignation} review submitted.`);
       onSubmitted?.(updated);
     } catch (err) {
       console.error("Could not submit non-teaching review:", err);
@@ -819,22 +924,21 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
         registrarRemarks: role === "registrar" ? remarks : form.registrarRemarks,
         vcRemarks: role === "vc" ? remarks : form.vcRemarks,
       },
-      visibleRoles: visibleNonTeachingReviewRoles(role),
+      visibleRoles,
     });
   };
 
   return (
     <div>
       <div style={{ background: "#0f172a", borderRadius: 10, padding: "14px 18px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
-        <button type="button" onClick={onBack} style={{ background: "#1e293b", color: "#cbd5e1", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontFamily: "Georgia, serif" }}>Back</button>
+        <button type="button" onClick={onBack} style={{ background: "#1e293b", color: "#cbd5e1", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
         <Avatar name={item.name} color={item.avatarColor || accent} />
         <div style={{ flex: 1 }}>
           <div style={{ color: "#f8fafc", fontSize: 15, fontWeight: 800 }}>{item.name}</div>
           <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.roleLabel} | {item.designation} | {item.employeeId}</div>
         </div>
-        <StatusBadge status={item.status} />
         <div style={{ background: "#1e293b", borderRadius: 8, padding: "8px 12px", color: "#e2e8f0", textAlign: "center" }}>
-          <div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{nonTeachingRoleLabel(role)} Total</div>
+          <div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 800, textTransform: "uppercase" }}>{reviewerDesignation} Total</div>
           <div style={{ color: accent, fontWeight: 900, fontSize: 16 }}>{totals.total.toFixed(1)}</div>
         </div>
       </div>
@@ -850,21 +954,44 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
             requestAnimationFrame(() => {
               window.scrollTo({ top: 0, left: 0, behavior: "auto" });
             });
-          }} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", cursor: "pointer", fontFamily: "Georgia, serif", fontWeight: 800 }}>
+          }} style={{ border: "none", borderRadius: 7, padding: "8px 16px", background: tab === id ? accent : "#e2e8f0", color: tab === id ? "#fff" : "#475569", cursor: "pointer", fontFamily: "inherit", fontWeight: 800 }}>
             {label}
           </button>
         ))}
       </div>
 
+      {finalisedByVc && locked && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingFinalised(true);
+              setConfirmed(false);
+            }}
+            style={{ padding: "10px 28px", background: accent, color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit" }}
+          >
+            Edit Form
+          </button>
+        </div>
+      )}
+
       <fieldset disabled={locked} style={{ border: "none", padding: 0, margin: 0 }}>
-        {tab === "partA" && <AuthorityPartA form={form} setForm={setForm} reviewerRole={role} readOnly={locked} />}
-        {tab === "partB" && <AuthorityPartB form={form} setForm={setForm} reviewerRole={role} readOnly={locked} />}
+        {tab === "partA" && <AuthorityPartA form={form} setForm={setForm} reviewerRole={role} readOnly={locked} visibleRoles={visibleRoles} />}
+        {tab === "partB" && <AuthorityPartB form={form} setForm={setForm} reviewerRole={role} readOnly={locked} visibleRoles={visibleRoles} />}
       </fieldset>
+      {(tab === "partA" || tab === "partB") && !locked && (
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
+          <span style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{draftStatus}</span>
+          <button type="button" onClick={handleSaveDraft} disabled={savingDraft} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontFamily: "inherit" }}>
+            {savingDraft ? "Saving..." : "Save Draft"}
+          </button>
+        </div>
+      )}
 
       {tab === "remarks" && (
-        <SectionCard title={locked ? "Submitted Review" : `${nonTeachingRoleLabel(role)} Remarks & Submission`} accent={accent}>
-          {role === "vc" && form.roRemarks && <PriorRemark label="Reporting Officer Remarks" value={form.roRemarks} color={ACCENT} />}
-          {role === "vc" && form.registrarRemarks && <PriorRemark label="Registrar Remarks" value={form.registrarRemarks} color={REG_ACCENT} />}
+        <SectionCard title={locked ? "Submitted Review" : `${reviewerDesignation} Remarks & Submission`} accent={accent}>
+          {role === "vc" && visibleRoles.includes("ro") && form.roRemarks && <PriorRemark label={`${workflowDesignationForNonTeachingRole({ ...item, form }, "reporting_officer")} Remarks`} value={form.roRemarks} color={ACCENT} />}
+          {role === "vc" && visibleRoles.includes("registrar") && form.registrarRemarks && <PriorRemark label={`${workflowDesignationForNonTeachingRole({ ...item, form }, "registrar")} Remarks`} value={form.registrarRemarks} color={REG_ACCENT} />}
 
           <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>Staff Submitted Score</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
@@ -880,7 +1007,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
             ))}
           </div>
 
-          <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>{nonTeachingRoleLabel(role)} Score</div>
+          <div style={{ color: "#334155", fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 8 }}>{authorityScoreLabel}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
             {[
               ["Part A", totals.partA, NON_TEACHING_MAX.partA],
@@ -894,7 +1021,7 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
             ))}
           </div>
 
-          <label style={{ fontSize: 12, color: "#334155", fontWeight: 800, display: "block", marginBottom: 6 }}>Remarks</label>
+          <label style={{ fontSize: 12, color: "#334155", fontWeight: 800, display: "block", marginBottom: 6 }}>{remarksLabel}</label>
           <TextArea value={remarks} onChange={setRemarks} readOnly={locked} rows={4} placeholder="Enter review remarks and recommendations..." />
 
           {!locked && (
@@ -904,14 +1031,24 @@ export function NonTeachingAuthorityReviewPanel({ item, reviewerRole, onBack, on
             </label>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
-            <button type="button" onClick={onBack} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>{locked ? "Close" : "Cancel"}</button>
-            <button type="button" onClick={handleReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#e2e8f0", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "Georgia, serif" }}>Generate Report</button>
-            {!locked && (
-              <button type="button" onClick={handleSubmit} disabled={!confirmed || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: confirmed ? accent : "#94a3b8", color: "#fff", cursor: confirmed && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "Georgia, serif" }}>
-                {submitting ? "Submitting..." : "Confirm & Submit"}
-              </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+            <span style={{ color: "#64748b", fontSize: 11, fontWeight: 800 }}>{draftStatus}</span>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+            <button type="button" onClick={onBack} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#f1f5f9", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}>{locked ? "Close" : "Cancel"}</button>
+            {role !== "registrar" && (
+              <button type="button" onClick={handleReport} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#e2e8f0", color: "#475569", cursor: "pointer", fontWeight: 800, fontFamily: "inherit" }}>Generate Report</button>
             )}
+            {!locked && (
+              <>
+              <button type="button" onClick={handleSaveDraft} disabled={savingDraft} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontFamily: "inherit" }}>
+                {savingDraft ? "Saving..." : "Save Draft"}
+              </button>
+              <button type="button" onClick={handleSubmit} disabled={!confirmed || !remarks.trim() || submitting} style={{ padding: "10px 24px", border: "none", borderRadius: 7, background: (confirmed && remarks.trim()) ? accent : "#94a3b8", color: "#fff", cursor: confirmed && remarks.trim() && !submitting ? "pointer" : "not-allowed", fontWeight: 800, fontFamily: "inherit" }}>
+                {submitting ? "Submitting..." : "Submit"}
+              </button>
+              </>
+            )}
+            </div>
           </div>
         </SectionCard>
       )}
@@ -930,10 +1067,9 @@ function PriorRemark({ label, value, color }) {
 
 function QueueCard({ item, active, onClick, accent }) {
   return (
-    <button type="button" onClick={onClick} style={{ width: "100%", border: "none", borderLeft: active ? `3px solid ${accent}` : "3px solid transparent", borderRadius: 8, padding: "10px 11px", textAlign: "left", background: active ? `${accent}22` : "transparent", cursor: "pointer", marginBottom: 6, fontFamily: "Georgia, serif" }}>
+    <button type="button" onClick={onClick} style={{ width: "100%", border: "none", borderLeft: active ? `3px solid ${accent}` : "3px solid transparent", borderRadius: 8, padding: "10px 11px", textAlign: "left", background: active ? `${accent}22` : "transparent", cursor: "pointer", marginBottom: 6, fontFamily: "inherit" }}>
       <div style={{ color: "#e2e8f0", fontWeight: 800, fontSize: 12 }}>{item.name}</div>
       <div style={{ color: "#94a3b8", fontSize: 10, marginTop: 2 }}>{item.roleLabel}</div>
-      <div style={{ marginTop: 7 }}><StatusBadge status={item.status} /></div>
     </button>
   );
 }
@@ -975,11 +1111,11 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
   }, [reviewerRole]);
 
   const selected = items.find((item) => item.id === selectedId);
-  const pendingCount = items.filter((item) => item.status === expectedPendingStatus(reviewerRole)).length;
+  const pendingCount = items.length;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", color: "#0f172a", fontFamily: "Georgia, serif" }}>
-      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12 }}>
+    <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", color: "#0f172a", fontFamily: "inherit" }}>
+      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={sessionStorage.getItem("name") || title} color={accent} />
           <div>
@@ -998,7 +1134,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
               requestAnimationFrame(() => {
                 window.scrollTo({ top: 0, left: 0, behavior: "auto" });
               });
-            }} style={{ flex: 1, border: "none", borderRadius: 7, padding: "7px 6px", background: tab === id ? accent : "#1e293b", color: tab === id ? "#fff" : "#94a3b8", cursor: "pointer", fontSize: 10, fontWeight: 800, fontFamily: "Georgia, serif" }}>
+            }} style={{ flex: 1, border: "none", borderRadius: 7, padding: "7px 6px", background: tab === id ? accent : "#1e293b", color: tab === id ? "#fff" : "#94a3b8", cursor: "pointer", fontSize: 10, fontWeight: 800, fontFamily: "inherit" }}>
               {label}
             </button>
           ))}
@@ -1024,6 +1160,10 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
           )}
         </div>
 
+        <div style={{ margin: "8px 0", padding: "10px 12px", background: "rgba(37,99,235,0.15)", border: "1px solid #2563eb", borderRadius: 8 }}>
+          <div style={{ color: "#94a3b8", fontWeight: 700, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>For any queries</div>
+          <a href="mailto:appraisal@dypiu.ac.in" style={{ color: "#60a5fa", fontWeight: 600, fontSize: 11, wordBreak: "break-all", textDecoration: "none" }}>appraisal@dypiu.ac.in</a>
+        </div>
         <div style={S.sideActions}>
           <button type="button" onClick={() => setShowLogoutModal(true)} style={{ ...S.sideButton, color: "#f87171" }}>Logout</button>
         </div>
@@ -1044,7 +1184,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
           <NonTeachingAuthorityReviewPanel
             item={selected}
             reviewerRole={reviewerRole}
-            readOnly={selected.status !== expectedPendingStatus(reviewerRole)}
+            readOnly={false}
             onBack={() => setSelectedId("")}
             onSubmitted={(updated) => {
               setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
@@ -1067,8 +1207,8 @@ function LogoutModal({ onCancel, onConfirm }) {
         <div style={{ color: "#0f172a", fontWeight: 900, fontSize: 17, marginBottom: 8 }}>Confirm Logout</div>
         <div style={{ color: "#64748b", fontSize: 12, lineHeight: 1.6, marginBottom: 18 }}>You are about to leave {APP_INFO.PORTAL_NAME}. Any unsaved edits will be lost.</div>
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" onClick={onCancel} style={{ flex: 1, border: "none", borderRadius: 8, background: "#f1f5f9", color: "#475569", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Cancel</button>
-          <button type="button" onClick={onConfirm} style={{ flex: 1, border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "Georgia, serif" }}>Logout</button>
+          <button type="button" onClick={onCancel} style={{ flex: 1, border: "none", borderRadius: 8, background: "#f1f5f9", color: "#475569", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button type="button" onClick={onConfirm} style={{ flex: 1, border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", padding: "10px", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>Logout</button>
         </div>
       </div>
     </div>
@@ -1085,7 +1225,7 @@ const S = {
     cursor: "pointer",
     fontWeight: 800,
     fontSize: 12,
-    fontFamily: "Georgia, serif",
+    fontFamily: "inherit",
   },
   sideButton: {
     width: "100%",
@@ -1097,7 +1237,7 @@ const S = {
     cursor: "pointer",
     fontWeight: 800,
     fontSize: 12,
-    fontFamily: "Georgia, serif",
+    fontFamily: "inherit",
   },
   sideActions: {
     position: "absolute",
@@ -1116,4 +1256,3 @@ const S = {
 export default function NonTeachingStaffDashboard() {
   return <NonTeachingAppraisalForm role="non_teaching_staff" />;
 }
-

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { APP_INFO } from "../constants/formConfig";
 import {
@@ -19,6 +19,30 @@ import {
   sanitizeText, filterNumeric, filterPhone,
 } from "../utils/validation";
 
+// - Pseudo-class styles (hover / focus) injected once on mount -
+const EP_CSS = `
+  .ep-inp { transition: border-color .15s, box-shadow .15s; }
+  .ep-inp:hover:not(:disabled) { border-color: #93c5fd; }
+  .ep-inp:focus { outline: none; border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.10) !important; }
+  .ep-cancel:hover { background: #f8fafc !important; border-color: #94a3b8 !important; color: #0f172a !important; }
+  .ep-save:hover:not(:disabled) { background: #1d4ed8 !important; box-shadow: 0 4px 14px rgba(37,99,235,.35) !important; }
+  .ep-save:active:not(:disabled) { transform: translateY(1px); }
+  .ep-back:hover { color: #2563eb !important; }
+  @media (max-width: 620px) { .ep-grid { grid-template-columns: 1fr !important; } }
+`;
+
+function CssInjector() {
+  useEffect(() => {
+    const el = document.createElement("style");
+    el.textContent = EP_CSS;
+    el.setAttribute("data-ep", "1");
+    document.head.appendChild(el);
+    return () => el.remove();
+  }, []);
+  return null;
+}
+
+// - Constants -
 const ROLE_LABEL = {
   faculty: "Faculty",
   hod: "Head of Department",
@@ -43,20 +67,70 @@ const BASE_ROLE_OPTIONS = [
   { value: "non_teaching_staff", label: "Non-Teaching Staff" },
 ];
 
-const STAFF_TYPE_LABEL = {
-  teaching: "Teaching",
-  non_teaching: "Non-Teaching",
-};
+const STAFF_TYPE_LABEL = { teaching: "Teaching", non_teaching: "Non-Teaching" };
 
 const initialsFromName = (name = "") =>
-  String(name || "U")
-    .trim()
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "U";
+  String(name || "U").trim().split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "U";
 
+// - Sub-components -
+function SectionHead({ title, badge, badgeColor = "#64748b", badgeBack = "#f1f5f9" }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, paddingBottom: 16, borderBottom: "1px solid #f1f5f9" }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", letterSpacing: "-0.01em" }}>{title}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, background: badgeBack, color: badgeColor, borderRadius: 20, padding: "3px 10px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+        {badge}
+      </span>
+    </div>
+  );
+}
+
+function FrozenField({ label, value, wide }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, ...(wide ? { gridColumn: "1 / -1" } : {}) }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+      <div style={{ minHeight: 40, display: "flex", alignItems: "center", background: "#f9fafb", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "0 13px", fontSize: 13, color: value ? "#4b5563" : "#c4c9d4" }}>
+        {value || "-"}
+      </div>
+    </div>
+  );
+}
+
+function InputField({ label, required, hint, wide, children }) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 5, ...(wide ? { gridColumn: "1 / -1" } : {}) }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        {label}
+        {required && <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>}
+      </span>
+      {children}
+      {hint && <span style={{ fontSize: 10, color: "#9ca3af" }}>{hint}</span>}
+    </label>
+  );
+}
+
+// - Shared style tokens -
+const CARD = {
+  background: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 14,
+  padding: "24px 28px",
+  boxShadow: "0 1px 3px rgba(15,23,42,.05), 0 4px 16px rgba(15,23,42,.04)",
+};
+
+const INP = {
+  width: "100%",
+  boxSizing: "border-box",
+  height: 40,
+  border: "1.5px solid #d1d5db",
+  borderRadius: 8,
+  padding: "0 13px",
+  fontSize: 13,
+  color: "#0f172a",
+  fontFamily: "inherit",
+  background: "#fff",
+};
+
+// - Main Component -
 export default function EditProfile() {
   const navigate = useNavigate();
   const initialRole = normalizeRole(sessionStorage.getItem("role"), "faculty");
@@ -91,7 +165,6 @@ export default function EditProfile() {
   const needsDepartment = !isNonTeaching && schoolNeedsDepartment;
   const roleOptions = BASE_ROLE_OPTIONS.filter((role) => {
     const optionIsNonTeaching = isNonTeachingRole(role.value);
-
     if (isNonTeaching) return optionIsNonTeaching;
     if (optionIsNonTeaching) return false;
     if (role.value === "hod") return schoolNeedsDepartment;
@@ -103,15 +176,9 @@ export default function EditProfile() {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => {
-      if (name === "school") {
-        return { ...prev, school: value, role: "", department: "" };
-      }
-      if (name === "experience") {
-        return { ...prev, experience: filterNumeric(value) };
-      }
-      if (name === "phone") {
-        return { ...prev, phone: filterPhone(value) };
-      }
+      if (name === "school") return { ...prev, school: value, role: "", department: "" };
+      if (name === "experience") return { ...prev, experience: filterNumeric(value) };
+      if (name === "phone") return { ...prev, phone: filterPhone(value) };
       return { ...prev, [name]: value };
     });
   };
@@ -121,86 +188,22 @@ export default function EditProfile() {
     setError("");
     setMessage("");
 
-    const email = String(formData.email || "").trim().toLowerCase();
-    const role = normalizeRole(formData.role, "");
-    const nonTeaching = formData.staffType === "non_teaching";
-    const selectedRoleIsNonTeaching = isNonTeachingRole(role);
-    const school = canonicalSchoolValue(formData.school);
-    const department = nonTeaching
-      ? String(formData.department || "").trim()
-      : isSoemrSchool(school)
-        ? canonicalDepartmentValue(formData.department)
-        : "";
-
-    if (!email || !formData.role || (!nonTeaching && role !== "vc" && !school) || !formData.name.trim() || !formData.employeeId.trim() || !formData.designation.trim()) {
-      setError(nonTeaching
-        ? "Please fill in Role, Email, Full Name, Employee ID, Designation, and Department / Office."
-        : "Please fill in School, Role, Email, Full Name, Employee ID, and Designation.");
-      return;
-    }
-
-    if (!isValidName(formData.name)) {
-      setError("Full name must be between 2 and 100 characters.");
-      return;
-    }
-
-    if (!isValidEmployeeId(formData.employeeId)) {
-      setError("Employee ID must be 2–30 characters and contain only letters, numbers, /, - or _.");
-      return;
-    }
-
-    if (formData.experience && !isValidExperience(formData.experience)) {
-      setError("Experience must be a number between 0 and 80.");
-      return;
-    }
-
-    if (formData.phone && !isValidPhone(formData.phone)) {
-      setError("Please enter a valid phone number.");
-      return;
-    }
-
-    if (!nonTeaching && selectedRoleIsNonTeaching) {
-      setError("Please select a teaching role for this teaching profile.");
-      return;
-    }
-
-    if (nonTeaching && !selectedRoleIsNonTeaching) {
-      setError("Please select a non-teaching role for this non-teaching profile.");
-      return;
-    }
-
-    if (!nonTeaching && role !== "vc" && !isValidSchool(school)) {
-      setError("Please select one of the approved schools or centers from the dropdown.");
-      return;
-    }
-
-    if (nonTeaching && !department) {
-      setError("Please enter the department/office for non-teaching staff.");
-      return;
-    }
-
-    if (isSoemrSchool(school) && (!department || !isValidSoemrDepartment(department))) {
-      setError("Please select the correct SoEMR department from the dropdown.");
-      return;
-    }
-
-    if (formData.role === "hod" && !isSoemrSchool(school)) {
-      setError("HOD profiles must remain assigned to a SoEMR department in this hierarchy.");
-      return;
-    }
-
-    if (formData.role === "center_head" && !isCisrSchool(school)) {
-      setError("Center Head profiles must remain assigned to CISR.");
-      return;
-    }
-
-    if (isCisrSchool(school) && (formData.role === "director" || formData.role === "dean" || formData.role === "hod")) {
-      setError("CISR uses only Center Head and Faculty roles below VC.");
-      return;
-    }
+    if (!formData.employeeId.trim()) { setError("Employee ID is required."); return; }
+    if (!isValidEmployeeId(formData.employeeId)) { setError("Employee ID must be 2-30 characters and contain only letters, numbers, /, - or _."); return; }
+    if (!formData.designation.trim()) { setError("Designation is required."); return; }
+    if (formData.experience && !isValidExperience(formData.experience)) { setError("Experience must be a number between 0 and 80."); return; }
+    if (formData.phone && !isValidPhone(formData.phone)) { setError("Please enter a valid phone number."); return; }
 
     setSaving(true);
     try {
+      const email = String(formData.email || "").trim().toLowerCase();
+      const role = normalizeRole(formData.role, "");
+      const nonTeaching = formData.staffType === "non_teaching";
+      const school = canonicalSchoolValue(formData.school);
+      const department = nonTeaching
+        ? String(formData.department || "").trim()
+        : isSoemrSchool(school) ? canonicalDepartmentValue(formData.department) : "";
+
       const cleanFormData = {
         ...formData,
         email,
@@ -216,12 +219,7 @@ export default function EditProfile() {
       };
       const profilePayload = buildProfilePayload(cleanFormData, APP_INFO.DEFAULT_AY);
       const savedProfile = await updateProfile(profilePayload);
-
-      storeUserSession({
-        profile: savedProfile || profilePayload,
-        fallbackEmail: email,
-      });
-
+      storeUserSession({ profile: savedProfile || profilePayload, fallbackEmail: email });
       setMessage("Profile updated successfully.");
       setTimeout(() => navigate("/dashboard", { replace: true }), 450);
     } catch (err) {
@@ -231,282 +229,216 @@ export default function EditProfile() {
     }
   };
 
+  const initials = initialsFromName(formData.name);
+  const roleLabel = ROLE_LABEL[formData.role] || "User";
+
   return (
-    <div style={S.page}>
-      <div style={S.topBar}>
-        <div style={S.brand}>
-          <div style={S.logo}>FA</div>
-          <div>
-            <div style={S.portal}>{APP_INFO.PORTAL_NAME}</div>
-            <div style={S.university}>{APP_INFO.UNIVERSITY_NAME}</div>
+    <div style={{ minHeight: "100vh", background: "#fff", fontFamily: "inherit", color: "#0f172a" }}>
+      <CssInjector />
+
+      {/* - Sticky white navbar - */}
+      <nav style={{ position: "sticky", top: 0, zIndex: 40, background: "#fff", borderBottom: "1px solid #e5e7eb", boxShadow: "0 1px 4px rgba(15,23,42,.06)" }}>
+        <div style={{ maxWidth: 840, margin: "0 auto", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Brand */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#6366f1,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 11, letterSpacing: 0.5 }}>FA</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a", lineHeight: 1.1 }}>{APP_INFO.PORTAL_NAME}</div>
+              <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{APP_INFO.UNIVERSITY_NAME}</div>
+            </div>
+          </div>
+          {/* Back link */}
+          <button
+            className="ep-back"
+            onClick={() => navigate("/dashboard")}
+            style={{ display: "flex", alignItems: "center", gap: 5, border: "none", background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: "6px 0", transition: "color .15s" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+            Back to Dashboard
+          </button>
+        </div>
+      </nav>
+
+      {/* - Main content - */}
+      <main style={{ maxWidth: 840, margin: "0 auto", padding: "40px 24px 80px" }}>
+
+        {/* - Profile hero - */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 36 }}>
+          {/* Avatar */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <div style={{ width: 78, height: 78, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 24, letterSpacing: 1, boxShadow: "0 4px 18px rgba(99,102,241,.3)" }}>
+              {initials}
+            </div>
+            <div style={{ position: "absolute", bottom: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: "#22c55e", border: "2.5px solid #fff" }} />
+          </div>
+          {/* Name + tags */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ margin: "0 0 8px", fontSize: 24, fontWeight: 800, color: "#0f172a", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {formData.name || "Your Profile"}
+            </h1>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 20, padding: "3px 11px" }}>
+                {roleLabel}
+              </span>
+              {formData.school && !isNonTeaching && (
+                <span style={{ fontSize: 12, fontWeight: 500, color: "#166534", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, padding: "3px 11px" }}>
+                  {formData.school}
+                </span>
+              )}
+              {formData.email && (
+                <span style={{ fontSize: 12, color: "#64748b" }}>{formData.email}</span>
+              )}
+            </div>
+          </div>
+          {/* Divider line decoration */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+            <div style={{ width: 36, height: 3, borderRadius: 2, background: "linear-gradient(90deg,#6366f1,#2563eb)" }} />
+            <div style={{ width: 24, height: 3, borderRadius: 2, background: "#bfdbfe" }} />
+            <div style={{ width: 14, height: 3, borderRadius: 2, background: "#dbeafe" }} />
           </div>
         </div>
-        <button onClick={() => navigate("/dashboard")} style={S.backBtn}>Back to Dashboard</button>
-      </div>
 
-      <main style={S.main}>
-        <div style={S.header}>
-          <div style={S.avatar}>{initialsFromName(formData.name)}</div>
-          <div>
-            <h1 style={S.title}>Edit Profile</h1>
-            <div style={S.subTitle}>{ROLE_LABEL[formData.role] || "User"} profile details</div>
-          </div>
-        </div>
+        <form onSubmit={handleSubmit}>
 
-        <form onSubmit={handleSubmit} style={S.card}>
-          {error && <div style={S.error}>{error}</div>}
-          {message && <div style={S.success}>{message}</div>}
+          {/* - Alerts - */}
+          {error && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "#fff5f5", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 10, padding: "13px 16px", marginBottom: 22, fontSize: 13, lineHeight: 1.5 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+              {error}
+            </div>
+          )}
+          {message && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 10, padding: "13px 16px", marginBottom: 22, fontSize: 13, lineHeight: 1.5 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M20 6L9 17l-5-5" /></svg>
+              {message}
+            </div>
+          )}
 
-          <div style={S.grid}>
-            <Field label="Staff Type">
-              <input style={{ ...S.input, background: "#f8fafc", color: "#64748b" }} value={STAFF_TYPE_LABEL[formData.staffType]} readOnly />
-            </Field>
-
-            <Field label="Role" required>
-              <select style={S.input} name="role" value={formData.role} onChange={handleChange} required>
-                <option value="">Select role</option>
-                {roleOptions.map((role) => (
-                  <option key={role.value} value={role.value}>{role.label}</option>
-                ))}
-              </select>
-            </Field>
-
-            {!isNonTeaching && (
-              <Field label="School" required={requiresSchool} wide>
-                <select style={S.input} name="school" value={formData.school} onChange={handleChange} required={requiresSchool}>
-                  <option value="">Select school</option>
-                  {SCHOOL_OPTIONS.map((school) => (
-                    <option key={school.value} value={school.value}>{school.label}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-
-            {needsDepartment && (
-              <Field label="SoEMR Department" required>
-                <select style={S.input} name="department" value={formData.department} onChange={handleChange} required>
-                  <option value="">Select department</option>
-                  {SOEMR_DEPARTMENTS.map((department) => (
-                    <option key={department} value={department}>{department}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-
-            {isNonTeaching && (
-              <Field label="Department / Office" required>
-                <input style={S.input} name="department" value={formData.department} onChange={handleChange} required />
-              </Field>
-            )}
-
-            <Field label="Email" required>
-              <input style={{ ...S.input, background: "#f8fafc", color: "#64748b" }} name="email" type="email" value={formData.email} readOnly required />
-            </Field>
-
-            <Field label="Full Name" required>
-              <input style={S.input} name="name" value={formData.name} onChange={handleChange} required maxLength={100} placeholder="e.g. Dr. Jane Smith" />
-            </Field>
-            <Field label="Employee ID" required>
-              <input style={S.input} name="employeeId" value={formData.employeeId} onChange={handleChange} required maxLength={30} placeholder="e.g. EMP001" />
-            </Field>
-            <Field label="Designation" required>
-              <input style={S.input} name="designation" value={formData.designation} onChange={handleChange} required maxLength={100} placeholder="e.g. Assistant Professor" />
-            </Field>
-            <Field label="Qualification">
-              <input style={S.input} name="qualification" value={formData.qualification} onChange={handleChange} maxLength={100} placeholder="e.g. Ph.D, M.Tech" />
-            </Field>
-
-            <Field label="Experience (Years)">
-              <input style={S.input} name="experience" value={formData.experience} onChange={handleChange} inputMode="decimal" maxLength={4} placeholder="e.g. 10" />
-            </Field>
-            <Field label="Phone">
-              <input style={S.input} name="phone" value={formData.phone} onChange={handleChange} inputMode="tel" maxLength={20} placeholder="e.g. +91 98765 43210" />
-            </Field>
+          {/* - Card 1: Account Information (read-only) - */}
+          <div style={CARD}>
+            <SectionHead title="Account Information" badge="Read-only" badgeColor="#64748b" badgeBack="#f1f5f9" />
+            <div className="ep-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18 }}>
+              <FrozenField label="Staff Type" value={STAFF_TYPE_LABEL[formData.staffType]} />
+              <FrozenField label="Role" value={ROLE_LABEL[formData.role] || formData.role} />
+              {!isNonTeaching && (
+                <FrozenField label="School" value={formData.school} wide />
+              )}
+              {(needsDepartment || isNonTeaching) && (
+                <FrozenField
+                  label={isNonTeaching ? "Department / Office" : "SoEMR Department"}
+                  value={formData.department}
+                />
+              )}
+              <FrozenField label="Email Address" value={formData.email} />
+              <FrozenField label="Full Name" value={formData.name} />
+            </div>
           </div>
 
-          <div style={S.actions}>
-            <button type="button" onClick={() => navigate("/dashboard")} style={S.cancelBtn}>Cancel</button>
-            <button type="submit" disabled={saving} style={{ ...S.saveBtn, opacity: saving ? 0.72 : 1, cursor: saving ? "wait" : "pointer" }}>
-              {saving ? "Saving..." : "Save Profile"}
-            </button>
+          {/* - Card 2: Editable Details - */}
+          <div style={{ ...CARD, marginTop: 20 }}>
+            <SectionHead title="Personal Details" badge="Editable" badgeColor="#2563eb" badgeBack="#eff6ff" />
+            <div className="ep-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18 }}>
+              <InputField label="Employee ID" required hint="e.g. EMP001 - letters, numbers, / - _">
+                <input
+                  className="ep-inp"
+                  style={INP}
+                  name="employeeId"
+                  value={formData.employeeId}
+                  onChange={handleChange}
+                  required
+                  maxLength={30}
+                  placeholder="EMP001"
+                />
+              </InputField>
+
+              <InputField label="Designation" required hint="e.g. Assistant Professor">
+                <input
+                  className="ep-inp"
+                  style={INP}
+                  name="designation"
+                  value={formData.designation}
+                  onChange={handleChange}
+                  required
+                  maxLength={100}
+                  placeholder="Assistant Professor"
+                />
+              </InputField>
+
+              <InputField label="Qualification" hint="e.g. Ph.D, M.Tech">
+                <input
+                  className="ep-inp"
+                  style={INP}
+                  name="qualification"
+                  value={formData.qualification}
+                  onChange={handleChange}
+                  maxLength={100}
+                  placeholder="Ph.D, M.Tech"
+                />
+              </InputField>
+
+              <InputField label="Experience (years)" hint="0 to 80 years">
+                <input
+                  className="ep-inp"
+                  style={INP}
+                  name="experience"
+                  value={formData.experience}
+                  onChange={handleChange}
+                  inputMode="decimal"
+                  maxLength={4}
+                  placeholder="e.g. 10"
+                />
+              </InputField>
+
+              <InputField label="Phone" hint="+91 98765 43210" wide>
+                <input
+                  className="ep-inp"
+                  style={INP}
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  inputMode="tel"
+                  maxLength={20}
+                  placeholder="+91 98765 43210"
+                />
+              </InputField>
+            </div>
+
+            {/* - Actions - */}
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginTop: 30, paddingTop: 22, borderTop: "1px solid #f1f5f9" }}>
+              <button
+                type="button"
+                className="ep-cancel"
+                onClick={() => navigate("/dashboard")}
+                style={{ border: "1.5px solid #e2e8f0", background: "#fff", color: "#475569", borderRadius: 9, padding: "0 22px", height: 40, cursor: "pointer", fontWeight: 600, fontFamily: "inherit", fontSize: 13, transition: "all .15s" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="ep-save"
+                style={{ display: "flex", alignItems: "center", gap: 7, border: "none", background: saving ? "#93c5fd" : "#2563eb", color: "#fff", borderRadius: 9, padding: "0 24px", height: 40, cursor: saving ? "wait" : "pointer", fontWeight: 700, fontFamily: "inherit", fontSize: 13, transition: "all .18s", boxShadow: saving ? "none" : "0 2px 8px rgba(37,99,235,.25)" }}
+              >
+                {saving ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Save Profile
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+
         </form>
+
+        {/* Spinner keyframe (for save button loading state) */}
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </main>
     </div>
   );
 }
-
-function Field({ label, required = false, wide = false, children }) {
-  return (
-    <label style={{ ...S.field, gridColumn: wide ? "1 / -1" : undefined }}>
-      <span style={S.label}>{label}{required ? " *" : ""}</span>
-      {children}
-    </label>
-  );
-}
-
-const S = {
-  page: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    color: "#0f172a",
-    fontFamily: "Georgia, serif",
-  },
-  topBar: {
-    background: "#0f172a",
-    padding: "14px 28px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-  },
-  logo: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    background: "linear-gradient(135deg,#6366f1,#0ea5e9)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    fontWeight: 800,
-    fontSize: 12,
-  },
-  portal: {
-    color: "#f1f5f9",
-    fontWeight: 700,
-    fontSize: 13,
-  },
-  university: {
-    color: "#64748b",
-    fontSize: 9,
-    marginTop: 1,
-  },
-  backBtn: {
-    border: "1px solid #334155",
-    background: "#1e293b",
-    color: "#e2e8f0",
-    borderRadius: 8,
-    padding: "9px 14px",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontSize: 12,
-    fontFamily: "Georgia, serif",
-  },
-  main: {
-    maxWidth: 880,
-    margin: "0 auto",
-    padding: "34px 24px 56px",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: "50%",
-    background: "linear-gradient(135deg,#6366f1,#0ea5e9)",
-    color: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 800,
-    fontSize: 18,
-    letterSpacing: 1,
-  },
-  title: {
-    margin: 0,
-    fontSize: 24,
-  },
-  subTitle: {
-    color: "#64748b",
-    fontSize: 12,
-    marginTop: 4,
-  },
-  card: {
-    background: "#fff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    boxShadow: "0 10px 28px rgba(15,23,42,0.08)",
-    padding: "24px",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 16,
-  },
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 6,
-  },
-  label: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  input: {
-    width: "100%",
-    border: "1px solid #cbd5e1",
-    borderRadius: 8,
-    padding: "10px 12px",
-    fontSize: 13,
-    color: "#0f172a",
-    outline: "none",
-    fontFamily: "Georgia, serif",
-    background: "#fff",
-    boxSizing: "border-box",
-  },
-  actions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: 12,
-    marginTop: 24,
-  },
-  cancelBtn: {
-    border: "1px solid #cbd5e1",
-    background: "#f8fafc",
-    color: "#475569",
-    borderRadius: 8,
-    padding: "10px 18px",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontFamily: "Georgia, serif",
-  },
-  saveBtn: {
-    border: "none",
-    background: "#0f172a",
-    color: "#f8fafc",
-    borderRadius: 8,
-    padding: "10px 20px",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontFamily: "Georgia, serif",
-  },
-  error: {
-    background: "#fee2e2",
-    color: "#991b1b",
-    border: "1px solid #fecaca",
-    borderRadius: 8,
-    padding: "10px 12px",
-    fontSize: 12,
-    marginBottom: 16,
-  },
-  success: {
-    background: "#d1fae5",
-    color: "#065f46",
-    border: "1px solid #a7f3d0",
-    borderRadius: 8,
-    padding: "10px 12px",
-    fontSize: 12,
-    marginBottom: 16,
-  },
-};
-

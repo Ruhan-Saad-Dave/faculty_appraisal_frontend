@@ -1,8 +1,12 @@
 import axios from "axios";
+// https://faculty-appraisal-java-backend-376777978967.asia-south1.run.app
+// https://faculty-appraisal-git-376777978967.asia-south1.run.app
+const DEFAULT_API_BASE_URL =
+  "https://faculty-appraisal-python-919405994318.asia-south1.run.app/api/v1";
 
-const DEFAULT_API_BASE_URL = "https://faculty-appraisal-git-376777978967.asia-south1.run.app/api/v1";
-
-const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
+const rawBaseUrl = (
+  import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
+).replace(/\/$/, "");
 
 const isHttpsFrontend = typeof window !== "undefined" && window.location && window.location.protocol === "https:";
 
@@ -18,8 +22,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const token =
-    sessionStorage.getItem("accessToken") ||
-    sessionStorage.getItem("token");
+    sessionStorage.getItem("accessToken") || sessionStorage.getItem("token");
 
   if (token) {
     config.headers = config.headers || {};
@@ -68,7 +71,7 @@ export const resolveRelativeUrls = (data) => {
 };
 
 // Normalize every API error so err.message is always a user-safe string.
-// Priority: user_message → detail → generic fallback.
+// Backend detail fields are developer-facing; show user_message when present.
 // 401 clears the session and redirects to /login automatically.
 apiClient.interceptors.response.use(
   (response) => {
@@ -82,9 +85,7 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
 
     const userMessage =
-      data?.user_message ??
-      (typeof data?.detail === "string" ? data.detail : null) ??
-      "Something went wrong. Please try again.";
+      data?.user_message ?? "Something went wrong. Please try again.";
 
     error.message = userMessage;
     error.userMessage = userMessage;
@@ -96,16 +97,31 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export const api = {
+<<<<<<< HEAD
   get: (url, config) => apiClient.get(url, config).then((response) => response.data),
   post: (url, data, config) => apiClient.post(url, data, config).then((response) => response.data),
   put: (url, data, config) => apiClient.put(url, data, config).then((response) => response.data),
   delete: (url, config) => apiClient.delete(url, config).then((response) => response.data),
   getFileUrl,
+=======
+  get: (url, config) =>
+    apiClient.get(url, config).then((response) => response.data),
+  post: (url, data, config) =>
+    apiClient.post(url, data, config).then((response) => response.data),
+  put: (url, data, config) =>
+    apiClient.put(url, data, config).then((response) => response.data),
+  delete: (url, config) =>
+    apiClient.delete(url, config).then((response) => response.data),
+>>>>>>> refs/remotes/origin/main
 };
+
+// Returns an AbortController whose signal can be passed as { signal } in axios config.
+// Call controller.abort() in the useEffect cleanup to cancel in-flight requests.
+export const makeAbortController = () => new AbortController();
 
 export const createFormData = (fields = {}, file) => {
   const formData = new FormData();
@@ -130,4 +146,3 @@ export const fetchFormData = async () => {
 export const saveFormData = async (data) => {
   sessionStorage.setItem("formData", JSON.stringify(data));
 };
-

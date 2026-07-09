@@ -67,12 +67,16 @@ export const departmentHasHod = (school, department) => {
 };
 
 export const getReviewChain = (profile = {}) => {
-  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
+  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.appraisalRole || profile.role);
+  const reportsToRegistrar = profile.reports_to_registrar === true ||
+    profile.reportsToRegistrar === true ||
+    String(profile.reports_to_registrar || profile.reportsToRegistrar || "").trim().toLowerCase() === "true";
 
   if (role === "vc") return [];
   if (role === "registrar") return ["vc"];
   if (role === "reporting_officer") return ["registrar", "vc"];
-  if (role === "non_teaching_staff") return ["reporting_officer", "registrar", "vc"];
+  if (role === "non_teaching_staff")
+    return reportsToRegistrar ? ["registrar", "vc"] : ["reporting_officer", "registrar", "vc"];
   if (role === "center_head") return ["vc"];
   if (role === "dean") return ["vc"];
   if (role === "director") return ["dean", "vc"];
@@ -122,12 +126,80 @@ export const roleLabel = (role) => ({
 export const pendingStatusFor = (role) => `Pending ${roleLabel(role)} Review`;
 export const reviewedStatusFor = (role) => `${roleLabel(role)} Reviewed`;
 export const rejectedStatusFor = (role) => `${roleLabel(role)} Rejected`;
+export const isPendingReviewStatusFor = (status, role) => {
+  const reviewerRole = normalizeRoleForWorkflow(role);
+  const reviewerLabel = normalizeText(roleLabel(reviewerRole));
+  const reviewerKey = normalizeText(reviewerRole);
+
+  if (!reviewerRole) return false;
+  const values = (Array.isArray(status) ? status : [status]).map(normalizeText).filter(Boolean);
+  const pendingValues = [
+    normalizeText(pendingStatusFor(reviewerRole)),
+    `pending ${reviewerLabel}`,
+    `pending ${reviewerKey}`,
+    reviewerRole === "reporting_officer" ? "pending ro" : "",
+    reviewerRole === "vc" ? "pending vice chancellor" : "",
+    "pending review",
+  ].filter(Boolean);
+  return values.some((value) => pendingValues.includes(value));
+};
 export const isRejectedStatus = (status) => normalizeText(status).includes("rejected");
+const timestampMs = (value) => {
+  const time = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(time) ? time : null;
+};
+export const reviewListFrom = (reviews = []) => {
+  if (Array.isArray(reviews)) return reviews;
+  if (!reviews || typeof reviews !== "object") return [];
+  return Object.values(reviews).filter((review) => review && typeof review === "object");
+};
+const reviewTimestampMs = (review = {}) =>
+  timestampMs(review?.reviewed_at || review?.reviewedAt || review?.updated_at || review?.updatedAt || review?.created_at || review?.createdAt);
+const declarationTimestampMs = (declaration = {}) =>
+  timestampMs(declaration?.submitted_at || declaration?.submittedAt || declaration?.updated_at || declaration?.updatedAt || declaration?.created_at || declaration?.createdAt);
+export const hasRejectedReview = (reviews = [], { since } = {}) => {
+  const sinceMs = timestampMs(since);
+  return reviewListFrom(reviews).some((review) => [
+    review?.status,
+    review?.review_status,
+    review?.reviewStatus,
+    review?.workflow_status,
+    review?.workflowStatus,
+    review?.decision,
+  ].some(isRejectedStatus) && (!sinceMs || !reviewTimestampMs(review) || reviewTimestampMs(review) >= sinceMs));
+};
+export const hasActiveRejection = (declaration, reviews = []) =>
+  isRejectedStatus(declaration?.status || declaration?.workflow_status || declaration?.workflowStatus) ||
+  hasRejectedReview(reviews, { since: declarationTimestampMs(declaration) });
+export const isAppraisalFinalisedByVc = (item = {}) => {
+  const statuses = [
+    item?.declaration?.status,
+    item?.declarationStatus,
+    item?.declaration_status,
+    item?.workflowStatus,
+    item?.workflow_status,
+    item?.status,
+  ].map(normalizeText);
+  return statuses.some((status) => status === "reviewed" || status === "vc reviewed");
+};
 export const reviewStatusForDecision = (role, decision = "approved") =>
   decision === "rejected" ? rejectedStatusFor(role) : reviewedStatusFor(role);
 
+export const canReviewerRejectProfile = (reviewerRole, subjectProfile = {}) => {
+  const role = normalizeRoleForWorkflow(reviewerRole);
+  const subjectRole = normalizeRoleForWorkflow(subjectProfile.appraisal_role || subjectProfile.appraisalRole || subjectProfile.role);
+  const firstReviewer = getReviewChain(subjectProfile)[0];
+  if (firstReviewer !== role) return false;
+
+  if (subjectRole === "faculty") return ["hod", "center_head", "director"].includes(role);
+  if (subjectRole === "hod") return role === "director";
+  if (subjectRole === "director") return role === "dean";
+  if (subjectRole === "dean") return role === "vc";
+  return false;
+};
+
 export const workflowValidationError = (profile = {}) => {
-  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.role);
+  const role = normalizeRoleForWorkflow(profile.appraisal_role || profile.appraisalRole || profile.role);
   const schoolKey = getSchoolKey(profile.school);
 
   if (isNonTeachingRole(role)) {
@@ -164,7 +236,10 @@ export const canAuthorityReviewProfile = (reviewerProfile = {}, subjectProfile =
   }
 
   if (reviewerRole === "reporting_officer") {
-    return subjectRole === "non_teaching_staff";
+    const reportsToRegistrar = subjectProfile.reports_to_registrar === true ||
+      subjectProfile.reportsToRegistrar === true ||
+      String(subjectProfile.reports_to_registrar || subjectProfile.reportsToRegistrar || "").trim().toLowerCase() === "true";
+    return subjectRole === "non_teaching_staff" && !reportsToRegistrar;
   }
 
   if (isNonTeachingRole(reviewerRole) || isNonTeachingRole(subjectRole)) {
@@ -206,6 +281,12 @@ export const profileFromsessionStorage = () => ({
   school: sessionStorage.getItem("school") || "",
   department: sessionStorage.getItem("department") || "",
   designation: sessionStorage.getItem("designation") || "",
+  qualification: sessionStorage.getItem("qualification") || "",
+  teaching_experience: sessionStorage.getItem("experience") || "",
+  experience: sessionStorage.getItem("experience") || "",
   employee_id: sessionStorage.getItem("employeeId") || "",
+  reports_to_registrar: sessionStorage.getItem("reports_to_registrar") === "true" ||
+    sessionStorage.getItem("reportsToRegistrar") === "true",
+  reportsToRegistrar: sessionStorage.getItem("reports_to_registrar") === "true" ||
+    sessionStorage.getItem("reportsToRegistrar") === "true",
 });
-
