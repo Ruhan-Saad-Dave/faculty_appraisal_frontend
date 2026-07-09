@@ -36,18 +36,21 @@ apiClient.interceptors.request.use((config) => {
 
 export const getFileUrl = (url) => {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
-    return url;
+  // Clean up any double/single quotes wrapped around the URL (common .env parsing bug)
+  let cleanUrl = String(url).trim().replace(/^["']|["']$/g, "");
+  
+  if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://") || cleanUrl.startsWith("blob:") || cleanUrl.startsWith("data:")) {
+    return cleanUrl;
   }
   // Resolve relative URLs to the API base URL origin
   try {
     const origin = new URL(API_BASE_URL).origin;
-    const resolved = url.startsWith("/") ? `${origin}${url}` : `${origin}/${url}`;
+    const resolved = cleanUrl.startsWith("/") ? `${origin}${cleanUrl}` : `${origin}/${cleanUrl}`;
     console.log("=== Resolving relative file URL ===", url, "->", resolved);
     return resolved;
   } catch (e) {
     console.error("=== Failed to resolve relative file URL ===", url, e);
-    return url;
+    return cleanUrl;
   }
 };
 
@@ -59,7 +62,7 @@ export const resolveRelativeUrls = (data) => {
   if (typeof data === "object") {
     const resolved = {};
     for (const [key, value] of Object.entries(data)) {
-      if (typeof value === "string" && (key === "url" || key === "file_url" || key === "fileUrl" || key === "avatar_url" || key === "avatarUrl") && value.startsWith("/")) {
+      if (typeof value === "string" && (key === "url" || key === "file_url" || key === "fileUrl" || key === "avatar_url" || key === "avatarUrl")) {
         resolved[key] = getFileUrl(value);
       } else if (typeof value === "object" && value !== null) {
         resolved[key] = resolveRelativeUrls(value);
