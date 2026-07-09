@@ -101,22 +101,11 @@ apiClient.interceptors.response.use(
 );
 
 export const api = {
-<<<<<<< HEAD
   get: (url, config) => apiClient.get(url, config).then((response) => response.data),
   post: (url, data, config) => apiClient.post(url, data, config).then((response) => response.data),
   put: (url, data, config) => apiClient.put(url, data, config).then((response) => response.data),
   delete: (url, config) => apiClient.delete(url, config).then((response) => response.data),
   getFileUrl,
-=======
-  get: (url, config) =>
-    apiClient.get(url, config).then((response) => response.data),
-  post: (url, data, config) =>
-    apiClient.post(url, data, config).then((response) => response.data),
-  put: (url, data, config) =>
-    apiClient.put(url, data, config).then((response) => response.data),
-  delete: (url, config) =>
-    apiClient.delete(url, config).then((response) => response.data),
->>>>>>> refs/remotes/origin/main
 };
 
 // Returns an AbortController whose signal can be passed as { signal } in axios config.
