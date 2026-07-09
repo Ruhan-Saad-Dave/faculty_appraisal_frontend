@@ -36,8 +36,8 @@ apiClient.interceptors.request.use((config) => {
 
 export const getFileUrl = (url) => {
   if (!url) return "";
-  // Clean up any double/single quotes wrapped around the URL (common .env parsing bug)
-  let cleanUrl = String(url).trim().replace(/^["']|["']$/g, "");
+  // Clean up any double/single quotes wrapped around or inside the URL
+  let cleanUrl = String(url).replace(/["']/g, "").trim();
   
   if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://") || cleanUrl.startsWith("blob:") || cleanUrl.startsWith("data:")) {
     return cleanUrl;
