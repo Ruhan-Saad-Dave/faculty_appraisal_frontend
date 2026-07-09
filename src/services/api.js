@@ -15,6 +15,8 @@ export const API_BASE_URL = (isHttpsFrontend && /^http:\/\/(?!localhost)/.test(r
   ? rawBaseUrl.replace(/^http:\/\//, "https://")
   : rawBaseUrl;
 
+console.log("=== API_BASE_URL ===", API_BASE_URL);
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
@@ -40,11 +42,11 @@ export const getFileUrl = (url) => {
   // Resolve relative URLs to the API base URL origin
   try {
     const origin = new URL(API_BASE_URL).origin;
-    if (url.startsWith("/")) {
-      return `${origin}${url}`;
-    }
-    return `${origin}/${url}`;
+    const resolved = url.startsWith("/") ? `${origin}${url}` : `${origin}/${url}`;
+    console.log("=== Resolving relative file URL ===", url, "->", resolved);
+    return resolved;
   } catch (e) {
+    console.error("=== Failed to resolve relative file URL ===", url, e);
     return url;
   }
 };
