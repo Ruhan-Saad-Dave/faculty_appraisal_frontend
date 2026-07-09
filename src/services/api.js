@@ -4,8 +4,10 @@ const DEFAULT_API_BASE_URL = "https://faculty-appraisal-git-376777978967.asia-so
 
 const rawBaseUrl = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, "");
 
-// Force https for non-localhost URLs to prevent mixed-content blocks
-export const API_BASE_URL = /^http:\/\/(?!localhost)/.test(rawBaseUrl)
+const isHttpsFrontend = typeof window !== "undefined" && window.location && window.location.protocol === "https:";
+
+// Force https for non-localhost URLs to prevent mixed-content blocks only if the frontend is HTTPS
+export const API_BASE_URL = (isHttpsFrontend && /^http:\/\/(?!localhost)/.test(rawBaseUrl))
   ? rawBaseUrl.replace(/^http:\/\//, "https://")
   : rawBaseUrl;
 
@@ -27,11 +29,54 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+export const getFileUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
+    return url;
+  }
+  // Resolve relative URLs to the API base URL origin
+  try {
+    const origin = new URL(API_BASE_URL).origin;
+    if (url.startsWith("/")) {
+      return `${origin}${url}`;
+    }
+    return `${origin}/${url}`;
+  } catch (e) {
+    return url;
+  }
+};
+
+export const resolveRelativeUrls = (data) => {
+  if (!data) return data;
+  if (Array.isArray(data)) {
+    return data.map(resolveRelativeUrls);
+  }
+  if (typeof data === "object") {
+    const resolved = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (typeof value === "string" && (key === "url" || key === "file_url" || key === "fileUrl" || key === "avatar_url" || key === "avatarUrl") && value.startsWith("/")) {
+        resolved[key] = getFileUrl(value);
+      } else if (typeof value === "object" && value !== null) {
+        resolved[key] = resolveRelativeUrls(value);
+      } else {
+        resolved[key] = value;
+      }
+    }
+    return resolved;
+  }
+  return data;
+};
+
 // Normalize every API error so err.message is always a user-safe string.
 // Priority: user_message → detail → generic fallback.
 // 401 clears the session and redirects to /login automatically.
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data) {
+      response.data = resolveRelativeUrls(response.data);
+    }
+    return response;
+  },
   (error) => {
     const data = error?.response?.data;
     const status = error?.response?.status;
@@ -59,6 +104,7 @@ export const api = {
   post: (url, data, config) => apiClient.post(url, data, config).then((response) => response.data),
   put: (url, data, config) => apiClient.put(url, data, config).then((response) => response.data),
   delete: (url, config) => apiClient.delete(url, config).then((response) => response.data),
+  getFileUrl,
 };
 
 export const createFormData = (fields = {}, file) => {
