@@ -1,8 +1,6 @@
 import axios from "axios";
-// https://faculty-appraisal-java-backend-376777978967.asia-south1.run.app
-// https://faculty-appraisal-git-376777978967.asia-south1.run.app
-const DEFAULT_API_BASE_URL =
-  "https://faculty-appraisal-python-919405994318.asia-south1.run.app/api/v1";
+// Default API URL fallback. For production or custom configurations, specify VITE_API_BASE_URL in your .env file.
+const DEFAULT_API_BASE_URL = "/api/v1";
 
 const rawBaseUrl = (
   import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL
@@ -10,8 +8,8 @@ const rawBaseUrl = (
 
 const isHttpsFrontend = typeof window !== "undefined" && window.location && window.location.protocol === "https:";
 
-// Force https for non-localhost URLs to prevent mixed-content blocks only if the frontend is HTTPS
-export const API_BASE_URL = (isHttpsFrontend && /^http:\/\/(?!localhost)/.test(rawBaseUrl))
+// Force HTTPS for non-localhost/non-loopback URLs if the frontend is HTTPS to prevent mixed-content blocks
+export const API_BASE_URL = (isHttpsFrontend && /^http:\/\/(?!(localhost|127\.0\.0\.1))/.test(rawBaseUrl))
   ? rawBaseUrl.replace(/^http:\/\//, "https://")
   : rawBaseUrl;
 
@@ -44,7 +42,10 @@ export const getFileUrl = (url) => {
   }
   // Resolve relative URLs to the API base URL origin
   try {
-    const origin = new URL(API_BASE_URL).origin;
+    const baseForURL = API_BASE_URL.startsWith("http")
+      ? API_BASE_URL
+      : (typeof window !== "undefined" && window.location ? window.location.origin + API_BASE_URL : API_BASE_URL);
+    const origin = new URL(baseForURL).origin;
     const resolved = cleanUrl.startsWith("/") ? `${origin}${cleanUrl}` : `${origin}/${cleanUrl}`;
     console.log("=== Resolving relative file URL ===", url, "->", resolved);
     return resolved;
