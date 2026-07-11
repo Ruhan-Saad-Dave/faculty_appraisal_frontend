@@ -1037,6 +1037,39 @@ function buildDesignArtsSectionScores(person, reviewData, reviewerRole) {
  return payload;
 }
 
+const copyDeanScoresToReviewData = (person = {}, currentReviewData = {}, reviewerRole = "vc") =>{
+ const next = { ...currentReviewData };
+ ALL_ARRAY_KEYS.forEach((key) =>{
+ const rows = Array.isArray(person[key]) ? person[key] : [];
+ const currentRows = Array.isArray(currentReviewData[key]) ? currentReviewData[key] : [];
+ next[key] = rows.map((row, index) =>{
+ const deanScore = row.dean ?? row.dean_score ?? row.deanScore ?? row.dean_marks ?? row.deanMarks ?? "";
+ const nextScore = key === "society" && societyRowLocked(row)
+ ? "0"
+ : key === "acr"
+ ? (String(deanScore ?? "").trim() ? String(clampScore(deanScore, SCORE_LIMITS.acrRow)) : "")
+ : rowHasReviewableData(key, row) && String(deanScore ?? "").trim() !== ""
+ ? clampReviewScore(key, row, deanScore, SECTION_MAX_BY_KEY[key] || 0)
+ : "";
+ return { ...row, ...(currentRows[index] || {}), [reviewerRole]: nextScore };
+ });
+ });
+ const innovRows = Array.isArray(person.innovRows) && person.innovRows.length
+ ? person.innovRows
+ : [{ method: person.innovDetails || "", details: person.innovDetails || "", score: person.innovScore || "" }];
+ const currentInnovRows = Array.isArray(currentReviewData.innovRows) ? currentReviewData.innovRows : [];
+ next.innovRows = innovRows.map((row, index) =>{
+ const deanScore = row.dean ?? row.dean_score ?? row.deanScore ?? row.dean_marks ?? row.deanMarks ?? "";
+ const nextScore = rowHasReviewableData("innovRows", row) && String(deanScore ?? "").trim() !== ""
+ ? clampReviewScore("innovRows", row, deanScore, SCORE_LIMITS.innovativeRow)
+ : "";
+ return { ...row, ...(currentInnovRows[index] || {}), [reviewerRole]: nextScore };
+ });
+ const innovTotal = reviewSectionScore("innovRows", next.innovRows.map((row, index) =>({ ...innovRows[index], ...row })), SCORE_LIMITS.innovativeRow, reviewerRole);
+ next.innovativeTeaching = { ...(currentReviewData.innovativeTeaching || {}), [reviewerRole]: innovTotal ? String(innovTotal) : "" };
+ return next;
+};
+
 function GuideSection({ title, accent = ACCENT, children }) {
  return (
 <div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflow: "hidden", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
@@ -1046,7 +1079,7 @@ function GuideSection({ title, accent = ACCENT, children }) {
  );
 }
 
-export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, onSubmit, readOnly = false, showReport = false }) {
+export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, onSubmit, readOnly = false, showReport = false, enableCopyDeanMarks = false }) {
  const [sectionView, setSectionView] = useState("partA");
  const [reviewData, setReviewData] = useState({});
  const [remarks, setRemarks] = useState(person?.[`${reviewerRole}Remarks`] || "");
@@ -1127,6 +1160,7 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
  total: averageSourceTotals.reduce((sum, item) =>sum + n(item.total), 0) / averageSourceTotals.length,
  maxScores: totals.maxScores,
  } : { partA: 0, partB: 0, total: 0, maxScores: totals.maxScores };
+ const canCopyDeanMarks = enableCopyDeanMarks && reviewerRole === "vc" && visiblePreviousRoles.includes("dean") && !panelReadOnly;
  useEffect(() =>{
  let active = true;
  if (panelReadOnly || !subjectEmail) return undefined;
@@ -1237,7 +1271,16 @@ export function DesignArtsAuthorityReviewPanel({ person, reviewerRole, onBack, o
 </div>
 <StatusBadge status={person?.status} />
 </div>
-<div style={{ display: "flex", justifyContent: "flex-end" }}>
+<div style={{ display: "flex", justifyContent: "flex-end", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+ {canCopyDeanMarks && (sectionView === "partA" || sectionView === "partB") && (
+<button
+ type="button"
+ onClick={() =>{ setReviewData((current) =>copyDeanScoresToReviewData(form, current, reviewerRole)); setConfirmed(false); }}
+ style={{ ...smallButton("#059669"), height: 44, padding: "0 16px", borderRadius: 8, boxShadow: "0 2px 8px rgba(5,150,105,0.22)" }}
+>
+ Copy Dean Marks
+</button>
+ )}
 <SectionSelector value={sectionView} onChange={setSectionView} label="Review Section" />
 </div>
  {finalisedVcReadOnly && (

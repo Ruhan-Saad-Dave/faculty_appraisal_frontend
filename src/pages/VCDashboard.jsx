@@ -303,12 +303,9 @@ const rawVcTotalForRole = (person = {}, role) =>{
 const hasScoreValue = (value) =>
  value !== undefined && value !== null && String(value).trim() !== "" && Number.isFinite(Number(value));
 const vcAverageBeforeVc = (person = {}, personMode = "faculty", previousRoles = vcPreviousRolesFor(person, personMode)) =>{
- const scores = [
- rawVcSelfTotalForPerson(person),
- ...previousRoles
+ const scores = previousRoles
  .filter((role) =>role !== personMode)
- .map((role) =>rawVcTotalForRole(person, role)),
- ]
+ .map((role) =>rawVcTotalForRole(person, role))
  .filter(hasScoreValue)
  .map(Number);
  if (!scores.length) return 0;
@@ -404,16 +401,55 @@ const buildVcSectionScores = (person, vcData) =>{
  return payload;
 };
 
+const scoreFromRowForCopyRole = (row = {}, role = "dean") =>{
+ const field = role === "center_head" ? "hod" : role;
+ const camelField = field.replace(/_([a-z])/g, (_, letter) =>letter.toUpperCase());
+ return row[field] ?? row[`${field}_score`] ?? row[`${camelField}Score`] ?? row[`${field}_marks`] ?? row[`${camelField}Marks`] ?? "";
+};
+
+const copyAuthorityScoresToVcData = (person = {}, currentVcData = {}, sourceRole = "dean") =>{
+ const next = { ...currentVcData };
+ VC_REVIEW_ARRAY_KEYS.forEach((key) =>{
+ const rows = Array.isArray(person[key]) ? person[key] : [];
+ const currentRows = Array.isArray(currentVcData[key]) ? currentVcData[key] : [];
+ next[key] = rows.map((row, index) =>{
+ const sourceScore = scoreFromRowForCopyRole(row, sourceRole);
+ const vcScore = key === "society" && societyRowLocked(row)
+ ? "0"
+ : rowHasReviewableData(key, row) && hasScoreValue(sourceScore)
+ ? clampReviewScore(key, row, sourceScore, VC_SECTION_MAX[key] || 0)
+ : "";
+ return { ...row, ...(currentRows[index] || {}), vc: vcScore };
+ });
+ });
+
+ const innovativeRows = Array.isArray(person.innovRows) && person.innovRows.length
+ ? person.innovRows
+ : [{ method: person.innovDetails || "Innovative / participatory teaching methods used", details: person.innovDetails || "", score: person.innovScore || "" }];
+ const currentInnovRows = Array.isArray(currentVcData.innovRows) ? currentVcData.innovRows : [];
+ next.innovRows = innovativeRows.map((row, index) =>{
+ const sourceScore = scoreFromRowForCopyRole(row, sourceRole);
+ const vcScore = rowHasReviewableData("innovRows", row) && hasScoreValue(sourceScore)
+ ? clampReviewScore("innovRows", row, sourceScore, SCORE_LIMITS.innovativeRow)
+ : "";
+ return { ...row, ...(currentInnovRows[index] || {}), vc: vcScore };
+ });
+ const innovTotal = reviewSectionScore("innovRows", next.innovRows.map((row, index) =>({ ...innovativeRows[index], ...row })), SCORE_LIMITS.innovativeRow, "vc");
+ next.innovVc = innovTotal ? String(innovTotal) : "";
+ return next;
+};
+
 
 // --- VC Review Form -----------------------------------------------------------
 // personMode: "dean" | "director" | "hod" | "faculty"
-function VCReviewForm({ person, vcData, setVcData, personMode = "director", sectionView = "partA" }) {
+function VCReviewForm({ person, vcData, setVcData, personMode = "director", sectionView = "partA", onManualVcEdit }) {
  const info = mergeFacultyInfo(person.info, person);
  const hiddenInfoRows = new Set(["expDyp", "expPrev", "expTotal"]);
  const reviewRoles = vcPreviousRolesFor(person, personMode);
  const selfScoreLabel = personMode === "faculty" ? "Faculty Score" : "Self Score";
 
  const set = (section, idx, field, val) =>{
+ if (field === "vc") onManualVcEdit?.();
  setVcData(prev =>{
  const updated = { ...prev };
  if (!updated[section]) updated[section] = JSON.parse(JSON.stringify(person[section] || []));
@@ -449,6 +485,7 @@ function VCReviewForm({ person, vcData, setVcData, personMode = "director", sect
  : [{ method: person.innovDetails || "Innovative / participatory teaching methods used", details: person.innovDetails || "", score: person.innovScore || "" }];
  const getInnovVc = (index) =>vcData.innovRows?.[index]?.vc ?? innovativeRows[index]?.vc ?? "";
  const setInnovVc = (index, value) =>{
+ onManualVcEdit?.();
  const sourceRow = innovativeRows[index] || {};
  const nextValue = clampReviewScore("innovRows", sourceRow, value, 10);
  setVcData(prev =>{
@@ -830,6 +867,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const [draftStatus, setDraftStatus] = useState("");
  const [savingDraft, setSavingDraft] = useState(false);
+ const [deanCopyDisabled, setDeanCopyDisabled] = useState(false);
  const finalisedByVc = isAppraisalFinalisedByVc(person);
  const [editingFinalised, setEditingFinalised] = useState(false);
  const finalisedReadOnly = finalisedByVc && !editingFinalised;
@@ -881,12 +919,9 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  remarks: person[meta.remarksKey],
  };
  });
- const averageSourceTotals = [
- facultyTotals,
- ...previousSummaryCards
+ const averageSourceTotals = previousSummaryCards
  .filter((item) =>item.role !== personMode && item.totals.hasTotal)
- .map((item) =>item.totals),
- ];
+ .map((item) =>item.totals);
  const averageSummaryTotals = averageSourceTotals.length
  ? {
  partA: averageSourceTotals.reduce((sum, item) =>sum + n(item.partA), 0) / averageSourceTotals.length,
@@ -898,6 +933,9 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const vcReviewCompleted = !isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0);
  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
  const personInfo = mergeFacultyInfo(person.info, person);
+ const copyMarksSourceRole = previousRoles.includes("center_head") ? "center_head" : previousRoles.includes("dean") ? "dean" : "";
+ const copyMarksSourceLabel = copyMarksSourceRole === "center_head" ? "Center Head" : "Dean";
+ const canCopyDeanScores = Boolean(copyMarksSourceRole);
  useEffect(() =>{
  let active = true;
  if (reviewLocked || !subjectEmail) return undefined;
@@ -936,6 +974,13 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  } finally {
  setSavingDraft(false);
  }
+ };
+
+ const handleCopyDeanScores = () =>{
+ setVcData((current) =>copyAuthorityScoresToVcData(person, current, copyMarksSourceRole));
+ setDeanCopyDisabled(true);
+ setReviewConfirmed(false);
+ setDraftStatus(`${copyMarksSourceLabel} marks copied to VC score column. Please review and save or submit.`);
  };
 
  const generateVcReport = () =>{
@@ -1032,13 +1077,25 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </div>
 
  {/* Section switcher */}
-<div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+<div style={{ display: "flex", gap: 6 }}>
  {[["partA", "Part A"], ["partB", "Part B"], ["summary", "Summary"]].map(([id, label]) =>(
 <button key={id} onClick={() =>{ setSectionView(id); requestAnimationFrame(() =>{ window.scrollTo({ top: 0, left: 0, behavior: "auto" }); }); }}
  style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: sectionView === id ? "#4c1d95" : "#e2e8f0", color: sectionView === id ? "#ddd6fe" : "#475569" }}>
  {label}
 </button>
  ))}
+</div>
+ {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && canCopyDeanScores && (
+<button
+ type="button"
+ onClick={handleCopyDeanScores}
+ disabled={deanCopyDisabled}
+ style={{ height: 37, padding: "0 16px", background: deanCopyDisabled ? "#94a3b8" : "linear-gradient(135deg,#047857,#10b981)", color: "#fff", border: "none", borderRadius: 8, cursor: deanCopyDisabled ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit", boxShadow: deanCopyDisabled ? "none" : "0 3px 10px rgba(5,150,105,0.24)", whiteSpace: "nowrap" }}
+>
+ Copy {copyMarksSourceLabel} Marks
+</button>
+ )}
 </div>
  {finalisedReadOnly && (
 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
@@ -1049,11 +1106,11 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </div>
  )}
 
- {(sectionView === "partA" || sectionView === "partB") && (
+{(sectionView === "partA" || sectionView === "partB") && (
 <fieldset disabled={reviewLocked} style={{ border: "none", padding: 0, margin: 0 }}>
-<VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} sectionView={sectionView} />
+<VCReviewForm person={person} vcData={vcData} setVcData={setVcData} personMode={personMode} sectionView={sectionView} onManualVcEdit={() =>setDeanCopyDisabled(false)} />
 </fieldset>
- )}
+)}
  {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && (
 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
 <span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
@@ -1110,7 +1167,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg,#e2e8f0,transparent)" }} />
 </div>
 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-<SummaryBox title="Average Score" totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} accent="#f59e0b" roleScoreLabel="Average across all reviewers." />
+<SummaryBox title="Average Score" totals={averageSummaryTotals} maxScores={averageSummaryTotals.maxScores} accent="#f59e0b" roleScoreLabel="Average across higher authorities." />
 <SummaryBox title="Vice Chancellor Score" totals={reviewerSummaryTotals} maxScores={reviewerSummaryTotals.maxScores} accent="#7c3aed" roleScoreLabel="Vice Chancellor final score." />
 </div>
 
@@ -1926,6 +1983,7 @@ export default function VCDashboard() {
  onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed, decision)}
  readOnly={isVcReviewed(reviewing.person)}
  showReport
+ enableCopyDeanMarks
  />
  ) : formTypeForSchool(getSchoolKey(reviewing.person?.school)) === FORM_TYPES.DESIGN_ARTS ? (
 <DesignArtsAuthorityReviewPanel
@@ -1935,6 +1993,7 @@ export default function VCDashboard() {
  onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed, decision)}
  readOnly={isVcReviewed(reviewing.person)}
  showReport
+ enableCopyDeanMarks
  />
  ) : (
 <VCReviewPanel
