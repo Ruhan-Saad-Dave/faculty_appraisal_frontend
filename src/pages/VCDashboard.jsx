@@ -401,20 +401,23 @@ const buildVcSectionScores = (person, vcData) =>{
  return payload;
 };
 
-const deanScoreFromRow = (row = {}) =>
- row.dean ?? row.dean_score ?? row.deanScore ?? row.dean_marks ?? row.deanMarks ?? "";
+const scoreFromRowForCopyRole = (row = {}, role = "dean") =>{
+ const field = role === "center_head" ? "hod" : role;
+ const camelField = field.replace(/_([a-z])/g, (_, letter) =>letter.toUpperCase());
+ return row[field] ?? row[`${field}_score`] ?? row[`${camelField}Score`] ?? row[`${field}_marks`] ?? row[`${camelField}Marks`] ?? "";
+};
 
-const copyDeanScoresToVcData = (person = {}, currentVcData = {}) =>{
+const copyAuthorityScoresToVcData = (person = {}, currentVcData = {}, sourceRole = "dean") =>{
  const next = { ...currentVcData };
  VC_REVIEW_ARRAY_KEYS.forEach((key) =>{
  const rows = Array.isArray(person[key]) ? person[key] : [];
  const currentRows = Array.isArray(currentVcData[key]) ? currentVcData[key] : [];
  next[key] = rows.map((row, index) =>{
- const deanScore = deanScoreFromRow(row);
+ const sourceScore = scoreFromRowForCopyRole(row, sourceRole);
  const vcScore = key === "society" && societyRowLocked(row)
  ? "0"
- : rowHasReviewableData(key, row) && hasScoreValue(deanScore)
- ? clampReviewScore(key, row, deanScore, VC_SECTION_MAX[key] || 0)
+ : rowHasReviewableData(key, row) && hasScoreValue(sourceScore)
+ ? clampReviewScore(key, row, sourceScore, VC_SECTION_MAX[key] || 0)
  : "";
  return { ...row, ...(currentRows[index] || {}), vc: vcScore };
  });
@@ -425,9 +428,9 @@ const copyDeanScoresToVcData = (person = {}, currentVcData = {}) =>{
  : [{ method: person.innovDetails || "Innovative / participatory teaching methods used", details: person.innovDetails || "", score: person.innovScore || "" }];
  const currentInnovRows = Array.isArray(currentVcData.innovRows) ? currentVcData.innovRows : [];
  next.innovRows = innovativeRows.map((row, index) =>{
- const deanScore = deanScoreFromRow(row);
- const vcScore = rowHasReviewableData("innovRows", row) && hasScoreValue(deanScore)
- ? clampReviewScore("innovRows", row, deanScore, SCORE_LIMITS.innovativeRow)
+ const sourceScore = scoreFromRowForCopyRole(row, sourceRole);
+ const vcScore = rowHasReviewableData("innovRows", row) && hasScoreValue(sourceScore)
+ ? clampReviewScore("innovRows", row, sourceScore, SCORE_LIMITS.innovativeRow)
  : "";
  return { ...row, ...(currentInnovRows[index] || {}), vc: vcScore };
  });
@@ -930,7 +933,9 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  const vcReviewCompleted = !isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0);
  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
  const personInfo = mergeFacultyInfo(person.info, person);
- const canCopyDeanScores = previousRoles.includes("dean");
+ const copyMarksSourceRole = previousRoles.includes("center_head") ? "center_head" : previousRoles.includes("dean") ? "dean" : "";
+ const copyMarksSourceLabel = copyMarksSourceRole === "center_head" ? "Center Head" : "Dean";
+ const canCopyDeanScores = Boolean(copyMarksSourceRole);
  useEffect(() =>{
  let active = true;
  if (reviewLocked || !subjectEmail) return undefined;
@@ -972,10 +977,10 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  };
 
  const handleCopyDeanScores = () =>{
- setVcData((current) =>copyDeanScoresToVcData(person, current));
+ setVcData((current) =>copyAuthorityScoresToVcData(person, current, copyMarksSourceRole));
  setDeanCopyDisabled(true);
  setReviewConfirmed(false);
- setDraftStatus("Dean marks copied to VC score column. Please review and save or submit.");
+ setDraftStatus(`${copyMarksSourceLabel} marks copied to VC score column. Please review and save or submit.`);
  };
 
  const generateVcReport = () =>{
@@ -1072,7 +1077,8 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </div>
 
  {/* Section switcher */}
-<div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+<div style={{ display: "flex", gap: 6 }}>
  {[["partA", "Part A"], ["partB", "Part B"], ["summary", "Summary"]].map(([id, label]) =>(
 <button key={id} onClick={() =>{ setSectionView(id); requestAnimationFrame(() =>{ window.scrollTo({ top: 0, left: 0, behavior: "auto" }); }); }}
  style={{ padding: "7px 18px", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: sectionView === id ? "#4c1d95" : "#e2e8f0", color: sectionView === id ? "#ddd6fe" : "#475569" }}>
@@ -1081,17 +1087,16 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  ))}
 </div>
  {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && canCopyDeanScores && (
-<div style={{ display: "flex", justifyContent: "flex-end", margin: "-4px 0 14px" }}>
 <button
  type="button"
  onClick={handleCopyDeanScores}
  disabled={deanCopyDisabled}
- style={{ padding: "8px 14px", background: deanCopyDisabled ? "#94a3b8" : "linear-gradient(135deg,#065f46,#10b981)", color: "#fff", border: "none", borderRadius: 7, cursor: deanCopyDisabled ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit", boxShadow: deanCopyDisabled ? "none" : "0 3px 12px rgba(5,150,105,0.28)" }}
+ style={{ height: 37, padding: "0 16px", background: deanCopyDisabled ? "#94a3b8" : "linear-gradient(135deg,#047857,#10b981)", color: "#fff", border: "none", borderRadius: 8, cursor: deanCopyDisabled ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit", boxShadow: deanCopyDisabled ? "none" : "0 3px 10px rgba(5,150,105,0.24)", whiteSpace: "nowrap" }}
 >
- Copy Dean Marks to VC
+ Copy {copyMarksSourceLabel} Marks
 </button>
-</div>
  )}
+</div>
  {finalisedReadOnly && (
 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
 <button onClick={() =>{ setEditingFinalised(true); setReviewConfirmed(false); }}
@@ -1978,6 +1983,7 @@ export default function VCDashboard() {
  onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed, decision)}
  readOnly={isVcReviewed(reviewing.person)}
  showReport
+ enableCopyDeanMarks
  />
  ) : formTypeForSchool(getSchoolKey(reviewing.person?.school)) === FORM_TYPES.DESIGN_ARTS ? (
 <DesignArtsAuthorityReviewPanel
@@ -1987,6 +1993,7 @@ export default function VCDashboard() {
  onSubmit={(id, scores, remarks, sectionScores, reviewConfirmed, decision) =>handleSubmit(id, scores, remarks, reviewing.personMode, sectionScores, reviewConfirmed, decision)}
  readOnly={isVcReviewed(reviewing.person)}
  showReport
+ enableCopyDeanMarks
  />
  ) : (
 <VCReviewPanel
