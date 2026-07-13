@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useState, useRef, useEffect } from "react";
+import { createContext, useContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { HodInput } from "../components/Inputs";
@@ -382,12 +382,40 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
 <SC title="Faculty Information" accent="#6366f1">
 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
 <tbody>
- {[["Name", info.name], ["Qualification", info.qual], ["Designation", info.desig], ["Academic Year", info.ay]].map(([label, val]) =>(
+ {[["Name", info.name], ["Qualification", info.qual], ["Designation", info.desig], ["Academic Year", info.ay]].map(([label, val]) => (
 <tr key={label}>
 <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%" }}>{label}</td>
-<td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{val}</td>
+<td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>
+                  {label === "Academic Year" ? (
+                    <select
+                      value={info.ay}
+                      onChange={(e) => {
+                        const newAy = e.target.value;
+                        setInfo(p => ({ ...p, ay: newAy }));
+                        sessionStorage.setItem("academicYear", newAy);
+                      }}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: "#fff",
+                        color: "#334155",
+                        fontFamily: "inherit",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        outline: "none"
+                      }}
+                    >
+                      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+                        <option key={c.academic_year} value={c.academic_year}>
+                          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+                        </option>
+                      ))}
+                    </select>
+                  ) : val}
+</td>
 </tr>
- ))}
+  ))}
 </tbody>
 </table>
 </SC>
@@ -1971,7 +1999,7 @@ export default function DeanDashboard() {
  expDyp: "",
  expPrev: "",
  expTotal: "",
- ay: "2025-2026"
+ ay: sessionStorage.getItem("academicYear") || "2025-2026"
  });
  const inf = (k) =>(v) =>setInfo((p) =>({ ...p, [k]: v }));
 
@@ -2168,7 +2196,12 @@ export default function DeanDashboard() {
  }),
  ]);
 
- setAppraisalLocked(Boolean(declarationRow) && !hasActiveRejection(declarationRow, loadedReviews));
+  // Lock form if cycle is closed/historical
+  const cycles = JSON.parse(sessionStorage.getItem("availableCycles") || "[]");
+  const thisCycle = cycles.find(c => c.academic_year === info.ay);
+  const isCycleClosed = thisCycle ? !thisCycle.is_open : false;
+  
+  setAppraisalLocked(isCycleClosed || (Boolean(declarationRow) && !hasActiveRejection(declarationRow, loadedReviews)));
  } catch (err) {
  console.error("Could not load saved dean appraisal:", err);
  }

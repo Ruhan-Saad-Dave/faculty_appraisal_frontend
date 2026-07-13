@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { saveAppraisalDraftSection, submitAppraisal, loadSavedAppraisal, loadAppraisalDocuments } from "../services/appraisalPersistence";
@@ -485,7 +485,35 @@ function FacultyReviewForm({ faculty, hodData, setHodData, sectionView = "partA"
             {[["Name", info.name], ["Qualification", info.qual], ["Designation", info.desig], ["Academic Year", info.ay]].map(([label, val]) => (
               <tr key={label}>
                 <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%" }}>{label}</td>
-                <td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{val}</td>
+                <td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>
+                  {label === "Academic Year" ? (
+                    <select
+                      value={info.ay}
+                      onChange={(e) => {
+                        const newAy = e.target.value;
+                        setInfo(p => ({ ...p, ay: newAy }));
+                        sessionStorage.setItem("academicYear", newAy);
+                      }}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: "#fff",
+                        color: "#334155",
+                        fontFamily: "inherit",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        outline: "none"
+                      }}
+                    >
+                      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+                        <option key={c.academic_year} value={c.academic_year}>
+                          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+                        </option>
+                      ))}
+                    </select>
+                  ) : val}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1267,7 +1295,7 @@ export default function HODDashboard() {
     expDyp: "",
     expPrev: "",
     expTotal: "",
-    ay: "2025-2026"
+    ay: sessionStorage.getItem("academicYear") || "2025-2026"
   });
   const inf = (k) => (v) => setInfo((p) => ({ ...p, [k]: v }));
 
@@ -1422,7 +1450,13 @@ export default function HODDashboard() {
         setWorkflowDeclaration(declaration);
         const loadedReviews = reviewListFrom(data?.reviews);
         setWorkflowReviews(loadedReviews);
-        setAppraisalLocked(Boolean(declaration) && !hasActiveRejection(declaration, loadedReviews));
+        
+        // Lock form if cycle is closed/historical
+        const cycles = JSON.parse(sessionStorage.getItem("availableCycles") || "[]");
+        const thisCycle = cycles.find(c => c.academic_year === info.ay);
+        const isCycleClosed = thisCycle ? !thisCycle.is_open : false;
+        
+        setAppraisalLocked(isCycleClosed || (Boolean(declaration) && !hasActiveRejection(declaration, loadedReviews)));
 
         await Promise.all([
           loadSavedAppraisal({
