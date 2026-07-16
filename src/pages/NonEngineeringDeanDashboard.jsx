@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useState, useRef, useEffect } from "react";
+import { createContext, useContext, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { HodInput } from "../components/Inputs";
@@ -1924,6 +1924,7 @@ export default function NonEngineeringDeanDashboard() {
  reviewerRole: "dean",
  reviewerProfile: profileFromsessionStorage(),
  schoolValues: NON_ENGINEERING_SCHOOL_CODES,
+ academicYear: info.ay,
  });
  const schoolOf = (item) =>getSchoolKey(item.school || item.school_name || item.schoolName || "");
  const roleOf = (item) =>(item.appraisalRole || item.appraisal_role || "").toLowerCase();
@@ -1941,7 +1942,7 @@ export default function NonEngineeringDeanDashboard() {
  };
 
  loadReviewQueue();
- }, []);
+ }, [info.ay]);
 
  const [filterStatus, setFilterStatus] = useState("All");
  const [selectedSchoolCode, setSelectedSchoolCode] = useState("all");
@@ -3661,14 +3662,42 @@ export default function NonEngineeringDeanDashboard() {
  {/* APPROVALS TAB */}
  {(activeMainTab === "directorApprovals" || activeMainTab === "facultyApprovals") && !reviewingApproval && (
 <>
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 12, marginBottom: 14 }}>
 <div>
 <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900, color: "#0f172a", letterSpacing: -0.5 }}>
  {activeMainTab === "directorApprovals" ? "Director's Appraisal" : "Faculty's Appraisal"}
 </h1>
 <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{NON_ENGINEERING_SCHOOLS.length} Non-Engineering Schools - AY {info.ay}</p>
 </div>
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Academic Year:</span>
+    <select
+      value={info.ay}
+      onChange={(e) => {
+        const newAy = e.target.value;
+        setInfo(p => ({ ...p, ay: newAy }));
+        sessionStorage.setItem("academicYear", newAy);
+      }}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#334155",
+        fontFamily: "inherit",
+        fontSize: 12,
+        cursor: "pointer",
+        outline: "none"
+      }}
+    >
+      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+        <option key={c.academic_year} value={c.academic_year}>
+          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+        </option>
+      ))}
+    </select>
+  </div>
 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>{pendingCount} Pending</div>
 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#d1fae5", color: "#065f46" }}>{reviewedCount} Reviewed</div>
 <AppraisalHeaderImage />

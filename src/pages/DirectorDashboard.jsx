@@ -1512,24 +1512,25 @@ export default function DirectorDashboard() {
  const [hodList, setHodList] = useState([]);
 
  useEffect(() =>{
- const loadReviewQueue = async () =>{
- try {
- const items = await fetchReviewQueueForRole({
- reviewerRole: "director",
- reviewerProfile: { ...profileFromsessionStorage(), school: dirSchool },
- schoolValues: [dirSchool],
- });
- setFacultyList(items.filter((item) =>item.appraisalRole === "faculty"));
- setHodList(items.filter((item) =>item.appraisalRole === "hod"));
- } catch (err) {
- console.error("Could not load Director review queue:", err);
- setFacultyList([]);
- setHodList([]);
- }
- };
+  const loadReviewQueue = async () =>{
+  try {
+  const items = await fetchReviewQueueForRole({
+  reviewerRole: "director",
+  reviewerProfile: { ...profileFromsessionStorage(), school: dirSchool },
+  schoolValues: [dirSchool],
+  academicYear: info.ay,
+  });
+  setFacultyList(items.filter((item) =>item.appraisalRole === "faculty"));
+  setHodList(items.filter((item) =>item.appraisalRole === "hod"));
+  } catch (err) {
+  console.error("Could not load Director review queue:", err);
+  setFacultyList([]);
+  setHodList([]);
+  }
+  };
 
- loadReviewQueue();
- }, [dirSchool]);
+  loadReviewQueue();
+  }, [dirSchool, info.ay]);
 
  const [filterStatus, setFilterStatus] = useState("All");
  const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -3203,14 +3204,42 @@ export default function DirectorDashboard() {
  {/* APPROVALS TAB */}
  {(activeMainTab === "facultyApprovals" || activeMainTab === "hodApprovals") && !reviewingFaculty && !reviewingHod && (
 <>
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 12, marginBottom: 14 }}>
 <div>
 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>
  {activeMainTab === "facultyApprovals" ? "Faculty's Appraisal" : "HOD's Appraisal"}
 </h1>
-<p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} - AY {APP_INFO.DEFAULT_AY}</p>
+<p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} - AY {info.ay}</p>
 </div>
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Academic Year:</span>
+    <select
+      value={info.ay}
+      onChange={(e) => {
+        const newAy = e.target.value;
+        setInfo(p => ({ ...p, ay: newAy }));
+        sessionStorage.setItem("academicYear", newAy);
+      }}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#334155",
+        fontFamily: "inherit",
+        fontSize: 12,
+        cursor: "pointer",
+        outline: "none"
+      }}
+    >
+      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+        <option key={c.academic_year} value={c.academic_year}>
+          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+        </option>
+      ))}
+    </select>
+  </div>
 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>
  {activeMainTab === "facultyApprovals" ? facultyPendingCount : hodPendingCount} Pending
 </div>

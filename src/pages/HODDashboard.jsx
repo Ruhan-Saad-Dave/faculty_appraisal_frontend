@@ -1423,22 +1423,23 @@ export default function HODDashboard({
  const hodDept = sessionStorage.getItem("department");
 
  useEffect(() =>{
- const loadReviewQueue = async () =>{
- try {
- const items = await fetchReviewQueueForRole({
- reviewerRole,
- reviewerProfile: { ...profileFromsessionStorage(), appraisal_role: reviewerRole, school: hodSchool, department: hodDept },
- schoolValues: [hodSchool],
- });
- setFacultyList(items);
- } catch (err) {
- console.error(`Could not load ${reviewerLabel} review queue:`, err);
- setFacultyList([]);
- }
- };
+  const loadReviewQueue = async () =>{
+  try {
+  const items = await fetchReviewQueueForRole({
+  reviewerRole,
+  reviewerProfile: { ...profileFromsessionStorage(), appraisal_role: reviewerRole, school: hodSchool, department: hodDept },
+  schoolValues: [hodSchool],
+  academicYear: info.ay,
+  });
+  setFacultyList(items);
+  } catch (err) {
+  console.error(`Could not load ${reviewerLabel} review queue:`, err);
+  setFacultyList([]);
+  }
+  };
 
- loadReviewQueue();
- }, [hodDept, hodSchool, reviewerLabel, reviewerRole]);
+  loadReviewQueue();
+  }, [hodDept, hodSchool, reviewerLabel, reviewerRole, info.ay]);
 
  const [filterStatus, setFilterStatus] = useState("All");
  const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -3403,12 +3404,40 @@ ${String(summaryOtherInfo ?? "").trim() ? `
  {/* APPROVALS TAB */}
  {activeMainTab === "approvals" && !reviewingFaculty && (
 <>
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 12, marginBottom: 14 }}>
 <div>
 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>Faculty's Appraisal</h1>
-<p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} - AY {APP_INFO.DEFAULT_AY}</p>
+<p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} - AY {info.ay}</p>
 </div>
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Academic Year:</span>
+    <select
+      value={info.ay}
+      onChange={(e) => {
+        const newAy = e.target.value;
+        setInfo(p => ({ ...p, ay: newAy }));
+        sessionStorage.setItem("academicYear", newAy);
+      }}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#334155",
+        fontFamily: "inherit",
+        fontSize: 12,
+        cursor: "pointer",
+        outline: "none"
+      }}
+    >
+      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+        <option key={c.academic_year} value={c.academic_year}>
+          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+        </option>
+      ))}
+    </select>
+  </div>
 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>{pendingCount} Pending</div>
 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#d1fae5", color: "#065f46" }}>{reviewedCount} Reviewed</div>
 <AppraisalHeaderImage />

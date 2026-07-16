@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, APP_INFO, createAcrRows } from "../constants/formConfig";
 import { FORM_SCHOOL_CODES, FORM_TYPES } from "../constants/formRouting";
@@ -1465,6 +1465,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
  reviewerRole: role,
  reviewerProfile: { ...profile, appraisal_role: role },
  schoolValues: FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS],
+ academicYear: academicYear,
  });
  setQueue(items.filter((item) =>FORM_SCHOOL_CODES[FORM_TYPES.DESIGN_ARTS].includes(getSchoolKey(item.school || item.info?.school))));
  } catch (err) {
@@ -1477,7 +1478,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
 
  useEffect(() =>{
  loadQueue();
- }, [role, profile.school, profile.department]);
+ }, [role, profile.school, profile.department, academicYear]);
 
  const isSelfSectionOpen = (_section) =>true;
 
@@ -1805,22 +1806,49 @@ export default function DesignArtsDashboard({ fixedRole }) {
 </div>
  )}
 
- {activeTab === "approvals" && !reviewing && role !== "faculty" && (
+  {activeTab === "approvals" && !reviewing && role !== "faculty" && (
 <div>
- {/* - Queue header & live stats - */}
- {!loadingQueue && queue.length >0 && (
+ {/* - Queue header - */}
 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
 <div>
-<div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Faculty Approvals Queue</div>
-<div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Review and grade submitted appraisals</div>
+<div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: 10 }}>
+  <span>Faculty Approvals Queue</span>
+  <select
+    value={academicYear}
+    onChange={(e) => {
+      const newAy = e.target.value;
+      setForm(prev => ({ ...prev, info: { ...prev.info, ay: newAy } }));
+      sessionStorage.setItem("academicYear", newAy);
+    }}
+    style={{
+      padding: "4px 8px",
+      borderRadius: 6,
+      border: "1px solid #cbd5e1",
+      background: "#fff",
+      color: "#334155",
+      fontFamily: "inherit",
+      fontSize: 12,
+      cursor: "pointer",
+      outline: "none"
+    }}
+  >
+    {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+      <option key={c.academic_year} value={c.academic_year}>
+        {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+      </option>
+    ))}
+  </select>
 </div>
+<div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Review and grade submitted appraisals for AY {academicYear}</div>
+</div>
+ {!loadingQueue && queue.length >0 && (
 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 <span style={{ background: "#f1f5f9", color: "#475569", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Total: {queue.length}</span>
 <span style={{ background: "#fef9c3", color: "#854d0e", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Pending: {queue.filter(i =>!isReviewerReviewComplete(i, role)).length}</span>
 <span style={{ background: "#dcfce7", color: "#166534", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>Reviewed: {queue.filter(i =>isReviewerReviewComplete(i, role)).length}</span>
 </div>
-</div>
  )}
+</div>
 
  {/* - Loading indicator - */}
  {loadingQueue && (

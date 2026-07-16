@@ -1616,6 +1616,7 @@ export default function VCDashboard() {
  const [facList, setFacList] = useState([]);
  const [nonTeachingList, setNonTeachingList] = useState([]);
  const [nonTeachingReviewedList, setNonTeachingReviewedList] = useState([]);
+ const [selectedAy, setSelectedAy] = useState(() => sessionStorage.getItem("academicYear") || APP_INFO.DEFAULT_AY || "2025-2026");
 
  const pollingActiveRef = useRef(true);
  const prevDataRef = useRef(null);
@@ -1632,12 +1633,13 @@ export default function VCDashboard() {
  DEAN_TRACKS.ENGINEERING,
  DEAN_TRACKS.NON_ENGINEERING,
  ],
+ academicYear: selectedAy,
  });
  let nonTeachingItems = [];
  try {
  nonTeachingItems = await fetchNonTeachingQueueForRole({
  reviewerRole: "vc",
- academicYear: APP_INFO.DEFAULT_AY,
+ academicYear: selectedAy,
  });
  } catch (nonTeachingErr) {
  console.warn("Could not load VC non-teaching review queue:", nonTeachingErr.message);
@@ -1671,7 +1673,7 @@ export default function VCDashboard() {
  setNonTeachingReviewedList([]);
  }
  }
- }, []);
+ }, [selectedAy]);
 
  useEffect(() =>{
  pollingActiveRef.current = true;
@@ -1877,16 +1879,44 @@ export default function VCDashboard() {
 
  {!reviewing && (
 <>
- {/* Hero */}
-<div className="vc-dashboard-hero fa-slide-top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+{/* Hero */}
+<div className="vc-dashboard-hero fa-slide-top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
 <div style={{ minWidth: 0 }}>
 <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#0f172a", lineHeight: 1.15, letterSpacing: -0.5 }}>School-wise Appraisal Reviews</h1>
 <p style={{ margin: "5px 0 0", color: "#64748b", fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}>
 <span style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{APP_INFO.SHORT_NAME}</span>
-<span>AY {APP_INFO.DEFAULT_AY}</span>
+<span>AY {selectedAy}</span>
 </p>
 </div>
 <div className="vc-hero-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Academic Year:</span>
+    <select
+      value={selectedAy}
+      onChange={(e) => {
+        const newAy = e.target.value;
+        setSelectedAy(newAy);
+        sessionStorage.setItem("academicYear", newAy);
+      }}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#334155",
+        fontFamily: "inherit",
+        fontSize: 12,
+        cursor: "pointer",
+        outline: "none"
+      }}
+    >
+      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+        <option key={c.academic_year} value={c.academic_year}>
+          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+        </option>
+      ))}
+    </select>
+  </div>
 <div className="vc-total-pill" style={{ fontSize: 12, color: "#374151", background: "#fff", padding: "10px 18px", borderRadius: 12, boxShadow: "0 2px 8px rgba(15,23,42,0.08)", fontWeight: 700 }}>
 <span style={{ color: "#6d28d9", fontWeight: 900, fontSize: 16 }}>{deanList.length + dirList.length + hodList.length + centerHeadList.length + facList.length + nonTeachingList.length + nonTeachingReviewedList.length}</span>{" "}total submissions
 </div>
