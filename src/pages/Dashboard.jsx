@@ -2132,10 +2132,39 @@ export default function HODDashboard() {
         {/* MY APPRAISAL TAB */}
         {activeMainTab === "myAppraisal" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ background: "#fff", borderRadius: 9, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 4, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ background: "#fff", borderRadius: 9, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>My Appraisal Form</h2>
-                <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{info.name || "Faculty"}.{info.ay}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                  <span>{info.name || "Faculty"}</span>
+                  <span>|</span>
+                  <span style={{ fontWeight: 600 }}>Academic Year:</span>
+                  <select
+                    value={info.ay}
+                    onChange={(e) => {
+                      const newAy = e.target.value;
+                      setInfo(p => ({ ...p, ay: newAy }));
+                      sessionStorage.setItem("academicYear", newAy);
+                    }}
+                    style={{
+                      padding: "3px 6px",
+                      borderRadius: 4,
+                      border: "1px solid #cbd5e1",
+                      background: "#fff",
+                      color: "#334155",
+                      fontFamily: "inherit",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      outline: "none"
+                    }}
+                  >
+                    {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+                      <option key={c.academic_year} value={c.academic_year}>
+                        {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <AppraisalHeaderImage height={64} />
             </div>
