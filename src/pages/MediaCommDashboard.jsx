@@ -307,7 +307,7 @@ const validateMediaBeforeSubmit = (form, docs = {}, sectionView = "all") =>{
 };
 
 function ScoreBar({ score, max, color }) {
- return<div style={{ height: 5, borderRadius: 6, background: "#e2e8f0", overflow: "hidden" }}><div style={{ width: `${pct(score, max)}%`, height: "100%", background: color }} /></div>;
+ return<div style={{ height: 5, borderRadius: 6, background: "#e2e8f0", overflowY: "auto" }}><div style={{ width: `${pct(score, max)}%`, height: "100%", background: color }} /></div>;
 }
 
 function Avatar({ initials, color = ACCENT, size = 40 }) {
@@ -427,7 +427,7 @@ function DocCell({ id, docs, setDocs, readOnly }) {
 <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
  {files.map((file, index) =>(
 <div key={`${file.name}-${index}`} style={{ display: "flex", alignItems: "center", gap: 5, background: "#fffbeb", border: "1px solid #fbbf24", borderRadius: 4, padding: "2px 6px" }}>
-<a href={file.url} target="_blank" rel="noreferrer" style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", color: ACCENT, textDecoration: "none", fontSize: 10 }}>{file.name}</a>
+<a href={file.url} target="_blank" rel="noreferrer" style={{ flex: 1, overflowY: "auto", textOverflow: "ellipsis", color: ACCENT, textDecoration: "none", fontSize: 10 }}>{file.name}</a>
  {!readOnly &&<button type="button" onClick={() =>removeFile(index)} style={{ border: 0, background: "transparent", color: "#dc2626", cursor: "pointer" }}>x</button>}
 </div>
  ))}
@@ -444,7 +444,7 @@ function DocCell({ id, docs, setDocs, readOnly }) {
 
 function SectionShell({ title, children, accent = ACCENT }) {
  return (
-<section style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`, borderRadius: 8, overflow: "hidden", marginBottom: 14 }}>
+<section style={{ background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`, borderRadius: 8, overflowY: "auto", marginBottom: 14 }}>
 <div style={{ padding: "10px 14px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", gap: 12 }}>
 <div style={{ fontWeight: 800, color: accent, fontSize: 13 }}>{title}</div>
 </div>
@@ -1156,7 +1156,7 @@ const copyDeanScoresToReviewData = (person = {}, currentReviewData = {}, reviewe
 
 function GuideSection({ title, accent = ACCENT, children }) {
  return (
-<div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflow: "hidden", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
+<div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflowY: "auto", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
 <div style={{ padding: "10px 15px", borderBottom: "1px solid #f1f5f9", fontWeight: 700, fontSize: 13, color: accent }}>{title}</div>
 <div style={{ padding: "13px 15px" }}>{children}</div>
 </div>
@@ -1811,7 +1811,7 @@ export default function MediaCommDashboard({ fixedRole }) {
 
  return (
 <div style={{ display: "flex", minHeight: "100vh", background: "#f8fafc", fontFamily: "inherit" }}>
-<aside style={{ width: 230, height: "100vh", minHeight: "100vh", position: "sticky", top: 0, alignSelf: "flex-start", boxSizing: "border-box", overflow: "hidden", background: "#0f172a", color: "#f8fafc", padding: "18px 12px", display: "flex", flexDirection: "column", gap: 14, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+<aside style={{ width: 230, height: "100vh", minHeight: "100vh", position: "sticky", top: 0, alignSelf: "flex-start", boxSizing: "border-box", overflowY: "auto", background: "#0f172a", color: "#f8fafc", padding: "18px 12px", display: "flex", flexDirection: "column", gap: 14, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
 <div style={{ borderBottom: "1px solid #1e293b", paddingBottom: 14 }}>
 <div style={{ fontSize: 13, fontWeight: 900 }}>{APP_INFO.PORTAL_NAME}</div>
 <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 3 }}>Media & Communication</div>
@@ -1844,10 +1844,10 @@ export default function MediaCommDashboard({ fixedRole }) {
  >
 <Avatar initials={userInitials(sessionStorage.getItem("name"))} color={ACCENT} size={34} />
 <div style={{ flex: 1, minWidth: 0 }}>
-<div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+<div style={{ color: "#e2e8f0", fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflowY: "auto", textOverflow: "ellipsis" }}>
  {(sessionStorage.getItem("name") || "User").split(" ").slice(0, 2).join(" ")}
 </div>
-<div style={{ color: "#475569", fontSize: 9, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+<div style={{ color: "#475569", fontSize: 9, whiteSpace: "nowrap", overflowY: "auto", textOverflow: "ellipsis" }}>
  {roleLabel(role)} {sessionStorage.getItem("department")?.split(" ")[0] || ""}
 </div>
 </div>
@@ -2022,12 +2022,12 @@ export default function MediaCommDashboard({ fixedRole }) {
  };
  const scoreLabel = `Submitted on ${item.submittedOn || "record"}`;
  return (
-<div key={item.id} style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", borderLeft: `4px solid ${reviewComplete ? "#22c55e" : ACCENT}`, overflow: "hidden" }}>
+<div key={item.id} style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", borderLeft: `4px solid ${reviewComplete ? "#22c55e" : ACCENT}`, overflowY: "auto" }}>
  {/* - Name / role / action row - */}
 <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
 <div style={{ width: 42, height: 42, borderRadius: "50%", background: `linear-gradient(135deg,${ACCENT},${ACCENT2})`, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13, flexShrink: 0, letterSpacing: 0.5 }}>{initials}</div>
 <div style={{ flex: 1, minWidth: 0 }}>
-<div style={{ fontWeight: 800, fontSize: 14, color: "#0f172a", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+<div style={{ fontWeight: 800, fontSize: 14, color: "#0f172a", marginBottom: 2, overflowY: "auto", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
 <div style={{ fontSize: 12, color: "#64748b" }}>{titleCase(item.appraisalRole)} - {item.school}</div>
 </div>
 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
@@ -2050,7 +2050,7 @@ export default function MediaCommDashboard({ fixedRole }) {
 <span style={{ fontWeight: 600, color: "#475569" }}>{label}</span>
 <span style={{ fontWeight: 700, color }}>{n(value).toFixed(1)}<span style={{ color: "#94a3b8", fontWeight: 500 }}>/{max}</span></span>
 </div>
-<div style={{ height: 5, background: "#e2e8f0", borderRadius: 99, overflow: "hidden" }}>
+<div style={{ height: 5, background: "#e2e8f0", borderRadius: 99, overflowY: "auto" }}>
 <div style={{ height: "100%", width: `${Math.min(100, max >0 ? (n(value) / max) * 100 : 0)}%`, background: color, borderRadius: 99, transition: "width 0.6s ease" }} />
 </div>
 </div>

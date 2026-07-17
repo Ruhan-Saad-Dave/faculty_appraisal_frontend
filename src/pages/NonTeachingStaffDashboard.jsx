@@ -621,7 +621,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", fontFamily: "inherit", color: "#0f172a" }}>
-      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", overflowY: "auto", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={sessionStorage.getItem("name") || "Staff"} color={accent} />
           <div>
@@ -1148,7 +1148,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", color: "#0f172a", fontFamily: "inherit" }}>
-      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", overflowY: "auto", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={sessionStorage.getItem("name") || title} color={accent} />
           <div>

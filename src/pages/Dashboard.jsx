@@ -100,7 +100,7 @@ function Avatar({ initials, color = "#6366f1", size = 40 }) {
 
 function ScoreBar({ score, max, color = "#6366f1" }) {
   return (
-    <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 5, overflow: "hidden" }}>
+    <div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 5, overflowY: "auto" }}>
       <div style={{ width: `${pct(score, max)}%`, height: "100%", background: color, borderRadius: 4, transition: "width .5s" }} />
     </div>
   );
@@ -335,7 +335,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
       {files.map((f, idx) => (
         <div key={idx} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f0f9ff", border: "1px solid #0ea5e9", borderRadius: 4, padding: "2px 6px" }}>
           <span style={{ color: "#0ea5e9", fontSize: 10 }}>File</span>
-          <span style={{ fontSize: 10, color: "#1e293b", flex: 1, overflow: "hidden", textOverflow: "ellipsis" }} title={f.name}>{f.name}</span>
+          <span style={{ fontSize: 10, color: "#1e293b", flex: 1, overflowY: "auto", textOverflow: "ellipsis" }} title={f.name}>{f.name}</span>
           {!readOnly && <button onClick={() => removeFile(idx)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: 10, cursor: "pointer" }}>Remove</button>}
         </div>
       ))}
@@ -422,7 +422,7 @@ function ViewDocsCell({ docKey, docs }) {
 // --- Section Card -------------------------------------------------------------
 function SC({ title, subtitle, accent = "#6366f1", children }) {
   return (
-    <div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflow: "hidden", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
+    <div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflowY: "auto", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
       <div style={{ padding: "10px 15px", borderBottom: "1px solid #f1f5f9" }}>
         <div style={{ fontWeight: 700, fontSize: 13, color: accent }}>{title}</div>
         {subtitle && <div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
@@ -2057,7 +2057,7 @@ export default function HODDashboard() {
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "inherit", background: "#f8fafc", color: "#1e293b" }}>
 
       {/* -- Sidebar -- */}
-      <aside style={{ width: 252, height: "100vh", minHeight: "100vh", boxSizing: "border-box", overflow: "hidden", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+      <aside style={{ width: 252, height: "100vh", minHeight: "100vh", boxSizing: "border-box", overflowY: "auto", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#6366f1,#0ea5e9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13 }}>FA</div>
           <div>

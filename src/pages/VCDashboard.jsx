@@ -41,7 +41,7 @@ function Avatar({ initials, color = "#0ea5e9", size = 40 }) {
 }
 function ScoreBar({ score, max, color = "#0ea5e9" }) {
  return (
-<div style={{ width: "100%", background: `${color}18`, borderRadius: 6, height: 5, overflow: "hidden", marginTop: 4 }}>
+<div style={{ width: "100%", background: `${color}18`, borderRadius: 6, height: 5, overflowY: "auto", marginTop: 4 }}>
 <div style={{ width: `${pct(score, max)}%`, height: "100%", background: `linear-gradient(90deg,${color}88,${color})`, borderRadius: 6, transition: "width .6s cubic-bezier(.4,0,.2,1)" }} />
 </div>
  );
@@ -80,7 +80,7 @@ function SummaryBox({
 <span style={{ fontSize: 9, color: "#94a3b8", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
 <span style={{ fontSize: 12, color, fontWeight: 900, whiteSpace: "nowrap" }}>{oneDecimal(value)}<span style={{ fontSize: 9, color: "#94a3b8", fontWeight: 600 }}> /{max}</span></span>
 </div>
-<div style={{ height: 5, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
+<div style={{ height: 5, background: "#f1f5f9", borderRadius: 3, overflowY: "auto" }}>
  <div style={{ height: "100%", width: `${pct(n(value), max)}%`, background: `linear-gradient(90deg,${color}99,${color})`, borderRadius: 3 }} />
 </div>
 </div>
@@ -170,7 +170,7 @@ function ViewDocsCell({ docKey, docs }) {
 }
 function SC({ title, subtitle, accent = "#7c3aed", children }) {
  return (
-<div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflow: "hidden", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
+<div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflowY: "auto", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
 <div style={{ padding: "10px 15px", borderBottom: "1px solid #f1f5f9" }}>
 <div style={{ fontWeight: 700, fontSize: 13, color: accent }}>{title}</div>
  {subtitle &&<div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
@@ -1130,7 +1130,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 <SummaryBox title={personMode === "faculty" ? "Faculty Score" : "Self Score"} totals={facultyTotals} maxScores={facultyTotals.maxScores} accent="#0ea5e9" roleScoreLabel={`${personMode === "faculty" ? "Faculty submitted" : "Self"} score for the engineering appraisal form.`} />
 
  {/* ③ Any Other Information */}
-<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 6px rgba(15,23,42,0.05)" }}>
+<div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflowY: "auto", boxShadow: "0 1px 6px rgba(15,23,42,0.05)" }}>
 <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", gap: 8 }}>
 <div style={{ width: 3, height: 16, background: "#94a3b8", borderRadius: 2 }} />
 <span style={{ fontWeight: 800, fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: 0.7 }}>Any Other Information Not Covered Above</span>
@@ -1172,7 +1172,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </div>
 
  {/* ⑥ VC Remarks & Actions */}
-<div style={{ background: "#fff", border: "1px solid #a5b4fc", borderRadius: 16, overflow: "hidden", boxShadow: "0 8px 24px rgba(79,70,229,0.10)" }}>
+<div style={{ background: "#fff", border: "1px solid #a5b4fc", borderRadius: 16, overflowY: "auto", boxShadow: "0 8px 24px rgba(79,70,229,0.10)" }}>
 
  {/* Header strip */}
 <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #c7d2fe", background: "#f5f7ff" }}>
@@ -1283,7 +1283,7 @@ function PersonCard({ person, role, onReview, schoolColor, loading = false }) {
  const rolePalette = ROLE_PALETTE[role] || { color: schoolColor || "#7c3aed", light: "#f3e8ff", label: role };
  const cardColor = rolePalette.color;
  return (
-<div className="vc-review-card fa-fade-up" style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 8px rgba(15,23,42,0.07)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+<div className="vc-review-card fa-fade-up" style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 8px rgba(15,23,42,0.07)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
  {/* Role-colored top stripe */}
 <div style={{ height: 4, background: `linear-gradient(90deg,${cardColor},${cardColor}66)`, flexShrink: 0 }} />
 
@@ -1413,7 +1413,7 @@ function NonTeachingCard({ item, onReview }) {
  const reviewed = isNonTeachingReviewComplete(item);
  const cardColor = "#1d4ed8";
  return (
-<div className="vc-review-card fa-fade-up" style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 8px rgba(15,23,42,0.07)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+<div className="vc-review-card fa-fade-up" style={{ background: "#fff", borderRadius: 14, boxShadow: "0 2px 8px rgba(15,23,42,0.07)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
 <div style={{ height: 4, background: `linear-gradient(90deg,${cardColor},#0ea5e9)`, flexShrink: 0 }} />
 
 <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1783,7 +1783,7 @@ export default function VCDashboard() {
 <div className="vc-app-shell" style={{ display: "flex", minHeight: "100vh", fontFamily: "inherit", background: "#f0f4ff", color: "#1e293b" }}>
 
  {/* -- Sidebar -- */}
-<aside className="vc-sidebar" style={{ width: 264, height: "100vh", minHeight: "100vh", boxSizing: "border-box", overflow: "hidden", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 12, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+<aside className="vc-sidebar" style={{ width: 264, height: "100vh", minHeight: "100vh", boxSizing: "border-box", overflowY: "auto", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 12, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
 <div className="vc-sidebar-brand" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
 <div className="vc-brand-mark" style={{ width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg,#0ea5e9,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 900, fontSize: 13 }}>FA</div>
 <div>
