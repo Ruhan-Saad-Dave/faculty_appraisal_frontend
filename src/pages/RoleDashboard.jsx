@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { normalizeRole } from "../auth/session";
 import { departmentHasHod, getDeanTrack } from "../utils/hierarchy";
 import { DEAN_TRACKS, getSchoolKey, isCisrSchool, normalizeHierarchyText } from "../constants/universityHierarchy";
 import { FORM_TYPES, formTypeForSchool } from "../constants/formRouting";
+import { api } from "../services/api";
 
 // Each dashboard is its own async chunk - only the one matching the user's role
 // is ever downloaded, cutting the initial JS payload by ~90% vs eager imports.
@@ -101,6 +102,42 @@ export default function RoleDashboard() {
   const formType   = formTypeForSchool(getSchoolKey(school));
 
   sessionStorage.setItem("role", role);
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const fetchCycles = async () => {
+      try {
+        const storedCycles = sessionStorage.getItem("availableCycles");
+        const storedAy = sessionStorage.getItem("academicYear");
+        
+        // Fetch if availableCycles is missing, empty array, or academicYear is missing
+        if (!storedCycles || JSON.parse(storedCycles).length === 0 || !storedAy) {
+          const cyclesData = await api.get("/appraisal/cycles");
+          if (Array.isArray(cyclesData) && active) {
+            sessionStorage.setItem("availableCycles", JSON.stringify(cyclesData));
+            if (!storedAy) {
+              const openCycle = cyclesData.find(c => c.is_open);
+              const ay = openCycle ? openCycle.academic_year : (cyclesData[0]?.academic_year || "2025-2026");
+              sessionStorage.setItem("academicYear", ay);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch cycles in RoleDashboard:", err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchCycles();
+    return () => { active = false; };
+  }, []);
+
+  if (loading) {
+    return <DashboardLoader />;
+  }
 
   return (
     <Suspense fallback={<DashboardLoader />}>
