@@ -109,19 +109,16 @@ export default function RoleDashboard() {
     let active = true;
     const fetchCycles = async () => {
       try {
-        const storedCycles = sessionStorage.getItem("availableCycles");
-        const storedAy = sessionStorage.getItem("academicYear");
-        
-        // Fetch if availableCycles is missing, empty array, or academicYear is missing
-        if (!storedCycles || JSON.parse(storedCycles).length === 0 || !storedAy) {
-          const cyclesData = await api.get("/appraisal/cycles");
-          if (Array.isArray(cyclesData) && active) {
-            sessionStorage.setItem("availableCycles", JSON.stringify(cyclesData));
-            if (!storedAy) {
-              const openCycle = cyclesData.find(c => c.is_open);
-              const ay = openCycle ? openCycle.academic_year : (cyclesData[0]?.academic_year || "2025-2026");
-              sessionStorage.setItem("academicYear", ay);
-            }
+        const cyclesData = await api.get("/appraisal/cycles");
+        if (Array.isArray(cyclesData) && active) {
+          sessionStorage.setItem("availableCycles", JSON.stringify(cyclesData));
+          
+          const storedAy = sessionStorage.getItem("academicYear");
+          // If stored year is not in the fresh cycles list, reset it to active or first year
+          if (!storedAy || !cyclesData.some(c => c.academic_year === storedAy)) {
+            const openCycle = cyclesData.find(c => c.is_open);
+            const ay = openCycle ? openCycle.academic_year : (cyclesData[0]?.academic_year || "2025-2026");
+            sessionStorage.setItem("academicYear", ay);
           }
         }
       } catch (err) {
