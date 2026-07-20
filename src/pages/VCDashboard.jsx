@@ -328,6 +328,7 @@ const vcAverageBeforeVc = (person = {}, personMode = "faculty", previousRoles = 
  .map((role) =>rawVcTotalForRole(person, role))
  .filter(hasScoreValue)
  .map(Number);
+ if (!scores.length && personMode === "center_head") return vcSelfTotalForPerson(person);
  if (!scores.length) return 0;
  return scores.reduce((sum, value) =>sum + value, 0) / scores.length;
 };
@@ -952,6 +953,8 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  total: averageSourceTotals.reduce((sum, item) =>sum + n(item.total), 0) / averageSourceTotals.length,
  maxScores: reviewerMaxScores,
  }
+ : personMode === "center_head"
+ ? { ...facultyTotals, maxScores: selfMaxScores }
  : { partA: 0, partB: 0, total: 0, maxScores: reviewerMaxScores };
  const averageGrade = {
  ...vcGradeFor(averageSummaryTotals.total, averageSummaryTotals.maxScores.grand),
