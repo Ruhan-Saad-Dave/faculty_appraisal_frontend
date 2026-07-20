@@ -1295,6 +1295,9 @@ function PersonCard({ person, role, onReview, schoolColor, loading = false }) {
  const personMode = role === "Director" ? "director" : role === "HOD" ? "hod" : role === "Dean" ? "dean" : role === "Center Head" ? "center_head" : "faculty";
  const previousRoles = vcPreviousRolesFor(person, personMode);
  const vcTotal = n(person.vcTotal);
+ const cardMaxScore = n(person.effectiveGrandMax) || MAX_SCORES.GRAND_TOTAL;
+ const averageScore = vcAverageBeforeVc(person, personMode, previousRoles);
+ const cardGrade = vcGradeFor(averageScore, cardMaxScore);
  const scoreTiles = [
  {
  label: personMode === "faculty" ? "Faculty Score" : "Self Score",
@@ -1305,7 +1308,7 @@ function PersonCard({ person, role, onReview, schoolColor, loading = false }) {
  const meta = vcRoleMeta(reviewRole);
  return { label: meta.shortLabel, value: vcTotalForRole(person, reviewRole), color: meta.color };
  }),
- { label: "Average Score", value: vcAverageBeforeVc(person, personMode, previousRoles), color: "#f59e0b" },
+ { label: "Average Score", value: averageScore, color: "#f59e0b" },
  { label: "VC Score", value: vcTotal, color: "#7c3aed", isVc: true },
  ];
  const remarkTiles = previousRoles
@@ -1341,7 +1344,22 @@ function PersonCard({ person, role, onReview, schoolColor, loading = false }) {
 <div style={{ fontSize: 10, color: "#64748b" }}>{person.designation}</div>
 <div style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace", marginTop: 1 }}>{person.employeeId}</div>
 </div>
+<div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
 <StatusBadge status={person.status} />
+<div title={`Grade ${cardGrade.label} from average score ${oneDecimal(averageScore)} / ${cardMaxScore}`} style={{ minWidth: 112, background: `linear-gradient(135deg,${cardGrade.color},${cardGrade.color}cc)`, color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 12, padding: "8px 10px", boxShadow: `0 8px 18px ${cardGrade.color}30`, position: "relative", overflow: "hidden" }}>
+<div style={{ position: "absolute", top: -18, right: -12, width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.16)" }} />
+<div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+<div>
+<div style={{ fontSize: 8, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.8, opacity: 0.82 }}>Auto Grade</div>
+<div style={{ fontSize: 11, fontWeight: 800, opacity: 0.88, marginTop: 3 }}>{cardGrade.percentageText}%</div>
+</div>
+<div style={{ fontSize: 25, lineHeight: 1, fontWeight: 950, letterSpacing: 0.2 }}>{cardGrade.label}</div>
+</div>
+<div style={{ position: "relative", marginTop: 7, height: 4, background: "rgba(255,255,255,0.24)", borderRadius: 999, overflow: "hidden" }}>
+<div style={{ width: `${Math.min(100, Number(cardGrade.percentageText) || 0)}%`, height: "100%", background: "rgba(255,255,255,0.88)", borderRadius: 999 }} />
+</div>
+</div>
+</div>
 </div>
 
  {/* Score grid */}
