@@ -1114,6 +1114,11 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 </button>
  ))}
 </div>
+<div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+<button type="button" onClick={() =>window.scrollTo({ top: document.documentElement.scrollHeight, left: 0, behavior: "smooth" })}
+ style={{ height: 37, padding: "0 16px", background: "linear-gradient(135deg,#0ea5e9,#2563eb)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 900, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 3px 10px rgba(37,99,235,0.24)" }}>
+ Bottom
+</button>
  {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && canCopyDeanScores && (
 <button
  type="button"
@@ -1124,6 +1129,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  Copy {copyMarksSourceLabel} Marks
 </button>
  )}
+</div>
 </div>
  {finalisedReadOnly && (
 <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
@@ -1142,6 +1148,10 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  {(sectionView === "partA" || sectionView === "partB") && !reviewLocked && (
 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, margin: "12px 0 14px", flexWrap: "wrap" }}>
 <span style={{ color: "#64748b", fontSize: 11, fontWeight: 700 }}>{draftStatus}</span>
+<button type="button" onClick={() =>window.scrollTo({ top: 0, left: 0, behavior: "smooth" })}
+ style={{ padding: "8px 14px", background: "linear-gradient(135deg,#0ea5e9,#2563eb)", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 900, fontSize: 12, fontFamily: "inherit", boxShadow: "0 3px 10px rgba(37,99,235,0.24)" }}>
+ Top
+</button>
 <button onClick={handleSaveDraft} disabled={savingDraft}
  style={{ padding: "8px 14px", background: savingDraft ? "#94a3b8" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: savingDraft ? "not-allowed" : "pointer", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}>
  {savingDraft ? "Saving..." : "Save Draft"}
@@ -1344,19 +1354,13 @@ function PersonCard({ person, role, onReview, schoolColor, loading = false }) {
 <div style={{ fontSize: 10, color: "#64748b" }}>{person.designation}</div>
 <div style={{ fontSize: 9, color: "#94a3b8", fontFamily: "monospace", marginTop: 1 }}>{person.employeeId}</div>
 </div>
-<div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+<div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 7, flexShrink: 0 }}>
 <StatusBadge status={person.status} />
-<div title={`Grade ${cardGrade.label} from average score ${oneDecimal(averageScore)} / ${cardMaxScore}`} style={{ minWidth: 112, background: `linear-gradient(135deg,${cardGrade.color},${cardGrade.color}cc)`, color: "#fff", border: "1px solid rgba(255,255,255,0.55)", borderRadius: 12, padding: "8px 10px", boxShadow: `0 8px 18px ${cardGrade.color}30`, position: "relative", overflow: "hidden" }}>
-<div style={{ position: "absolute", top: -18, right: -12, width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,0.16)" }} />
-<div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-<div>
-<div style={{ fontSize: 8, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.8, opacity: 0.82 }}>Auto Grade</div>
-<div style={{ fontSize: 11, fontWeight: 800, opacity: 0.88, marginTop: 3 }}>{cardGrade.percentageText}%</div>
-</div>
-<div style={{ fontSize: 25, lineHeight: 1, fontWeight: 950, letterSpacing: 0.2 }}>{cardGrade.label}</div>
-</div>
-<div style={{ position: "relative", marginTop: 7, height: 4, background: "rgba(255,255,255,0.24)", borderRadius: 999, overflow: "hidden" }}>
-<div style={{ width: `${Math.min(100, Number(cardGrade.percentageText) || 0)}%`, height: "100%", background: "rgba(255,255,255,0.88)", borderRadius: 999 }} />
+<div title={`Grade ${cardGrade.label}: ${cardGrade.range}`} style={{ width: 148, height: 44, boxSizing: "border-box", borderRadius: 999, background: "#fff", border: `1px solid ${cardGrade.border}`, boxShadow: `0 5px 14px ${cardGrade.color}18`, padding: "5px 8px 5px 5px", display: "flex", alignItems: "center", gap: 8 }}>
+<div style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg,${cardGrade.color},${cardGrade.color}cc)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 950, lineHeight: 1, flexShrink: 0, boxShadow: `0 4px 10px ${cardGrade.color}30` }}>{cardGrade.label}</div>
+<div style={{ minWidth: 0, flex: 1 }}>
+<div style={{ fontSize: 8, fontWeight: 950, color: cardGrade.color, textTransform: "uppercase", letterSpacing: 0.7, lineHeight: 1 }}>Grade</div>
+<div style={{ marginTop: 4, fontSize: 10, fontWeight: 850, color: "#475569", lineHeight: 1, whiteSpace: "nowrap" }}>{cardGrade.percentageText}% Average</div>
 </div>
 </div>
 </div>
