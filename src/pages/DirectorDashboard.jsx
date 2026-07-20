@@ -1511,6 +1511,20 @@ export default function DirectorDashboard() {
  const [facultyList, setFacultyList] = useState([]);
  const [hodList, setHodList] = useState([]);
 
+ // - HOD's own appraisal form state -
+ const [info, setInfo] = useState({
+ name: sessionStorage.getItem("name") || "",
+ qual: sessionStorage.getItem("qualification") || "",
+ desig: sessionStorage.getItem("role") === "director" ? "Director" : "",
+ school: sessionStorage.getItem("school") || sessionStorage.getItem("department") || "",
+ experience: sessionStorage.getItem("experience") || "",
+ expDyp: "",
+ expPrev: "",
+ expTotal: "",
+ ay: sessionStorage.getItem("academicYear") || "2025-2026"
+ });
+ const inf = (k) =>(v) =>setInfo((p) =>({ ...p, [k]: v }));
+
  useEffect(() =>{
   const loadReviewQueue = async () =>{
   try {
@@ -1535,20 +1549,6 @@ export default function DirectorDashboard() {
  const [filterStatus, setFilterStatus] = useState("All");
  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-
- // - HOD's own appraisal form state -
- const [info, setInfo] = useState({
- name: sessionStorage.getItem("name") || "",
- qual: sessionStorage.getItem("qualification") || "",
- desig: sessionStorage.getItem("role") === "director" ? "Director" : "",
- school: sessionStorage.getItem("school") || sessionStorage.getItem("department") || "",
- experience: sessionStorage.getItem("experience") || "",
- expDyp: "",
- expPrev: "",
- expTotal: "",
- ay: sessionStorage.getItem("academicYear") || "2025-2026"
- });
- const inf = (k) =>(v) =>setInfo((p) =>({ ...p, [k]: v }));
 
  const [lectures, setLectures] = useState([
  { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },

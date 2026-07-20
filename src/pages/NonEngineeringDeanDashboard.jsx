@@ -1917,6 +1917,20 @@ export default function NonEngineeringDeanDashboard() {
  const [facultyList, setFacultyList] = useState([]);
  const [directorList, setDirectorList] = useState([]);
 
+ // -- Dean's own appraisal form state --
+ const [info, setInfo] = useState({
+ name: sessionStorage.getItem("name") || "",
+ qual: sessionStorage.getItem("qualification") || "",
+ desig: sessionStorage.getItem("role") === "dean" ? "Dean" : "",
+ school: sessionStorage.getItem("school") || sessionStorage.getItem("department") || "",
+ experience: sessionStorage.getItem("experience") || "",
+ expDyp: "",
+ expPrev: "",
+ expTotal: "",
+ ay: sessionStorage.getItem("academicYear") || "2025-2026"
+ });
+ const inf = (k) =>(v) =>setInfo((p) =>({ ...p, [k]: v }));
+
  useEffect(() =>{
  const loadReviewQueue = async () =>{
  try {
@@ -1948,20 +1962,6 @@ export default function NonEngineeringDeanDashboard() {
  const [selectedSchoolCode, setSelectedSchoolCode] = useState("all");
  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-
- // -- Dean's own appraisal form state --
- const [info, setInfo] = useState({
- name: sessionStorage.getItem("name") || "",
- qual: sessionStorage.getItem("qualification") || "",
- desig: sessionStorage.getItem("role") === "dean" ? "Dean" : "",
- school: sessionStorage.getItem("school") || sessionStorage.getItem("department") || "",
- experience: sessionStorage.getItem("experience") || "",
- expDyp: "",
- expPrev: "",
- expTotal: "",
- ay: sessionStorage.getItem("academicYear") || "2025-2026"
- });
- const inf = (k) =>(v) =>setInfo((p) =>({ ...p, [k]: v }));
 
  const [lectures, setLectures] = useState([
  { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
