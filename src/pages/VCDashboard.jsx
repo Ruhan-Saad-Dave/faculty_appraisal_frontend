@@ -30,6 +30,26 @@ const grade = (score, max) =>{
  if (p >= 40) return { label: "Satisfactory", color: "#d97706", bg: "#fef3c7" };
  return { label: "Needs Improvement", color: "#dc2626", bg: "#fee2e2" };
 };
+const VC_GRADE_BANDS = [
+ { label: "A+", range: "70.00% and above", min: 70, color: "#047857", bg: "#ecfdf5", border: "#a7f3d0" },
+ { label: "A", range: "65.00% - 69.99%", min: 65, color: "#0f766e", bg: "#f0fdfa", border: "#99f6e4" },
+ { label: "B++", range: "60.00% - 64.99%", min: 60, color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" },
+ { label: "B+", range: "55.00% - 59.99%", min: 55, color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" },
+ { label: "B", range: "50.00% - 54.99%", min: 50, color: "#d97706", bg: "#fffbeb", border: "#fde68a" },
+ { label: "C", range: "Below 50.00%", min: 0, color: "#dc2626", bg: "#fef2f2", border: "#fecaca" },
+];
+const vcGradeFor = (score, max) =>{
+ const maximum = n(max);
+ const percentage = maximum >0 ? (n(score) / maximum) * 100 : 0;
+ const band = VC_GRADE_BANDS.find((item) =>percentage >= item.min) || VC_GRADE_BANDS[VC_GRADE_BANDS.length - 1];
+ return { ...band, percentage, percentageText: percentage.toFixed(2) };
+};
+const remarksWithoutAutoGrade = (value) =>
+ String(value ?? "").replace(/\n*\s*Assigned Grade:\s*[^\n]*(?:\nBased on Individual Average Score:\s*[^\n]*)?/i, "").trim();
+const vcFinalRemarksWithGrade = (value, gradeMarker) =>{
+ const base = remarksWithoutAutoGrade(value) || DEFAULT_VC_REMARKS;
+ return `${base}\n\nAssigned Grade: ${gradeMarker.label} (${gradeMarker.percentageText}%)\nBased on Individual Average Score: ${gradeMarker.scoreText}`;
+};
 
 // --- Sub-components -----------------------------------------------------------
 function Avatar({ initials, color = "#0ea5e9", size = 40 }) {
@@ -860,9 +880,12 @@ function calcVCScore(person, vcData) {
 }
 
 // --- VC Review Panel ----------------------------------------------------------
+const DEFAULT_VC_REMARKS = "You are suggested to work on the recommendations and suggestions provided by the Dean and the Director of the School";
+const vcRemarksWithDefault = (value) =>String(value ?? "").trim() || DEFAULT_VC_REMARKS;
+
 function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false }) {
  const [vcData, setVcData] = useState({});
- const [remarks, setRemarks] = useState(person.vcRemarks || "");
+ const [remarks, setRemarks] = useState(() =>vcRemarksWithDefault(person.vcRemarks));
  const [sectionView, setSectionView] = useState("partA");
  const [reviewConfirmed, setReviewConfirmed] = useState(false);
  const [draftStatus, setDraftStatus] = useState("");
@@ -930,6 +953,11 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  maxScores: reviewerMaxScores,
  }
  : { partA: 0, partB: 0, total: 0, maxScores: reviewerMaxScores };
+ const averageGrade = {
+ ...vcGradeFor(averageSummaryTotals.total, averageSummaryTotals.maxScores.grand),
+ scoreText: `${oneDecimal(averageSummaryTotals.total)} / ${averageSummaryTotals.maxScores.grand}`,
+ };
+ const finalRemarks = vcFinalRemarksWithGrade(remarks, averageGrade);
  const vcReviewCompleted = !isPendingReviewStatusFor([person.status, person.workflowStatus, person.workflow_status], "vc") && (person.status === "Reviewed" || person.status === "VC Reviewed" || n(person.vcTotal) >0);
  const firstReviewRoleLabel = previousRoles.includes("center_head") ? "Center Head Remarks" : "HOD Remarks";
  const personInfo = mergeFacultyInfo(person.info, person);
@@ -943,7 +971,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  .then((draft) =>{
  if (!active || !draft?.payload) return;
  setVcData(draft.payload.section_scores || {});
- setRemarks(draft.payload.remarks ?? "");
+ setRemarks(vcRemarksWithDefault(draft.payload.remarks));
  setDraftStatus(draft.updated_at ? `Last saved: ${new Date(draft.updated_at).toLocaleString()}` : "Draft loaded");
  })
  .catch((err) =>{
@@ -964,7 +992,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  partAScore: partA,
  partBScore: partB,
  totalScore: total,
- remarks,
+ remarks: finalRemarks,
  sectionScores: buildVcSectionScores(person, vcData),
  });
  setDraftStatus(`Draft saved: ${new Date().toLocaleString()}`);
@@ -1027,7 +1055,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  remarksSections: buildReviewRemarks({
  source: person,
  currentRole: "vc",
- currentRemarks: remarks,
+ currentRemarks: finalRemarks,
  roleLabels: { hod: firstReviewRoleLabel },
  }),
  generatedBy: sessionStorage.getItem("name") || "Vice Chancellor",
@@ -1179,8 +1207,22 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 <div>
 <div style={{ fontSize: 15, fontWeight: 900, color: "#1e293b", letterSpacing: -0.3 }}>Vice Chancellor Final Remarks</div>
 <div style={{ fontSize: 10, color: "#64748b", marginTop: 3 }}>Enter your assessment remarks and confirm before submitting</div>
+<div style={{ marginTop: 10, background: averageGrade.bg, border: `1px solid ${averageGrade.border}`, borderLeft: `4px solid ${averageGrade.color}`, borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+<div>
+<div style={{ fontSize: 9, fontWeight: 900, color: averageGrade.color, textTransform: "uppercase", letterSpacing: 0.7 }}>Grading Marker</div>
+<div style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>Automatic grade from Individual Average Score: <strong>{averageGrade.scoreText}</strong> | Range: <strong>{averageGrade.range}</strong></div>
+</div>
+<div style={{ marginLeft: "auto", display: "flex", alignItems: "baseline", gap: 8 }}>
+<span style={{ fontSize: 24, lineHeight: 1, fontWeight: 950, color: averageGrade.color }}>{averageGrade.label}</span>
+<span style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>{averageGrade.percentageText}%</span>
+</div>
+</div>
 </div>
 <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+<div style={{ background: averageGrade.bg, border: `1px solid ${averageGrade.border}`, borderRadius: 10, padding: "7px 16px", textAlign: "center" }}>
+<div style={{ fontSize: 8, fontWeight: 800, color: averageGrade.color, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 }}>Grade</div>
+<div style={{ fontSize: 18, fontWeight: 950, color: averageGrade.color, lineHeight: 1 }}>{averageGrade.label}<span style={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}> {averageGrade.percentageText}%</span></div>
+</div>
 <div style={{ background: "#fff", border: "1px solid #c7d2fe", borderRadius: 10, padding: "7px 16px", textAlign: "center" }}>
 <div style={{ fontSize: 8, fontWeight: 800, color: "#6366f1", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 }}>VC Total</div>
 <div style={{ fontSize: 18, fontWeight: 900, color: "#4338ca", lineHeight: 1 }}>{oneDecimal(reviewerSummaryTotals.total)}<span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>/{reviewerSummaryTotals.maxScores.grand}</span></div>
@@ -1213,7 +1255,7 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
 <button onClick={onBack} style={{ padding: "9px 16px", background: "#fff", color: "#475569", border: "1px solid #cbd5e1", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>Close</button>
 <button onClick={generateVcReport} disabled={!vcReviewCompleted}
- style={{ padding: "9px 16px", background: vcReviewCompleted ? "rgba(255,255,255,0.93)" : "rgba(255,255,255,0.08)", color: vcReviewCompleted ? "#4c1d95" : "#6b7280", border: "none", borderRadius: 9, cursor: vcReviewCompleted ? "pointer" : "not-allowed", fontWeight: 800, fontSize: 12, fontFamily: "inherit" }}>
+ style={{ padding: "9px 18px", background: vcReviewCompleted ? "#eef2ff" : "#f8fafc", color: vcReviewCompleted ? "#3730a3" : "#64748b", border: `1px solid ${vcReviewCompleted ? "#a5b4fc" : "#cbd5e1"}`, borderRadius: 9, cursor: vcReviewCompleted ? "pointer" : "not-allowed", fontWeight: 900, fontSize: 12, fontFamily: "inherit", boxShadow: vcReviewCompleted ? "0 2px 8px rgba(79,70,229,0.16)" : "none", opacity: vcReviewCompleted ? 1 : 0.9, minWidth: 136 }}>
  📄 Generate Report
 </button>
  {!reviewLocked && (
@@ -1223,13 +1265,13 @@ function VCReviewPanel({ person, personMode, onBack, onSubmit, readOnly = false 
  {savingDraft ? "Saving…" : "Save Draft"}
 </button>
  {canReject && (
-<button onClick={() =>{ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) { onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData), reviewConfirmed, "rejected"); } }}
+<button onClick={() =>{ if (window.confirm("Reject this appraisal and send it back to the user for editing?")) { onSubmit(person.id, { partA, partB, total }, finalRemarks, personMode, buildVcSectionScores(person, vcData), reviewConfirmed, "rejected"); } }}
  disabled={!reviewConfirmed || !remarks.trim()}
  style={{ padding: "9px 16px", background: (reviewConfirmed && remarks.trim()) ? "linear-gradient(135deg,#b91c1c,#ef4444)" : "rgba(255,255,255,0.06)", color: "#fff", border: "none", borderRadius: 9, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 12, fontFamily: "inherit", boxShadow: (reviewConfirmed && remarks.trim()) ? "0 3px 12px rgba(185,28,28,0.4)" : "none" }}>
  Reject Form
 </button>
  )}
-<button onClick={() =>onSubmit(person.id, { partA, partB, total }, remarks, personMode, buildVcSectionScores(person, vcData), reviewConfirmed)}
+<button onClick={() =>onSubmit(person.id, { partA, partB, total }, finalRemarks, personMode, buildVcSectionScores(person, vcData), reviewConfirmed)}
  disabled={!reviewConfirmed || !remarks.trim()}
  style={{ padding: "9px 22px", background: (reviewConfirmed && remarks.trim()) ? "linear-gradient(135deg,#047857,#10b981)" : "rgba(255,255,255,0.06)", color: "#fff", border: "none", borderRadius: 9, cursor: (reviewConfirmed && remarks.trim()) ? "pointer" : "not-allowed", fontWeight: 900, fontSize: 12, fontFamily: "inherit", letterSpacing: 0.2, boxShadow: (reviewConfirmed && remarks.trim()) ? "0 4px 16px rgba(4,120,87,0.5)" : "none" }}>
  {finalisedByVc ? "Edit & Resubmit" : "✓ Submit VC Review"}
