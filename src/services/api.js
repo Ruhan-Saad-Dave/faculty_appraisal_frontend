@@ -1,4 +1,5 @@
 import axios from "axios";
+
 // Default API URL fallback. For production or custom configurations, specify VITE_API_BASE_URL in your .env file.
 const DEFAULT_API_BASE_URL = "/api/v1";
 
