@@ -364,9 +364,11 @@ function SummaryPanel({ form, onSubmit, onUpdateRemarks, onUpdateSummaryOtherInf
   );
 }
 
-export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role"), embedded = false }) {
+export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role"), embedded = false, academicYear }) {
   const normalizedRole = normalizeNonTeachingRole(role, "non_teaching_staff");
   const navigate = useNavigate();
+  const [selectedAy, setSelectedAy] = useState(() => sessionStorage.getItem("academicYear") || APP_INFO.DEFAULT_AY || "2025-2026");
+  const activeAy = academicYear || selectedAy;
   const [form, setForm] = useState(() => emptyNonTeachingForm(profileFromsessionStorage(), normalizedRole));
   const [tab, setTab] = useState("info");
   const [loading, setLoading] = useState(true);
@@ -397,13 +399,13 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         }
         const saved = await loadNonTeachingAppraisal({
           email: profile.email,
-          academicYear: APP_INFO.DEFAULT_AY,
+          academicYear: activeAy,
           profile,
           role: normalizedRole,
         });
         const liveWorkflow = await loadNonTeachingWorkflow({
           email: profile.email,
-          academicYear: APP_INFO.DEFAULT_AY,
+          academicYear: activeAy,
         }).catch(() => null);
         if (!active) return;
         setForm(saved?.form || emptyNonTeachingForm(profile, normalizedRole));
@@ -416,7 +418,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
     };
     loadForm();
     return () => { active = false; };
-  }, [normalizedRole]);
+  }, [normalizedRole, activeAy]);
 
   const updateInfo = (field, value) => {
     setForm((current) => ({ ...current, info: { ...(current.info || {}), [field]: value } }));
@@ -619,7 +621,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", fontFamily: "inherit", color: "#0f172a" }}>
-      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+      <aside style={{ width: 230, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", overflowY: "auto", background: "#0f172a", padding: "18px 14px 110px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={sessionStorage.getItem("name") || "Staff"} color={accent} />
           <div>
@@ -630,6 +632,37 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         <div style={{ background: "#1e293b", borderRadius: 8, padding: "10px 12px", fontSize: 11, color: "#94a3b8", lineHeight: 1.6 }}>
           {sidebarWorkflowText}
         </div>
+        {!embedded && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "4px 0" }}>
+            <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Academic Year</div>
+            <select
+              value={activeAy}
+              onChange={(e) => {
+                const newAy = e.target.value;
+                setSelectedAy(newAy);
+                sessionStorage.setItem("academicYear", newAy);
+              }}
+              style={{
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: "1px solid #374151",
+                background: "#1e293b",
+                color: "#e2e8f0",
+                fontFamily: "inherit",
+                fontSize: 11,
+                cursor: "pointer",
+                outline: "none",
+                width: "100%"
+              }}
+            >
+              {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+                <option key={c.academic_year} value={c.academic_year}>
+                  {c.academic_year} {c.is_open ? "(Active)" : "(Closed)"}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div style={{ margin: "8px 0", padding: "10px 12px", background: "rgba(37,99,235,0.15)", border: "1px solid #2563eb", borderRadius: 8 }}>
           <div style={{ color: "#94a3b8", fontWeight: 700, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4 }}>For any queries</div>
           <a href="mailto:appraisal@dypiu.ac.in" style={{ color: "#60a5fa", fontWeight: 600, fontSize: 11, wordBreak: "break-all", textDecoration: "none" }}>appraisal@dypiu.ac.in</a>
@@ -1082,6 +1115,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [selectedAy, setSelectedAy] = useState(() => sessionStorage.getItem("academicYear") || APP_INFO.DEFAULT_AY || "2025-2026");
 
   const loadQueue = async () => {
     setLoading(true);
@@ -1089,7 +1123,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
     try {
       const queue = await fetchNonTeachingQueueForRole({
         reviewerRole,
-        academicYear: APP_INFO.DEFAULT_AY,
+        academicYear: selectedAy,
       });
       setItems(queue);
       if (selectedId && !queue.some((item) => item.id === selectedId)) {
@@ -1107,15 +1141,14 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
   useEffect(() => {
     const timer = setTimeout(loadQueue, 0);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reviewerRole]);
+  }, [reviewerRole, selectedAy]);
 
   const selected = items.find((item) => item.id === selectedId);
   const pendingCount = items.length;
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: "#f1f5f9", color: "#0f172a", fontFamily: "inherit" }}>
-      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+      <aside style={{ width: 244, height: "100vh", position: "fixed", left: 0, top: 0, zIndex: 20, boxSizing: "border-box", overflowY: "auto", background: "#0f172a", color: "#e2e8f0", display: "flex", flexDirection: "column", padding: "18px 14px 86px", gap: 12, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={sessionStorage.getItem("name") || title} color={accent} />
           <div>
@@ -1146,6 +1179,36 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
           </div>
         )}
 
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, margin: "4px 0" }}>
+          <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 700, textTransform: "uppercase" }}>Academic Year</div>
+          <select
+            value={selectedAy}
+            onChange={(e) => {
+              const newAy = e.target.value;
+              setSelectedAy(newAy);
+              sessionStorage.setItem("academicYear", newAy);
+            }}
+            style={{
+              padding: "6px 8px",
+              borderRadius: 6,
+              border: "1px solid #374151",
+              background: "#1e293b",
+              color: "#e2e8f0",
+              fontFamily: "inherit",
+              fontSize: 11,
+              cursor: "pointer",
+              outline: "none",
+              width: "100%"
+            }}
+          >
+            {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+              <option key={c.academic_year} value={c.academic_year}>
+                {c.academic_year} {c.is_open ? "(Active)" : "(Closed)"}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div style={{ flex: 1, overflowY: "auto" }}>
           {tab === "review" && (
             loading ? (
@@ -1171,7 +1234,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
 
       <main style={{ flex: 1, minWidth: 0, marginLeft: 244, padding: "22px 26px", overflowX: "auto" }}>
         {tab === "self" ? (
-          <NonTeachingAppraisalForm role={reviewerRole} embedded />
+          <NonTeachingAppraisalForm role={reviewerRole} embedded academicYear={selectedAy} />
         ) : loadError ? (
           <div style={{ color: "#991b1b", background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 10, padding: "16px 18px", fontSize: 13, marginTop: 28 }}>
             Unable to load the review queue. {loadError}

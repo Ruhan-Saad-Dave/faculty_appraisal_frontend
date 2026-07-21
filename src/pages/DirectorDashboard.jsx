@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { HodInput } from "../components/Inputs";
 import { useNavigate } from "react-router-dom";
 import { ACR_DETAIL_POINTS, SOCIETY_LABELS, MAX_SCORES, APP_INFO, createAcrRows } from "../constants/formConfig";
@@ -51,7 +51,7 @@ function Avatar({ initials, color = "#0ea5e9", size = 40 }) {
 
 function ScoreBar({ score, max, color = "#0ea5e9" }) {
  return (
-<div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 5, overflow: "hidden" }}>
+<div style={{ width: "100%", background: "#f1f5f9", borderRadius: 4, height: 5, overflowY: "auto" }}>
 <div style={{ width: `${pct(score, max)}%`, height: "100%", background: color, borderRadius: 4, transition: "width .5s" }} />
 </div>
  );
@@ -118,7 +118,7 @@ function StatusBadge({ status }) {
 
 function SC({ title, subtitle, accent = "#0ea5e9", children }) {
  return (
-<div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflow: "hidden", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
+<div className="fa-section-card" style={{ background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px rgba(15,23,42,0.07)", marginBottom: 14, overflowY: "auto", border: "1px solid #e8ecf0", borderTop: `3px solid ${accent}` }}>
 <div style={{ padding: "10px 15px", borderBottom: "1px solid #f1f5f9" }}>
 <div style={{ fontWeight: 700, fontSize: 13, color: accent }}>{title}</div>
  {subtitle &&<div style={{ color: "#64748b", fontSize: 11, marginTop: 2 }}>{subtitle}</div>}
@@ -227,7 +227,7 @@ function DocCell({ id, docs, setDocs, readOnly = false }) {
 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
  {files.map((f, idx) =>(
 <div key={idx} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f0f9ff", border: "1px solid #0ea5e9", borderRadius: 4, padding: "2px 6px" }}>
-<span style={{ fontSize: 10, color: "#1e293b", flex: 1, overflow: "hidden", textOverflow: "ellipsis" }} title={f.name}>{f.name}</span>
+<span style={{ fontSize: 10, color: "#1e293b", flex: 1, overflowY: "auto", textOverflow: "ellipsis" }} title={f.name}>{f.name}</span>
  {!readOnly &&<button onClick={() =>removeFile(idx)} style={{ background: "none", border: "none", color: "#dc2626", fontSize: 10, cursor: "pointer" }}>x</button>}
 </div>
  ))}
@@ -502,12 +502,40 @@ function FacultyReviewForm({ faculty, hodData, setHodData, dirData, setDirData, 
 <SC title="Faculty Information" accent="#6366f1">
 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
 <tbody>
- {[["Name", info.name], ["Qualification", info.qual], ["Designation", info.desig], ["Academic Year", info.ay]].map(([label, val]) =>(
+ {[["Name", info.name], ["Qualification", info.qual], ["Designation", info.desig], ["Academic Year", info.ay]].map(([label, val]) => (
 <tr key={label}>
 <td style={{ padding: "6px 10px", background: "#f8fafc", fontWeight: 600, border: "1px solid #e2e8f0", width: "35%" }}>{label}</td>
-<td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>{val}</td>
+<td style={{ padding: "5px 10px", border: "1px solid #e2e8f0", color: "#334155" }}>
+                  {label === "Academic Year" ? (
+                    <select
+                      value={info.ay}
+                      onChange={(e) => {
+                        const newAy = e.target.value;
+                        setInfo(p => ({ ...p, ay: newAy }));
+                        sessionStorage.setItem("academicYear", newAy);
+                      }}
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: "#fff",
+                        color: "#334155",
+                        fontFamily: "inherit",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        outline: "none"
+                      }}
+                    >
+                      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+                        <option key={c.academic_year} value={c.academic_year}>
+                          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+                        </option>
+                      ))}
+                    </select>
+                  ) : val}
+</td>
 </tr>
- ))}
+  ))}
 </tbody>
 </table>
 </SC>
@@ -1483,30 +1511,6 @@ export default function DirectorDashboard() {
  const [facultyList, setFacultyList] = useState([]);
  const [hodList, setHodList] = useState([]);
 
- useEffect(() =>{
- const loadReviewQueue = async () =>{
- try {
- const items = await fetchReviewQueueForRole({
- reviewerRole: "director",
- reviewerProfile: { ...profileFromsessionStorage(), school: dirSchool },
- schoolValues: [dirSchool],
- });
- setFacultyList(items.filter((item) =>item.appraisalRole === "faculty"));
- setHodList(items.filter((item) =>item.appraisalRole === "hod"));
- } catch (err) {
- console.error("Could not load Director review queue:", err);
- setFacultyList([]);
- setHodList([]);
- }
- };
-
- loadReviewQueue();
- }, [dirSchool]);
-
- const [filterStatus, setFilterStatus] = useState("All");
- const [showLogoutModal, setShowLogoutModal] = useState(false);
-
-
  // - HOD's own appraisal form state -
  const [info, setInfo] = useState({
  name: sessionStorage.getItem("name") || "",
@@ -1517,9 +1521,34 @@ export default function DirectorDashboard() {
  expDyp: "",
  expPrev: "",
  expTotal: "",
- ay: "2025-2026"
+ ay: sessionStorage.getItem("academicYear") || "2025-2026"
  });
  const inf = (k) =>(v) =>setInfo((p) =>({ ...p, [k]: v }));
+
+ useEffect(() =>{
+  const loadReviewQueue = async () =>{
+  try {
+  const items = await fetchReviewQueueForRole({
+  reviewerRole: "director",
+  reviewerProfile: { ...profileFromsessionStorage(), school: dirSchool },
+  schoolValues: [dirSchool],
+  academicYear: info.ay,
+  });
+  setFacultyList(items.filter((item) =>item.appraisalRole === "faculty"));
+  setHodList(items.filter((item) =>item.appraisalRole === "hod"));
+  } catch (err) {
+  console.error("Could not load Director review queue:", err);
+  setFacultyList([]);
+  setHodList([]);
+  }
+  };
+
+  loadReviewQueue();
+  }, [dirSchool, info.ay]);
+
+ const [filterStatus, setFilterStatus] = useState("All");
+ const [showLogoutModal, setShowLogoutModal] = useState(false);
+
 
  const [lectures, setLectures] = useState([
  { sem: "", code: "", planned: "", conducted: "", score: "", hod: "", director: "" },
@@ -1713,7 +1742,12 @@ export default function DirectorDashboard() {
  setDocs,
  }),
  ]);
- setAppraisalLocked(Boolean(declarationRow) && !hasActiveRejection(declarationRow, loadedReviews));
+ // Lock form if cycle is closed/historical
+ const cycles = JSON.parse(sessionStorage.getItem("availableCycles") || "[]");
+ const thisCycle = cycles.find(c => c.academic_year === info.ay);
+ const isCycleClosed = thisCycle ? !thisCycle.is_open : false;
+
+ setAppraisalLocked(isCycleClosed || (Boolean(declarationRow) && !hasActiveRejection(declarationRow, loadedReviews)));
  } catch (err) {
  console.error("Could not load saved director appraisal:", err);
  }
@@ -2057,7 +2091,7 @@ export default function DirectorDashboard() {
 <div style={{ display: "flex", minHeight: "100vh", fontFamily: "inherit", background: "#f8fafc", color: "#1e293b" }}>
 
  {/* - Sidebar - */}
-<aside style={{ width: 252, height: "100vh", minHeight: "100vh", boxSizing: "border-box", overflow: "hidden", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
+<aside style={{ width: 252, height: "100vh", minHeight: "100vh", boxSizing: "border-box", overflowY: "auto", background: "#0f172a", display: "flex", flexDirection: "column", padding: "22px 16px", gap: 14, position: "sticky", top: 0, alignSelf: "flex-start", flexShrink: 0, borderRight: "1px solid rgba(255,255,255,0.06)", boxShadow: "2px 0 16px rgba(15,23,42,0.14)" }}>
 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
 <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#6366f1,#0ea5e9)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 13 }}>FA</div>
 <div>
@@ -2133,10 +2167,39 @@ export default function DirectorDashboard() {
  {/* MY APPRAISAL TAB */}
  {activeMainTab === "myAppraisal" && (
 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-<div style={{ background: "#fff", borderRadius: 9, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 4, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+<div style={{ background: "#fff", borderRadius: 9, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
 <div>
 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>My Appraisal Form</h2>
-<p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748b" }}>{info.name || "HOD"} - {info.ay}</p>
+<div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 12, color: "#64748b" }}>
+  <span>{info.name || "HOD"}</span>
+  <span>|</span>
+  <span style={{ fontWeight: 600 }}>Academic Year:</span>
+  <select
+    value={info.ay}
+    onChange={(e) => {
+      const newAy = e.target.value;
+      setInfo(p => ({ ...p, ay: newAy }));
+      sessionStorage.setItem("academicYear", newAy);
+    }}
+    style={{
+      padding: "3px 6px",
+      borderRadius: 4,
+      border: "1px solid #cbd5e1",
+      background: "#fff",
+      color: "#334155",
+      fontFamily: "inherit",
+      fontSize: 12,
+      cursor: "pointer",
+      outline: "none"
+    }}
+  >
+    {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+      <option key={c.academic_year} value={c.academic_year}>
+        {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+      </option>
+    ))}
+  </select>
+</div>
 </div>
 <AppraisalHeaderImage height={64} />
 </div>
@@ -3170,14 +3233,42 @@ export default function DirectorDashboard() {
  {/* APPROVALS TAB */}
  {(activeMainTab === "facultyApprovals" || activeMainTab === "hodApprovals") && !reviewingFaculty && !reviewingHod && (
 <>
-<div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 12, marginBottom: 14 }}>
 <div>
 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0f172a", letterSpacing: -0.5 }}>
  {activeMainTab === "facultyApprovals" ? "Faculty's Appraisal" : "HOD's Appraisal"}
 </h1>
-<p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} - AY {APP_INFO.DEFAULT_AY}</p>
+<p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 11 }}>{sessionStorage.getItem("department") || ""} - AY {info.ay}</p>
 </div>
-<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Academic Year:</span>
+    <select
+      value={info.ay}
+      onChange={(e) => {
+        const newAy = e.target.value;
+        setInfo(p => ({ ...p, ay: newAy }));
+        sessionStorage.setItem("academicYear", newAy);
+      }}
+      style={{
+        padding: "5px 10px",
+        borderRadius: 8,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#334155",
+        fontFamily: "inherit",
+        fontSize: 12,
+        cursor: "pointer",
+        outline: "none"
+      }}
+    >
+      {JSON.parse(sessionStorage.getItem("availableCycles") || "[]").map(c => (
+        <option key={c.academic_year} value={c.academic_year}>
+          {c.academic_year} {c.is_open ? "(Active)" : "(Closed / Read-Only)"}
+        </option>
+      ))}
+    </select>
+  </div>
 <div style={{ fontSize: 11, fontWeight: 700, padding: "5px 12px", borderRadius: 20, background: "#fef3c7", color: "#92400e" }}>
  {activeMainTab === "facultyApprovals" ? facultyPendingCount : hodPendingCount} Pending
 </div>
