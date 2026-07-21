@@ -101,15 +101,19 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
 
     const userMessage =
-      data?.user_message ?? "Something went wrong. Please try again.";
+      data?.user_message ?? data?.detail ?? "Something went wrong. Please try again.";
 
-    error.message = userMessage;
-    error.userMessage = userMessage;
+    error.message = typeof userMessage === "string" ? userMessage : "Something went wrong. Please try again.";
+    error.userMessage = error.message;
     error.statusCode = status;
 
     if (status === 401) {
-      sessionStorage.clear();
-      window.location.href = "/login";
+      const isLoginRequest = error.config?.url?.includes("/auth/login");
+      const isLoginPage = typeof window !== "undefined" && window.location?.pathname === "/login";
+      if (!isLoginRequest && !isLoginPage) {
+        sessionStorage.clear();
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(error);

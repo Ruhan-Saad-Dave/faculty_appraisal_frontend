@@ -178,47 +178,59 @@ export default function Login() {
             {error && <div style={s.error}>{error}</div>}
             {message && <div style={s.success}>{message}</div>}
 
-            <input
-              className="dyp-input"
-              type="email"
-              placeholder="Enter email address"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              onKeyDown={handleKeyDown}
-              autoComplete="email"
-              maxLength={254}
-            />
-
-            <div style={{ position: "relative", marginBottom: 2 }}>
+            <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
               <input
                 className="dyp-input"
-                style={{ marginBottom: 0, paddingRight: 44 }}
-                type={showPw ? "text" : "password"}
-                placeholder="Enter password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
-                autoComplete="current-password"
+                type="email"
+                placeholder="Enter email address"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                autoComplete="email"
+                maxLength={254}
               />
-              <button
-                style={s.eyeBtn}
-                onClick={() => setShowPw(v => !v)}
-                tabIndex={-1}
-                aria-label={showPw ? "Hide password" : "Show password"}
-              >
-                {showPw ? "Hide" : "Show"}
+
+              <div style={{ position: "relative", marginBottom: 2 }}>
+                <input
+                  className="dyp-input"
+                  style={{ marginBottom: 0, paddingRight: 44 }}
+                  type={showPw ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  style={s.eyeBtn}
+                  onClick={() => setShowPw(v => !v)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  tabIndex={-1}
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                >
+                  {showPw ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              <div style={{ marginBottom: 16 }} />
+
+              <button type="submit" className="dyp-btn" disabled={loading}>
+                {loading ? "Signing in..." : "Login"}
               </button>
-            </div>
 
-            <div style={{ marginBottom: 16 }} />
-
-            <button className="dyp-btn" onClick={handleLogin} disabled={loading}>
-              {loading ? "Signing in..." : "Login"}
-            </button>
-
-            <button className="dyp-forgot" onClick={handleForgotPassword} disabled={resetLoading}>
-              {resetLoading ? "Sending reset link..." : "Forgot password?"}
-            </button>
+              <button type="button" className="dyp-forgot" onClick={handleForgotPassword} disabled={resetLoading}>
+                {resetLoading ? "Sending reset link..." : "Forgot password?"}
+              </button>
+            </form>
 
           </div>
 
@@ -337,10 +349,12 @@ const s = {
     background: "none",
     border: "none",
     cursor: "pointer",
-    fontSize: 16,
     padding: 4,
-    color: "rgba(255,255,255,0.6)",
-    lineHeight: 1,
+    color: "rgba(255,255,255,0.7)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
 
   error: {
