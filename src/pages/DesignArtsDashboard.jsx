@@ -1492,7 +1492,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
  const handleSaveSelfSection = async (section) =>{
  if (locked) return;
  if (!userEmail) {
- navigate("/login", { replace: true });
+ window.location.href = "/login";
  return;
  }
  const nextStatus = { ...sectionSaveStatus, [section]: true };
@@ -1537,7 +1537,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
  return;
  }
  if (!userEmail) {
- navigate("/login", { replace: true });
+ window.location.href = "/login";
  return;
  }
  const submitterProfile = { ...profile, school: currentSchoolValue, appraisal_role: role };
@@ -1966,7 +1966,7 @@ export default function DesignArtsDashboard({ fixedRole }) {
  onConfirm={() =>{
  setShowLogoutModal(false);
  sessionStorage.clear();
- navigate("/login", { replace: true });
+ window.location.href = "/login";
  }}
  />
  )}

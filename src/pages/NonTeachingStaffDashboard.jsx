@@ -672,7 +672,7 @@ export function NonTeachingAppraisalForm({ role = sessionStorage.getItem("role")
         </div>
       </aside>
       {content}
-      {showLogoutModal && <LogoutModal onCancel={() => setShowLogoutModal(false)} onConfirm={() => { sessionStorage.clear(); navigate("/login", { replace: true }); }} />}
+      {showLogoutModal && <LogoutModal onCancel={() => setShowLogoutModal(false)} onConfirm={() => { sessionStorage.clear(); window.location.href = "/login"; }} />}
     </div>
   );
 }
@@ -1258,7 +1258,7 @@ export function NonTeachingReviewDashboard({ reviewerRole, title, subtitle, acce
         )}
       </main>
 
-      {showLogoutModal && <LogoutModal onCancel={() => setShowLogoutModal(false)} onConfirm={() => { sessionStorage.clear(); navigate("/login", { replace: true }); }} />}
+      {showLogoutModal && <LogoutModal onCancel={() => setShowLogoutModal(false)} onConfirm={() => { sessionStorage.clear(); window.location.href = "/login"; }} />}
     </div>
   );
 }

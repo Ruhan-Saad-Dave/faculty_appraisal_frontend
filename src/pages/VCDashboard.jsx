@@ -2122,7 +2122,7 @@ export default function VCDashboard() {
  style={{ flex: 1, padding: "11px 0", background: "#f8fafc", color: "#475569", border: "1.5px solid #e2e8f0", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>
  Cancel
 </button>
-<button onClick={() =>{ setShowLogoutModal(false); sessionStorage.clear(); navigate("/", { replace: true }); }}
+<button onClick={() =>{ setShowLogoutModal(false); sessionStorage.clear(); window.location.href = "/login"; }}
  style={{ flex: 1, padding: "11px 0", background: "linear-gradient(135deg,#dc2626,#ef4444)", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13, fontFamily: "inherit", boxShadow: "0 4px 14px rgba(220,38,38,0.35)" }}>
  Yes, Logout
 </button>

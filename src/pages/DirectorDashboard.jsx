@@ -1935,7 +1935,7 @@ export default function DirectorDashboard() {
  if (appraisalLocked) return;
  const userEmail = sessionStorage.getItem("username");
  if (!userEmail) {
- navigate("/login", { replace: true });
+ window.location.href = "/login";
  return;
  }
  const nextStatus = { ...sectionSaveStatus, [section]: true };
@@ -1980,7 +1980,7 @@ export default function DirectorDashboard() {
  const userEmail = sessionStorage.getItem("username");
  if (!userEmail) {
  alert("Please login again before submitting. Your email was not found in this session.");
- navigate("/login", { replace: true });
+ window.location.href = "/login";
  return;
  }
 
@@ -3486,7 +3486,7 @@ export default function DirectorDashboard() {
  setShowLogoutModal(false);
  sessionStorage.removeItem("user");
  sessionStorage.clear();
- navigate("/login", { replace: true });
+ window.location.href = "/login";
  }}
  style={{
  flex: 1,
